@@ -382,7 +382,7 @@ Index("ix_diagnoses_generated_at", diagnoses.c.generated_at)
 # forecast_predictions/contention_predictions/diagnoses have, because
 # nothing here was fit to data; catalog_version instead identifies which
 # revision of the curated category->actions mapping
-# (config/recommendations.yaml) produced these actions, which is the
+# (aiperfopt/resources/recommendations.yaml) produced these actions, which is the
 # actual thing that can change over time and that FR-9.3 needs traced.
 #
 # No SQL FOREIGN KEY constraint on diagnosis_id: nothing else in this
@@ -406,7 +406,7 @@ recommendations = Table(
     Column("diagnosis_category", String(64), nullable=False),
     # [{"title": ..., "description": ..., "rationale": ...}, ...], ranked
     # highest-priority first — FR-9.1's actions curated by
-    # aiperfopt.recommendation.catalog from config/recommendations.yaml.
+    # aiperfopt.recommendation.catalog from aiperfopt/resources/recommendations.yaml.
     Column("actions", JSON, nullable=False),
     Column("catalog_version", String(64), nullable=False),
 )

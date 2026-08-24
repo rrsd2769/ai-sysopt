@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is a first-class target, not an afterthought: several
+        # defects are Windows-only and silent (psutil emulates getloadavg
+        # there rather than raising), so the suite has to actually run on it.
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Doctor (proves the install is usable, not just importable)
+        run: aiperfopt doctor
+
+      - name: Backend tests
+        run: python -m pytest --ignore=tests/frontend -q
+
+  frontend:
+    name: frontend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Frontend tests (headless)
+        # Currently expected to fail: the Qt suite segfaults (exit 139).
+        # Phase 8 fixes it; until then this job reports without blocking,
+        # so the red is visible rather than hidden behind a skip.
+        continue-on-error: true
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests/frontend -q
+
+  wheel:
+    name: wheel contains its config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+
+      - name: Assert packaged YAML is present
+        # The original wheel contained 101 files and zero .yaml, so every
+        # non-editable install died at load_settings(). Never again.
+        run: |
+          python - <<'PY'
+          import glob, sys, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          yaml = [n for n in names if n.endswith(".yaml")]
+          print(f"{wheel}: {len(names)} files, yaml={yaml}")
+          if len(yaml) < 2:
+              sys.exit("packaged YAML missing from the wheel")
+          PY

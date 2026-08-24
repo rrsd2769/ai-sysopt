@@ -4,7 +4,7 @@
 automated action itself (FR-9.2).
 
 - ``catalog``  -> RecommendationCatalog + load_recommendation_catalog() —
-                  loads and validates config/recommendations.yaml
+                  loads and validates aiperfopt/resources/recommendations.yaml
 - ``service``  -> generate_recommendations() — the Phase 7 entrypoint
 """
 

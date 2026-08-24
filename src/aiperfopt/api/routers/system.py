@@ -7,7 +7,10 @@ from fastapi import APIRouter, Depends
 from aiperfopt.api.dependencies import get_app_context, get_live_loop, get_monitoring_pipeline
 from aiperfopt.bootstrap import AppContext
 from aiperfopt.api.live_state import LiveInferenceLoop
+from aiperfopt.api.schemas import ReadinessOut
+from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.pipeline import MonitoringPipeline
+from aiperfopt.readiness import assess_readiness
 
 router = APIRouter(tags=["system"])
 
@@ -28,6 +31,25 @@ def get_config(ctx: Annotated[AppContext, Depends(get_app_context)]) -> dict:
     with V1's local-only, no-remote-admin scope, Section 13).
     """
     return ctx.settings.model_dump(mode="json")
+
+
+@router.get("/readiness", response_model=ReadinessOut)
+def readiness(ctx: Annotated[AppContext, Depends(get_app_context)]) -> ReadinessOut:
+    """Why the live pipeline can or cannot produce a prediction right now.
+
+    The frontend renders this instead of a hardcoded "Live" banner, so a
+    system that is merely still collecting data no longer looks identical
+    to one that is working.
+    """
+    result = assess_readiness(ctx.storage_engine, FeatureEngineeringConfig(), ctx.settings.retraining)
+    return ReadinessOut(
+        state=result.state.value,
+        detail=result.detail,
+        history_seconds=result.history_seconds,
+        history_seconds_required=result.history_seconds_required,
+        active_model_version=result.active_model_version,
+        can_predict=result.can_predict,
+    )
 
 
 @router.get("/monitoring/status")

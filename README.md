@@ -1,270 +1,136 @@
 # AI System Performance Optimizer
 
-Predictive, explainable macOS system health monitor. Full specification:
-`PROJECT_SPEC.md` (single source of truth — see repository root / project
-files).
+Predictive, explainable system health monitor for **Windows and macOS**.
+It watches your machine, forecasts where CPU and memory are heading,
+predicts resource contention before you feel it, explains why, and
+suggests what to do about it.
 
-## Status
+> **Repair in progress.** This project is being brought back to a working
+> state against a measured diagnosis. See
+> [`docs/plans/2026-08-24-make-it-actually-predict.md`](docs/plans/2026-08-24-make-it-actually-predict.md)
+> for what is broken, what is being fixed, and in what order. Phase 0
+> (foundations) is complete; the model quality work is not. **Do not yet
+> trust the predictions this produces** — the forecasters currently lose
+> to naive baselines and the anomaly detector saturates. That is Phases
+> 3–6.
 
-**Phase 0 — Project Foundation: complete.**
-**Phase 1 — Data Storage: complete.**
-**Phase 2 — Monitoring Engine + Data Ingestion: complete.**
-**Phase 3 — Feature Engineering: complete.**
-**Phase 4 — Forecasting Models + Evaluation Harness: complete.**
-**Phase 5 — Contention Prediction + Anomaly Detection: complete.**
-**Phase 6 — Diagnosis / Explainable AI: complete.**
-**Phase 7 — Recommendation Engine: complete.**
-**Phase 8 — Model Retraining: complete.**
-**Phase 9 — API Layer: complete.**
-**Phase 10 — Frontend: complete.**
-**Phase 11 — Reporting / Analytics: complete.**
+## Quickstart
 
-Implemented so far:
-- Layered configuration (`aiperfopt.config`) — packaged defaults → user
-  override file → `.env` → environment variables (FR-15.1).
-- Structured JSON logging (`aiperfopt.applog`) — one JSON object per line,
-  console + rotating file handler, logger name doubles as pipeline-stage
-  tag (FR-16.1).
-- Storage engine bootstrap (`aiperfopt.storage.engine`) — SQLAlchemy Core
-  engine over SQLite with WAL journaling and foreign keys enabled
-  (ADL-17).
-- Full storage schema (`aiperfopt.storage.schema`) — `raw_system_metrics`,
-  `raw_process_metrics`, `process_events`, `raw_system_metrics_rollup`,
-  `features`, `forecast_predictions`, `contention_predictions`,
-  `evaluations`, `app_logs` (FR-3.1), every timestamp column indexed
-  (FR-3.3).
-- Typed read/write API (`aiperfopt.storage.reader` /
-  `aiperfopt.storage.writer`) — the only supported way to touch storage;
-  no other subsystem should build raw SQL against `schema.py` directly.
-- Downsampling + retention (`aiperfopt.storage.rollup`) — old system
-  metrics are aggregated into hourly buckets and pruned in one
-  transaction; old process-level data is pruned outright (FR-3.2,
-  NFR-4.1, NFR-4.3). Wired to a periodic check inside `IngestionConsumer`
-  (Phase 2).
-- **Monitoring Engine** (`aiperfopt.monitoring`) — two dedicated polling
-  threads (system metrics, process metrics) producing onto a shared
-  bounded queue (FR-1.1, FR-1.2, ADL-18). Per-metric-source graceful
-  degradation (FR-1.4) and real process launch/termination detection via
-  a persistent pid→Process cache (FR-1.3), verified against real
-  subprocesses in tests. Process exclusions (Section 13, NFR-7.4) are
-  enforced at collection time — excluded processes never reach the queue.
-  Backpressure is handled by dropping samples (never blocking) if the
-  queue fills (FR-2.2).
-- **Data Ingestion** (`aiperfopt.ingestion`) — a single consumer thread
-  drains the shared queue in strict FIFO order, batches same-type records,
-  and flushes to storage on batch-size or time triggers (FR-2.1, FR-2.3).
-  Storage failures during flush are logged and the batch is dropped
-  rather than crashing the consumer or blocking Monitoring (NFR-5.4).
-  Also owns the periodic retention-policy trigger.
-- **Feature Engineering** (`aiperfopt.features`) — lag features, rolling
-  statistics, and rate-of-change over the Section 9 metric set (FR-4.1).
-  One pandas-vectorized function (`features.engine.compute_feature_matrix`)
-  is the single source of truth used by both the live-inference path and
-  batch/training path, structurally guaranteeing no train/serve skew
-  (FR-4.2) — verified directly in tests, not just by code review. Gap
-  handling (FR-4.3): lag lookups use a time tolerance and return `None`
-  rather than a stale value across a gap; OS counters (disk/net I/O) are
-  rate-transformed before any statistics are computed on them, with
-  counter resets treated as gaps.
-- `aiperfopt.pipeline.create_monitoring_pipeline()` — assembles Monitoring
-  + Ingestion around their shared queue; deliberately *not* auto-started
-  by `bootstrap()`, so importing the package never has the side effect of
-  spawning threads.
-- **Forecasting Models + Evaluation Harness** (`aiperfopt.forecasting`) —
-  LightGBM per metric/horizon (ADL-13) with model-derived confidence
-  from walk-forward validation RMSE (FR-5.2, ADL-11); three mandatory
-  baselines (naive persistence, moving average, Holt exponential
-  smoothing — Section 10.8) sharing one `Forecaster` interface with the
-  real model (FR-5.3); walk-forward validation via `TimeSeriesSplit`
-  (Section 11, FR-10.1) with MAE/RMSE/directional accuracy; Section
-  10.7's contingency plan (fall back to the best baseline if LightGBM
-  doesn't meaningfully outperform it) implemented and evaluation-result
-  driven, not hardcoded. A synthetic scenario generator (`aiperfopt.synthetic`,
-  Section 10.3 Phase 1) supplies training/eval data since no real usage
-  history exists yet; one scenario is held out entirely from training
-  folds for a genuine generalization check (Section 11). Evaluation
-  results persist to the `evaluations` table; trained LightGBM artifacts
-  persist to disk under `AppSettings.forecasting.models_dir`.
-- **Contention Prediction + Anomaly Detection** (`aiperfopt.contention`,
-  `aiperfopt.anomaly`) — Isolation Forest (Section 10.4, FR-7.1) scores
-  the same engineered feature vectors Forecasting consumes; a logistic
-  regression classifier (Section 10.4, FR-6.1) consumes *only* forecast
-  outputs + current state + the anomaly score — never raw metrics
-  directly — and its coefficients give free per-feature attribution for
-  FR-6.2's "contributing metrics," with contributing *processes* resolved
-  via a lookup against `raw_process_metrics` once the dominant metric is
-  known. Anomaly score dampens the reported contention probability
-  (FR-7.2) and significant anomalies emit a distinct notification into
-  `app_logs`, never routed through the Recommendation Engine (ADL-36).
-  Walk-forward precision/recall/F1 (Section 11's methodology, adapted for
-  classification) persist into `evaluations.extra`.
-- **Diagnosis / Explainable AI** (`aiperfopt.diagnosis`) — reconciles
-  Contention Prediction and Forecasting output into exactly one of
-  Section 12's eight taxonomy categories (FR-8.3, ADL-24): a rule-based
-  resolver (`taxonomy.py`) checks for a significant anomaly first
-  (ADL-36 — that category always wins and bypasses the Recommendation
-  Engine), then finds the dominant resource type among contributing
-  metrics, splitting CPU-dominant events into single- vs. multi-process
-  and memory-dominant events into gradual vs. sudden. Explanation
-  generation is genuinely tiered (Section 10.5, NFR-1.3) for Forecasting
-  attribution — native LightGBM feature importance by default, real
-  `shap.TreeExplainer` only on high-confidence contention predictions,
-  significant anomalies, or explicit Developer Mode request — with an
-  honest fallback note when Section 10.7's contingency plan means the
-  deployed forecaster is a baseline, not LightGBM, and therefore has no
-  per-feature attribution to give. Contention attribution is reused as-is
-  rather than re-computed through SHAP: `ContentionClassifier`'s existing
-  coefficient-based attribution is numerically verified (in tests) to be
-  the exact SHAP-linear decomposition already. Every diagnosis gets both
-  a technical (Developer Mode, FR-8.1) and plain-language (General Mode,
-  FR-8.2) explanation from the same underlying data, the latter including
-  a short sentence connecting the symptom to the OS mechanism behind it
-  (Section 6's "OS concept demonstration" requirement). Persists to the
-  `diagnoses` table.
-- **Recommendation Engine** (`aiperfopt.recommendation`) — a deliberately
-  thin, rule-based subsystem (ADL-15): a pure `category -> ranked actions`
-  lookup against `config/recommendations.yaml` (NFR-12.1's "externally
-  configurable," not a Python dict literal), gated strictly on
-  `DiagnosisRecord.is_actionable` (`False` only for the anomaly category,
-  ADL-36 — checked directly rather than re-derived from the category
-  string). No ML, no thresholds, no raw metrics consulted (FR-9.1); no
-  system-mutating action is ever taken, only data is produced and
-  persisted (FR-9.2). Every recommendation carries the originating
-  diagnosis's id and category for traceability (FR-9.3). The catalog
-  loader validates at load time that every actionable Section 12 category
-  is covered and that the anomaly category is never present, so a
-  misconfigured catalog fails loudly at startup rather than surfacing as
-  a confusing runtime `None`. Persists to the `recommendations` table.
-- Shared exception hierarchy (`aiperfopt.common.exceptions`) used by every
-  subsystem for consistent, gradeable error handling.
-- **Model Retraining** (`aiperfopt.retraining`) — reuses Phase 4/5's
-  training pipelines unchanged (FR-11.1) against accumulated real-usage
-  history (`raw_system_metrics`, Section 10.3 Phase 2) instead of a fresh
-  synthetic bootstrap: a chronological (never leaking future-into-past,
-  ADL-10) train/holdout split of that history is built and handed to the
-  existing `train_and_evaluate_all`/`train_contention_and_anomaly_pipeline`
-  entrypoints via their new `scenarios`/`holdout_samples` parameters. The
-  resulting candidate's holdout metrics are compared against whatever
-  model_version is currently active (its own previously-recorded holdout
-  evaluation, looked up from the `evaluations` table) — a regression on
-  any comparable metric beyond a configurable tolerance recommends
-  against deployment, though the recommendation is always advisory
-  (FR-10.2). Deployment is never automatic (FR-11.2, ADL-23):
-  `confirm_deployment(..., confirmed: bool)` is the only function in the
-  codebase that writes the atomically-updated active-version pointer file,
-  and every decision — deployed or rejected — persists to a new
-  `model_deployments` audit table. `rollback_to_last_known_good()`
-  implements NFR-5.3's automatic fallback by walking that table backwards
-  for the most recent successfully-deployed version.
-- `aiperfopt.bootstrap.bootstrap()` — the single entrypoint that wires
-  config → logging → storage (including schema creation) in the required
-  order; every future entrypoint (API server, PySide6 app, CLI, tests)
-  should call this rather than constructing these independently.
-- **API Layer** (`aiperfopt.api`) — a FastAPI app (`create_app()`,
-  ADL-16) that is the only access path to backend functionality
-  (FR-12.4): REST endpoints wrap every existing `storage.reader`
-  function for historical queries (FR-12.2), Phase 8's retraining
-  pipeline for a trigger/confirm/rollback endpoint trio (FR-11.x exposed
-  over HTTP, still human-confirmed per ADL-23 — the client round-trips
-  the exact comparison it was shown so nothing can be silently
-  substituted between review and confirmation), and OpenAPI docs are
-  auto-generated (FR-12.3, `/docs`). The actual substance of this phase
-  is the **live-inference loop** (`LiveInferenceLoop`) — a dedicated
-  thread (ADL-18's pattern) that, for the first time in this codebase,
-  runs feature → forecast → contention → diagnosis → recommendation
-  continuously rather than as a one-shot call, streaming each snapshot
-  over WebSocket (`/ws/live`, FR-12.1). Two small but real pieces of new
-  infrastructure make this possible:
-  `forecasting.resolve_deployed_forecasters()` reconstructs a
-  model_version's forecasters purely from persisted evaluation history
-  (no in-memory training object needed, since live inference runs in a
-  different process/moment than training), and
-  `contention.build_live_contention_input_row()` is the live-inference
-  counterpart to Phase 5's training-only `build_contention_dataset`.
-  Every stage of a live cycle degrades gracefully rather than erroring
-  (NFR-11.1/11.2) — no history yet, no model deployed yet, and a model
-  load failure triggers Phase 8's `rollback_to_last_known_good()`
-  automatically (NFR-5.3) before giving up on that cycle. Run with
-  `python3 -m aiperfopt.api.server`.
-- **Reporting (Section 7.1 item 14, small Phase 10 addition)** —
-  `GET /reporting/predicted-vs-actual` (`aiperfopt.reporting.predicted_vs_actual`,
-  exposed via `aiperfopt.api.routers.reporting`) joins forecast
-  predictions against the actual metric value nearest each
-  `target_timestamp`, powering FR-13.3's comparison view.
-- **Frontend** (`aiperfopt.frontend`, Phase 10, ADL-16, FR-13.1-13.3) — a
-  PySide6 desktop client, a pure API consumer (FR-13.2): nothing under
-  this package imports storage or model code. `ApiClient` wraps every
-  REST endpoint above; `LiveWebSocketClient` streams `/ws/live` into the
-  Qt event loop via `QWebSocket`. General Mode (`DashboardWidget`) and
-  Developer Mode (`DeveloperPanel`) render the *same* `LiveStateOut`
-  payload — the mode toggle is a pure rendering distinction, not a
-  separate data path. `PredictedVsActualChart`/`PredictedVsActualTab`
-  render Section 6's flagship comparison view against the reporting
-  endpoint above. `RetrainingPanel` exposes Phase 8/9's
-  run/confirm/reject/rollback flow, with every call routed through
-  `workers.run_in_background()` (`QThreadPool`) so the multi-minute
-  `/retraining/run` call never freezes the window. Run with
-  `python3 -m aiperfopt.frontend.main` (the backend must be reachable,
-  though not necessarily already running — the WebSocket client retries
-  indefinitely per NFR-11.2).
-- **Reporting / Analytics** (`aiperfopt.reporting`, Phase 11, Section 7.1
-  item 14, FR-14.1/FR-14.2, ADL-22) — `build_report()`
-  (`aiperfopt.reporting.summary`) produces an exportable daily/weekly (or
-  custom-window) summary combining system-metrics context with
-  prediction accuracy (FR-14.2's explicit requirement, reusing
-  `predicted_vs_actual.join_predicted_vs_actual` plus
-  `forecasting.evaluation.compute_mae_rmse`/`compute_directional_accuracy`
-  — the same metrics Section 11's walk-forward validation reports,
-  computed here over live-observed predictions), contention, diagnosis,
-  and recommendation summaries. Scoped strictly to the three flagship
-  pillars (ADL-22), not generic dashboarding — system-metrics summaries
-  are included only as interpretive context for the other three.
-  `GET /reporting/summary?period=daily|weekly` (or `?start=&end=`)
-  exposes it; `?download=true` returns the same JSON as a downloadable
-  attachment (FR-14.1's "exportable," without inventing a second export
-  format — Section 18 defers that kind of detail, and JSON-over-REST is
-  the project's existing default everywhere else). The Phase 10
-  predicted-vs-actual join moved from the API router into this package
-  (`reporting/predicted_vs_actual.py`) once this became its second
-  consumer, per that router's own docstring flagging this as the
-  intended landing spot. A `ReportingTab` in the Phase 10 frontend
-  (available in both General and Developer Mode, unlike Retraining)
-  renders the report.
+Requires **Python 3.12** (3.13+ is not yet supported by parts of the ML
+stack; 3.11 and below lack features this code uses).
 
-Every Section 7.1 subsystem is now at least minimally implemented.
-
-## Setup
-
-Requires Python ≥ 3.11.
+**macOS / Linux**
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+**Windows (PowerShell)**
+
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+```
+
+Then, on either platform:
+
+```bash
+aiperfopt doctor
+```
+
+That reports your environment, every resolved path, and whether the
+system can currently predict anything — and tells you the next command to
+run. From a standing start:
+
+```bash
+aiperfopt collect --minutes 15
+```
+
+```bash
+aiperfopt train --source synthetic --deploy
+```
+
+```bash
+aiperfopt run
+```
+
+`run` starts the backend and opens the desktop UI against it. Every
+command also works as `python -m aiperfopt <command>`.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `aiperfopt doctor` | Environment, resolved paths, readiness, and the next step |
+| `aiperfopt collect --minutes N` | Collect metrics for a fixed period, no server |
+| `aiperfopt train [--source synthetic\|real] [--deploy]` | Train a candidate model; `--deploy` activates it |
+| `aiperfopt serve` | API server with monitoring and live inference |
+| `aiperfopt ui` | Desktop UI against an already-running backend |
+| `aiperfopt run` | Backend + UI together |
+
+Add `--log-level DEBUG` to any command for verbose output, or
+`--config path/to/override.yaml` to layer in your own settings.
+
+## Where your data lives
+
+Everything the application writes — the SQLite database, trained model
+artifacts, logs, and the active-version pointer — lives under one
+application home:
+
+| Platform | Default location |
+|---|---|
+| Windows | `%LOCALAPPDATA%\aiperfopt` |
+| macOS | `~/Library/Application Support/aiperfopt` |
+| Linux | `$XDG_DATA_HOME/aiperfopt` or `~/.local/share/aiperfopt` |
+
+Override it by setting `AIPERFOPT_HOME`. This matters: these paths used
+to resolve against the current working directory, so launching from two
+different folders silently produced two separate empty databases.
+`aiperfopt doctor` always prints exactly which files are in use.
+
 ## Configuration
 
-Copy `config/.env.example` to `.env` and/or create a user override YAML
-file (any subset of `config/default.yaml`'s structure). Load order,
-highest precedence first:
+Layered, highest priority first:
 
-1. Environment variables (`AIPERFOPT_SECTION__FIELD=value`)
-2. `.env` file
-3. User override YAML (pass its path to `load_settings()`)
-4. `config/default.yaml` (packaged defaults)
+1. Environment variables — prefix `AIPERFOPT_`, nested delimiter `__`
+   (e.g. `AIPERFOPT_MONITORING__POLLING_INTERVAL_SECONDS=2.0`)
+2. A `.env` file
+3. A user override YAML — `--config`, or `AIPERFOPT_CONFIG_FILE`
+4. The packaged defaults (`src/aiperfopt/resources/default.yaml`)
 
-```python
-from aiperfopt.config import load_settings
-
-settings = load_settings("path/to/my_overrides.yaml")  # or load_settings() for defaults+env only
-```
+The defaults ship *inside* the package so they are present in a built
+wheel and a PyInstaller bundle. Relative paths in any layer resolve
+against `AIPERFOPT_HOME`, never the working directory.
 
 ## Running tests
 
 ```bash
-pytest
+pytest --ignore=tests/frontend -q
 ```
+
+The backend suite is currently **384 passing**. The Qt frontend suite
+segfaults (`exit 139`) on a current environment — a known defect
+scheduled for Phase 8 of the repair plan, tracked in CI as a
+non-blocking job rather than hidden behind a skip:
+
+```bash
+QT_QPA_PLATFORM=offscreen pytest tests/frontend -q
+```
+
+Be aware that a green backend suite does **not** currently imply the
+models work: the suite tests plumbing, not answer quality. Phase 2 of the
+repair plan labels every test accordingly.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs the backend suite on **both
+`windows-latest` and `macos-latest`**, plus a job asserting that a built
+wheel actually contains its YAML configuration. Windows is a first-class
+target: several defects are Windows-only and silent, so the suite has to
+really run there.
 
 ## Project layout
 
@@ -393,6 +259,10 @@ cross-platform support, etc.).
 
 ## Running the full Phase 0-6 pipeline end-to-end
 
+> **Superseded.** `aiperfopt train --deploy` does all of this. The code
+> below is kept as a description of what the pipeline does internally,
+> not as instructions anyone should have to follow.
+
 ```python
 from aiperfopt.bootstrap import bootstrap
 from aiperfopt.features import FeatureEngineeringConfig
@@ -472,7 +342,7 @@ on the record `diagnose_contention_event` returns) — it's a pure
 ```python
 from aiperfopt.recommendation import generate_recommendations, load_recommendation_catalog
 
-catalog = load_recommendation_catalog()  # config/recommendations.yaml
+catalog = load_recommendation_catalog()  # aiperfopt/resources/recommendations.yaml
 if diagnosis is not None:
     recommendation = generate_recommendations(ctx.storage_engine, diagnosis, catalog)
     if recommendation is not None:  # None for the anomaly category (ADL-36) — informational only

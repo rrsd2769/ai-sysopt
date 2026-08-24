@@ -3,7 +3,7 @@ Recommendation catalog loading (Section 7.1 item 9, ADL-15, FR-9.1, NFR-12.1).
 
 The catalog is the *entire* decision surface of the Recommendation
 Engine: a pure ``category -> ranked actions`` mapping loaded from
-``config/recommendations.yaml``. Deliberately not a Python dict literal
+``aiperfopt/resources/recommendations.yaml``. Deliberately not a Python dict literal
 in source — NFR-12.1 requires operational parameters be externally
 configurable without touching application source, and recommendation
 wording is exactly the kind of thing that legitimately needs editing
@@ -30,6 +30,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+
+from aiperfopt.resources import RECOMMENDATION_CATALOG_FILENAME, resource_path
 from typing import Any
 
 import yaml
@@ -37,8 +39,7 @@ import yaml
 from aiperfopt.common.exceptions import RecommendationError
 from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
 
-_PACKAGE_ROOT = Path(__file__).resolve().parents[3]
-_DEFAULT_CATALOG_PATH = _PACKAGE_ROOT / "config" / "recommendations.yaml"
+_DEFAULT_CATALOG_PATH = resource_path(RECOMMENDATION_CATALOG_FILENAME)
 
 # Every category the catalog must cover — all of Section 12 except the
 # anomaly category, which must never appear (ADL-36; see module docstring).

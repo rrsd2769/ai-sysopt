@@ -11,12 +11,20 @@ Priority order, highest to lowest:
     1. Environment variables      (prefix ``AIPERFOPT_``, nested delimiter ``__``)
     2. ``.env`` file               (if present)
     3. User override YAML file     (``AIPERFOPT_CONFIG_FILE`` or explicit path)
-    4. Packaged default YAML file  (``config/default.yaml``)
+    4. Packaged default YAML file  (``aiperfopt/resources/default.yaml``)
 
 This is implemented via pydantic-settings' ``settings_customise_sources``
 hook rather than hand-merging dicts, so each layer's precedence is
 enforced by the library itself and is easy to reason about / test in
 isolation.
+
+Path fields
+-----------
+Every ``Path`` field here is made absolute at validation time against
+:func:`aiperfopt.paths.app_home`. Relative values in any layer are
+therefore never interpreted against the current working directory --
+which is what previously caused two launches from two directories to
+reach two different, empty databases.
 """
 
 from __future__ import annotations
@@ -35,9 +43,10 @@ from pydantic_settings import (
 )
 
 from aiperfopt.common.exceptions import ConfigError
+from aiperfopt.paths import resolve_under_home
+from aiperfopt.resources import DEFAULT_CONFIG_FILENAME, resource_path
 
-_PACKAGE_ROOT = Path(__file__).resolve().parents[3]
-_DEFAULT_CONFIG_PATH = _PACKAGE_ROOT / "config" / "default.yaml"
+_DEFAULT_CONFIG_PATH = resource_path(DEFAULT_CONFIG_FILENAME)
 
 # Carries the user-override YAML path into settings_customise_sources at
 # instantiation time. A ContextVar (rather than a mutable class attribute)
@@ -48,6 +57,16 @@ _DEFAULT_CONFIG_PATH = _PACKAGE_ROOT / "config" / "default.yaml"
 _user_config_path_var: contextvars.ContextVar[Path | None] = contextvars.ContextVar(
     "aiperfopt_user_config_path", default=None
 )
+
+
+def _absolute_under_app_home(value: Path) -> Path:
+    """Field validator: interpret a configured path against the app home.
+
+    Applied to every path field so that a relative value in
+    ``default.yaml`` can never be resolved against the current working
+    directory. See :mod:`aiperfopt.paths`.
+    """
+    return resolve_under_home(value)
 
 
 class InterfaceMode(str, Enum):
@@ -97,6 +116,8 @@ class ForecastingSettings(BaseModel):
     # baseline, preventing deployment flip-flopping on noise-level
     # differences.
     baseline_improvement_margin: float = Field(ge=0, lt=1)
+
+    _abs_models_dir = field_validator("models_dir")(_absolute_under_app_home)
 
     @field_validator("short_horizon_seconds", "medium_horizon_seconds")
     @classmethod
@@ -206,6 +227,8 @@ class RetrainingSettings(BaseModel):
     # avoid future-to-past leakage (Section 11, ADL-10).
     real_usage_holdout_fraction: float = Field(gt=0.0, lt=1.0)
 
+    _abs_active_version_file = field_validator("active_version_file")(_absolute_under_app_home)
+
 
 class ApiSettings(BaseModel):
     """API Layer tunables (Section 7.1 item 12, FR-12.1-12.4).
@@ -239,6 +262,8 @@ class StorageSettings(BaseModel):
     database_path: Path
     full_resolution_retention_hours: int = Field(gt=0)
 
+    _abs_database_path = field_validator("database_path")(_absolute_under_app_home)
+
 
 class IngestionSettings(BaseModel):
     """Tunables for the Data Ingestion consumer (Phase 2).
@@ -266,6 +291,8 @@ class LoggingSettings(BaseModel):
     level: str = "INFO"
     log_dir: Path = Path("logs")
     json_format: bool = True
+
+    _abs_log_dir = field_validator("log_dir")(_absolute_under_app_home)
 
     @field_validator("level")
     @classmethod

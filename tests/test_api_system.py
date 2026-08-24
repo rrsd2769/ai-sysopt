@@ -59,3 +59,33 @@ def test_live_start_and_stop(tmp_path: Path):
         r = client.post("/live/stop")
         assert r.status_code == 200
         assert r.json() == {"running": False}
+
+
+# --- readiness (Phase 0) -------------------------------------------------
+#
+# The live loop returns early on two conditions and previously did so
+# silently while the UI showed a green "Live" banner. These assert the
+# endpoint the UI uses instead of that hardcoded banner.
+
+
+def test_readiness_reports_no_data_on_a_fresh_database(tmp_path: Path):
+    with build_test_client(tmp_path) as client:
+        r = client.get("/readiness")
+        assert r.status_code == 200
+
+        body = r.json()
+        assert body["state"] == "no_data"
+        assert body["can_predict"] is False
+        assert body["active_model_version"] is None
+        assert body["history_seconds"] == 0.0
+        assert body["history_seconds_required"] > 0
+
+
+def test_readiness_reports_needs_training_once_history_exists(tmp_path: Path):
+    with build_test_client(tmp_path, with_history=True) as client:
+        body = client.get("/readiness").json()
+
+        assert body["state"] == "needs_training"
+        assert body["can_predict"] is False
+        assert body["history_seconds"] >= body["history_seconds_required"]
+        assert "aiperfopt train" in body["detail"]

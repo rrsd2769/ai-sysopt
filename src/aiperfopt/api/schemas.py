@@ -140,7 +140,7 @@ class RecommendationActionOut(_RecordSchema):
     """One curated action from a :class:`RecommendationOut.actions` entry.
 
     Not used directly as a response model (``actions`` is a plain list of
-    dicts sourced from ``config/recommendations.yaml``, per Phase 7's
+    dicts sourced from ``aiperfopt/resources/recommendations.yaml``, per Phase 7's
     design — see that phase's YAML-is-the-source-of-truth rationale) —
     provided here only so the OpenAPI schema documents the shape a
     consumer should expect inside each dict.
@@ -315,3 +315,14 @@ class ReportSummaryOut(BaseModel):
     contention: ContentionSummaryOut
     diagnosis: DiagnosisSummaryOut
     recommendation: RecommendationSummaryOut
+
+
+class ReadinessOut(BaseModel):
+    """Why the live pipeline can or cannot predict right now (``GET /readiness``)."""
+
+    state: str
+    detail: str
+    history_seconds: float
+    history_seconds_required: float
+    active_model_version: str | None = None
+    can_predict: bool
