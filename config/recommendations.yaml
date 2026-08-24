@@ -1,0 +1,204 @@
+# Recommendation catalog (Section 12, ADL-15, FR-9.1).
+#
+# Deliberately the ONLY source of recommendation content — the
+# Recommendation Engine (aiperfopt.recommendation) performs a pure
+# category -> actions lookup against this file and nothing else, per
+# FR-9.1's "never raw metrics or ad hoc conditions directly." Editing
+# this file (NFR-12.1: externally configurable) is the supported way to
+# change recommendation wording/actions; no recommendation text should
+# live in Python source.
+#
+# catalog_version is stored on every generated aiperfopt.storage.records.
+# RecommendationRecord (FR-9.3's traceability) — bump it whenever this
+# file's content changes meaningfully, the same way a model_version bump
+# marks a retrained model elsewhere in this codebase.
+#
+# Deliberately NO entry for "unusual_pattern_anomaly_flagged": that
+# category is informational-only (ADL-36) and must never reach the
+# Recommendation Engine. aiperfopt.recommendation.service enforces this
+# via DiagnosisRecord.is_actionable *before* ever consulting this file —
+# but the absence of an entry here is a second, independent line of
+# defense: even a future bug that skipped the is_actionable check would
+# hit a missing-category error rather than silently recommending
+# something for an anomaly.
+#
+# Every category lists 2-3 actions, highest-priority first. Actions are
+# deliberately generic (no process names, no numeric thresholds) — that
+# specificity already lives in the Diagnosis explanation (FR-8.1/8.2)
+# that a person reads right alongside these actions; repeating it here
+# would just be the same information twice, and would also pull raw
+# per-event data into what's supposed to be a category-level lookup.
+
+catalog_version: "v1"
+
+categories:
+  cpu_bound_single_process:
+    - title: "Quit or pause the dominant process"
+      description: >-
+        Close the application driving the CPU spike, or pause it if it's
+        running a task you still need (e.g. an export, render, or build).
+      rationale: >-
+        Removing the single largest consumer directly relieves the
+        scheduling pressure causing the slowdown (Section 6's scheduling
+        pressure concept) — this is the most direct fix available.
+    - title: "Lower the process's scheduling priority"
+      description: >-
+        If you need the process to keep running, reduce its priority (e.g.
+        macOS's `nice`/Activity Monitor priority controls) so the scheduler
+        favors everything else first.
+      rationale: >-
+        Keeps the work running while giving other processes first claim on
+        available CPU time, trading completion speed for overall
+        responsiveness.
+    - title: "Check for a runaway/stuck state"
+      description: >-
+        A single process pinning the CPU can also indicate a stuck loop or
+        hung state rather than legitimate heavy work — check if it's
+        actually making progress before assuming it needs the CPU it's using.
+      rationale: >-
+        Distinguishes "genuinely CPU-intensive task" from "bug consuming CPU
+        for no benefit" — only the former is worth tolerating.
+
+  cpu_bound_multi_process_contention:
+    - title: "Close applications you're not actively using"
+      description: >-
+        Several running programs are competing for CPU time at once; closing
+        ones you don't need right now frees their share for the rest.
+      rationale: >-
+        With no single dominant process, reducing the number of competitors
+        is more effective than targeting any one of them.
+    - title: "Stagger simultaneous heavy tasks"
+      description: >-
+        If multiple demanding tasks were started around the same time (builds,
+        exports, updates), let one finish before starting the next.
+      rationale: >-
+        Serializing competing demands avoids all of them slowing each other
+        down at once, even though total time across all tasks may be similar.
+    - title: "Check Activity Monitor's CPU tab for the full contributor list"
+      description: >-
+        Review which processes are contributing, in case one you don't
+        recognize is worth investigating or closing.
+      rationale: >-
+        Multi-process contention can include background/helper processes
+        that are easy to overlook but simple to close.
+
+  memory_pressure_gradual:
+    - title: "Close unused browser tabs and idle applications"
+      description: >-
+        Memory usage has been climbing steadily; freeing memory tied up in
+        applications and tabs you aren't actively using reverses the trend.
+      rationale: >-
+        Reclaims memory before macOS needs to start swapping to disk, which
+        is the mechanism behind the slowdown this diagnosis anticipates.
+    - title: "Restart long-running applications with known memory growth"
+      description: >-
+        Some applications gradually accumulate memory the longer they stay
+        open; restarting them releases what they've built up.
+      rationale: >-
+        A gradual trend often comes from accumulation over a long session
+        rather than one single cause, so a restart addresses the source
+        rather than just the symptom.
+    - title: "Let it be, if you're near your task's natural end"
+      description: >-
+        If the gradual trend matches a task you know is close to finishing
+        (e.g. a large import completing soon), no action may be needed.
+      rationale: >-
+        Not every forecasted pressure event needs intervention — this option
+        exists so the recommendation doesn't imply action is always required.
+
+  memory_pressure_sudden:
+    - title: "Identify what just launched or loaded a large dataset"
+      description: >-
+        Memory usage jumped sharply and recently — check what you just
+        opened, imported, or loaded, since that's the most likely cause.
+      rationale: >-
+        A sudden jump usually traces to one recent, identifiable action
+        rather than gradual accumulation, so pausing or closing that specific
+        thing is faster than closing things at random.
+    - title: "Save your work now"
+      description: >-
+        Given the sharp spike, save open documents/work before memory
+        pressure has a chance to affect application stability.
+      rationale: >-
+        A sudden spike carries more immediate risk of a stall or crash than
+        a gradual trend, so a defensive save is worth the few seconds it costs.
+    - title: "Close the newly-opened item if it isn't needed immediately"
+      description: >-
+        If the recent addition (a large file, a new browser tab, an
+        application launch) isn't urgent, closing it releases the memory
+        it just claimed.
+      rationale: >-
+        Directly reverses the action that caused the spike.
+
+  disk_io_bottleneck:
+    - title: "Let the current disk-heavy operation finish before starting another"
+      description: >-
+        Avoid starting additional large file copies, backups, or exports
+        until the current disk activity subsides.
+      rationale: >-
+        Disk I/O is inherently serialized per device; adding more concurrent
+        disk work compounds the queuing delay described in this diagnosis.
+    - title: "Check for background sync/backup/indexing activity"
+      description: >-
+        Cloud sync clients, Spotlight indexing, and Time Machine backups are
+        common, easy-to-overlook sources of sustained disk activity.
+      rationale: >-
+        These often run without an obvious foreground window, so they're
+        worth checking even when no application appears to be doing disk work.
+    - title: "Consider whether the workload needs faster storage"
+      description: >-
+        If disk bottlenecks recur regularly during a specific kind of work,
+        that workload may be a better fit for faster storage than a one-off fix.
+      rationale: >-
+        A recurring bottleneck under the same conditions points to a
+        capacity mismatch rather than a transient issue a one-time action fixes.
+
+  network_saturation:
+    - title: "Pause large downloads or uploads you don't need right now"
+      description: >-
+        Cloud sync, large file transfers, and streaming/downloads in the
+        background are common contributors — pausing the ones you don't
+        need immediately frees bandwidth for what you do.
+      rationale: >-
+        Directly reduces demand on the saturated resource, the same
+        principle as closing a dominant CPU process.
+    - title: "Check for unexpected background network activity"
+      description: >-
+        Software updates, cloud backups, and sync clients can saturate a
+        connection without an obvious open window.
+      rationale: >-
+        Network saturation is one of the easiest categories to misattribute
+        to "the network is just slow" rather than a specific controllable cause.
+    - title: "If persistent, consider your connection's actual capacity"
+      description: >-
+        If this keeps recurring under similar conditions, the workload may
+        simply exceed your connection's bandwidth.
+      rationale: >-
+        Mirrors the disk-bottleneck catalog entry's reasoning: a recurring
+        pattern under the same conditions points to a capacity limit, not a
+        one-off fixable cause.
+
+  cross_resource_contention:
+    - title: "Address the heaviest single application first"
+      description: >-
+        Even when several resources are under pressure at once, one
+        application is often behind more than one of them (e.g. a large
+        import that's both CPU- and memory-intensive) — closing or pausing
+        it can relieve multiple resources simultaneously.
+      rationale: >-
+        Cross-resource pressure compounds (Section 6): reducing one shared
+        cause is more effective than treating each resource independently.
+    - title: "Reduce concurrent workload rather than targeting one resource"
+      description: >-
+        Close or pause several of the applications contributing to the
+        combined load, rather than looking for a single resource to fix.
+      rationale: >-
+        No single resource dominates in this diagnosis by definition, so a
+        single-resource fix is unlikely to be sufficient on its own.
+    - title: "Consider whether this is simply too much at once"
+      description: >-
+        If several genuinely necessary tasks are running together, this may
+        be an expected, temporary peak rather than something to fix.
+      rationale: >-
+        Not every cross-resource event indicates a problem — sometimes it's
+        the honest cost of legitimately demanding concurrent work.

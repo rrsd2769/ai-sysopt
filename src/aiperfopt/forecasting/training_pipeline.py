@@ -1,0 +1,410 @@
+"""
+Forecasting training pipeline orchestrator.
+
+Ties together every other module in :mod:`aiperfopt.forecasting` into one
+callable: generate synthetic training scenarios, compute features
+per-scenario, run walk-forward evaluation against baselines, apply
+Section 10.7's contingency plan, persist evaluation results, save the
+winning artifact, and check generalization against a held-out scenario
+(Section 11).
+
+Why features are computed per-scenario, not on one concatenated series
+--------------------------------------------------------------------------
+Each synthetic scenario is an independent simulated run — there's no real
+continuity between the end of "idle" and the start of "disk_io_burst".
+Computing lag/rolling features on a naive concatenation of all scenarios
+would let a rolling window at the start of one scenario silently include
+samples from the tail of the previous one, corrupting every feature near
+a scenario boundary. Each scenario is feature-computed independently
+(with its own timestamp range — see ``start_timestamp`` in
+:mod:`aiperfopt.forecasting.synthetic`, offset far enough apart that no
+window could ever bridge them), and only the resulting *labeled feature
+rows* are concatenated afterward for walk-forward cross-validation.
+
+Why walk-forward CV needs *multiple* scenarios, not one
+------------------------------------------------------------
+This was found empirically while building this module, not assumed:
+running walk-forward CV on a single deterministic scenario (e.g. just
+"cpu_stress") trains early folds only on that scenario's pre-ramp segment
+and tests them on the ramp/plateau it has never seen — not a fair
+evaluation of the model's ability to generalize, and it made LightGBM
+look artificially worse than every baseline. Combining several
+differently-shaped scenarios before running `TimeSeriesSplit` gives each
+fold's training data genuine variety to learn from.
+"""
+
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass, field
+
+import pandas as pd
+from sqlalchemy import Engine
+
+from aiperfopt.applog import get_logger
+from aiperfopt.common.timeutils import epoch_seconds_to_utc_datetime
+from aiperfopt.config.settings import ForecastingSettings
+from aiperfopt.features import FeatureEngineeringConfig, compute_feature_matrix
+from aiperfopt.features.engine import counter_rate_per_second
+from aiperfopt.forecasting.baselines import (
+    ExponentialSmoothingForecaster,
+    Forecaster,
+    MovingAverageForecaster,
+    NaivePersistenceForecaster,
+)
+from aiperfopt.forecasting.dataset import build_supervised_dataset
+from aiperfopt.forecasting.evaluation import (
+    evaluate_forecaster_on_fold,
+    mean_metrics_by_model,
+    run_walk_forward_evaluation,
+    select_best_forecaster_name,
+)
+from aiperfopt.forecasting.model import MetricForecaster
+from aiperfopt.forecasting.persistence import save_forecaster
+from aiperfopt.synthetic import (
+    HELD_OUT_SCENARIO_GENERATOR,
+    HELD_OUT_SCENARIO_NAME,
+    SCENARIO_GENERATORS,
+)
+from aiperfopt.storage.records import EvaluationRecord, SystemMetricSample
+from aiperfopt.storage.writer import insert_evaluations_batch
+
+logger = get_logger(__name__)
+
+# Non-overlapping time blocks per scenario, large enough that no lag/
+# rolling window (max ~120s + tolerance) could ever bridge two scenarios.
+_SCENARIO_TIME_BLOCK_SECONDS = 1_000_000
+
+
+@dataclass
+class MetricHorizonOutcome:
+    metric_name: str
+    horizon_label: str
+    horizon_seconds: int
+    walk_forward_summary: dict[str, dict[str, float]]
+    selected_forecaster: str
+    holdout_mae: float | None
+    holdout_rmse: float | None
+    holdout_directional_accuracy: float | None
+    artifact_path: str | None = None
+    is_counter: bool = False
+
+
+@dataclass
+class TrainingRunSummary:
+    model_version: str
+    outcomes: list[MetricHorizonOutcome] = field(default_factory=list)
+
+
+def generate_training_scenarios(
+    duration_seconds: float, interval_seconds: float
+) -> dict[str, list[SystemMetricSample]]:
+    scenarios = {}
+    for index, (name, generator) in enumerate(SCENARIO_GENERATORS.items()):
+        start = index * _SCENARIO_TIME_BLOCK_SECONDS
+        scenarios[name] = generator(
+            duration_seconds=duration_seconds, interval_seconds=interval_seconds, start_timestamp=start
+        )
+    return scenarios
+
+
+def generate_holdout_scenario(
+    duration_seconds: float, interval_seconds: float, scenario_count: int
+) -> list[SystemMetricSample]:
+    start = scenario_count * _SCENARIO_TIME_BLOCK_SECONDS
+    return HELD_OUT_SCENARIO_GENERATOR(
+        duration_seconds=duration_seconds, interval_seconds=interval_seconds, start_timestamp=start
+    )
+
+
+def _combined_raw_history(scenarios: dict[str, list[SystemMetricSample]], metric_name: str) -> pd.Series:
+    all_samples = [s for samples in scenarios.values() for s in samples]
+    raw_df = pd.DataFrame.from_records(
+        [{"timestamp": s.timestamp, metric_name: getattr(s, metric_name)} for s in all_samples]
+    )
+    raw_df = raw_df.dropna(subset=[metric_name]).sort_values("timestamp")
+    raw_df["_dt"] = epoch_seconds_to_utc_datetime(raw_df["timestamp"])
+    return raw_df.set_index("_dt")[metric_name].astype(float)
+
+
+def baseline_factories_for(
+    metric_name: str, horizon_seconds: int, is_counter: bool = False
+) -> dict[str, "Forecaster"]:
+    """Public: also used by :mod:`aiperfopt.forecasting.deployment` to
+    reconstruct a deployed baseline forecaster outside a training run.
+
+    ``is_counter`` matters only for :class:`MovingAverageForecaster`: a
+    counter metric's rolling-mean feature column is named
+    ``{metric_name}_rate_roll_mean_{window}s`` (Feature Engineering
+    rate-transforms counters before computing any rolling statistic —
+    see :mod:`aiperfopt.features.engine`), not
+    ``{metric_name}_roll_mean_{window}s``. Getting this wrong means the
+    baseline silently falls through to its "column not found" fallback
+    every time, quietly returning ``current_value`` instead of an actual
+    moving average.
+    """
+    short_window = min(30, horizon_seconds)
+    moving_average_column_name = f"{metric_name}_rate" if is_counter else metric_name
+    return {
+        "naive_persistence": lambda: NaivePersistenceForecaster(),
+        "moving_average": lambda: MovingAverageForecaster(
+            metric_name=moving_average_column_name, window_seconds=short_window
+        ),
+        "exponential_smoothing": lambda: ExponentialSmoothingForecaster(horizon_seconds=horizon_seconds),
+    }
+
+
+def _persist_fold_evaluations(
+    engine: Engine,
+    fold_results,
+    metric_name: str,
+    horizon_label: str,
+    model_version: str,
+) -> None:
+    records = [
+        EvaluationRecord(
+            evaluated_at=time.time(),
+            model_name="lightgbm" if r.model_name == "lightgbm" else r.model_name,
+            model_version=model_version,
+            metric_name=metric_name,
+            horizon_label=horizon_label,
+            fold_index=r.fold_index,
+            dataset_tag="walk_forward",
+            mae=r.mae,
+            rmse=r.rmse,
+            directional_accuracy=r.directional_accuracy,
+            baseline_name=None if r.model_name == "lightgbm" else r.model_name,
+        )
+        for r in fold_results
+    ]
+    if records:
+        insert_evaluations_batch(engine, records)
+
+
+def train_evaluate_and_select_one(
+    engine: Engine,
+    scenarios: dict[str, list[SystemMetricSample]],
+    holdout_samples: list[SystemMetricSample],
+    feature_config: FeatureEngineeringConfig,
+    forecasting_settings: ForecastingSettings,
+    metric_name: str,
+    horizon_label: str,
+    horizon_seconds: int,
+    model_version: str,
+    is_counter: bool = False,
+    holdout_dataset_tag: str | None = None,
+) -> MetricHorizonOutcome:
+    """Full pipeline for one (metric, horizon) pair: walk-forward eval, selection,
+    held-out generalization check, and artifact persistence if LightGBM wins.
+
+    ``is_counter`` must be set for cumulative OS counters (disk/net I/O
+    byte counts) — see :mod:`aiperfopt.forecasting.dataset`'s module
+    docstring for why getting this wrong silently breaks both the
+    LightGBM target and the moving-average baseline for that metric.
+    """
+    tolerance = feature_config.tolerance_seconds
+
+    per_scenario_datasets = []
+    for samples in scenarios.values():
+        fm = compute_feature_matrix(samples, feature_config)
+        ds = build_supervised_dataset(
+            samples, fm, metric_name, horizon_seconds, tolerance, is_counter=is_counter
+        )
+        if not ds.empty:
+            per_scenario_datasets.append(ds)
+
+    combined = (
+        pd.concat(per_scenario_datasets, ignore_index=True).sort_values("timestamp").reset_index(drop=True)
+        if per_scenario_datasets
+        else pd.DataFrame()
+    )
+
+    raw_history = _combined_raw_history(scenarios, metric_name)
+    if is_counter:
+        # Baselines that consume raw_history (Exponential Smoothing) must
+        # also see the rate series, not the raw cumulative counter.
+        raw_history = counter_rate_per_second(raw_history, max_gap_seconds=30.0)
+
+    fold_results = run_walk_forward_evaluation(
+        combined,
+        metric_name=metric_name,
+        horizon_label=horizon_label,
+        horizon_seconds=horizon_seconds,
+        model_version=model_version,
+        n_splits=forecasting_settings.walk_forward_splits,
+        stability_threshold=forecasting_settings.directional_stability_threshold,
+        min_training_rows=forecasting_settings.min_training_rows,
+        raw_history=raw_history,
+        baseline_factories=baseline_factories_for(metric_name, horizon_seconds, is_counter=is_counter),
+    )
+    _persist_fold_evaluations(engine, fold_results, metric_name, horizon_label, model_version)
+
+    summary = mean_metrics_by_model(fold_results)
+    if not summary:
+        logger.warning(
+            "No walk-forward folds produced, skipping metric/horizon",
+            extra={"metric": metric_name, "horizon": horizon_label},
+        )
+        return MetricHorizonOutcome(
+            metric_name, horizon_label, horizon_seconds, {}, "none", None, None, None,
+            is_counter=is_counter,
+        )
+
+    selected = select_best_forecaster_name(summary, forecasting_settings.baseline_improvement_margin)
+
+    # Held-out generalization check (Section 11) — the scenario reserved
+    # here never appeared in any walk-forward training fold above.
+    holdout_fm = compute_feature_matrix(holdout_samples, feature_config)
+    holdout_dataset = build_supervised_dataset(
+        holdout_samples, holdout_fm, metric_name, horizon_seconds, tolerance, is_counter=is_counter
+    )
+
+    artifact_path = None
+    holdout_mae = holdout_rmse = holdout_directional = None
+
+    feature_cols = [c for c in combined.columns if c not in ("timestamp", "current_value", "target")]
+
+    if selected == "lightgbm":
+        final_model = MetricForecaster(
+            metric_name=metric_name, horizon_label=horizon_label, horizon_seconds=horizon_seconds,
+            model_version=model_version, min_training_rows=forecasting_settings.min_training_rows,
+        )
+        final_model.fit(combined[feature_cols], combined["target"])
+        final_model.set_confidence_from_validation(
+            rmse=summary["lightgbm"]["rmse"], target_std=float(combined["target"].std())
+        )
+        saved_dir = save_forecaster(final_model, forecasting_settings.models_dir)
+        artifact_path = str(saved_dir)
+        deployed_forecaster: Forecaster = final_model
+    else:
+        deployed_forecaster = baseline_factories_for(metric_name, horizon_seconds, is_counter=is_counter)[selected]()
+
+    if not holdout_dataset.empty:
+        holdout_history = _combined_raw_history({HELD_OUT_SCENARIO_NAME: holdout_samples}, metric_name)
+        if is_counter:
+                holdout_history = counter_rate_per_second(holdout_history, max_gap_seconds=30.0)
+        holdout_mae, holdout_rmse, holdout_directional = evaluate_forecaster_on_fold(
+            deployed_forecaster, holdout_dataset,
+            forecasting_settings.directional_stability_threshold,
+            raw_history=holdout_history,
+        )
+        insert_evaluations_batch(engine, [
+            EvaluationRecord(
+                evaluated_at=time.time(),
+                model_name=selected, model_version=model_version,
+                metric_name=metric_name, horizon_label=horizon_label, fold_index=None,
+                dataset_tag=holdout_dataset_tag or f"holdout_{HELD_OUT_SCENARIO_NAME}",
+                mae=holdout_mae, rmse=holdout_rmse, directional_accuracy=holdout_directional,
+                baseline_name=None if selected == "lightgbm" else selected,
+                extra={"selected_forecaster": selected},
+            )
+        ])
+
+    logger.info(
+        "Metric/horizon training complete",
+        extra={
+            "metric": metric_name, "horizon": horizon_label, "selected": selected,
+            "holdout_mae": holdout_mae,
+        },
+    )
+
+    return MetricHorizonOutcome(
+        metric_name=metric_name, horizon_label=horizon_label, horizon_seconds=horizon_seconds,
+        walk_forward_summary=summary, selected_forecaster=selected,
+        holdout_mae=holdout_mae, holdout_rmse=holdout_rmse,
+        holdout_directional_accuracy=holdout_directional, artifact_path=artifact_path,
+        is_counter=is_counter,
+    )
+
+
+def train_and_evaluate_all(
+    engine: Engine,
+    feature_config: FeatureEngineeringConfig,
+    forecasting_settings: ForecastingSettings,
+    model_version: str,
+    target_metrics: list[str] | None = None,
+    scenario_duration_seconds: float = 900.0,
+    interval_seconds: float = 2.0,
+    scenarios: dict[str, list[SystemMetricSample]] | None = None,
+    holdout_samples: list[SystemMetricSample] | None = None,
+    holdout_dataset_tag: str | None = None,
+) -> TrainingRunSummary:
+    """Train and evaluate every (metric, horizon) combination. The Phase 4 entrypoint.
+
+    Parameters
+    ----------
+    target_metrics:
+        Metrics to forecast. Defaults to every metric Feature Engineering
+        is configured to compute features for (``feature_config.gauge_metrics
+        + feature_config.counter_metrics``) — every metric we have
+        engineered features for is also worth forecasting.
+    scenario_duration_seconds / interval_seconds:
+        Control synthetic training data volume. Callers with tight time
+        budgets (e.g. tests) should pass shorter durations; a real
+        training run should use the defaults or larger. Must comfortably
+        exceed the medium horizon's target seconds — a scenario shorter
+        than the horizon it's meant to train against cannot produce any
+        forward-looking label at all (every row's target would fall
+        past the end of the simulated series). This degrades gracefully
+        (an empty dataset skips that metric/horizon with a logged
+        warning rather than raising) but produces no model for that
+        combination, so it's worth choosing a duration deliberately
+        rather than discovering the constraint from a warning log.
+        Ignored when ``scenarios``/``holdout_samples`` are supplied
+        explicitly (see below).
+    scenarios / holdout_samples:
+        Optional pre-built training data, bypassing synthetic scenario
+        generation entirely. This is the hook Model Retraining (Phase 8)
+        uses to train against accumulated real-usage data (Section 10.3
+        Phase 2) instead of Phase 1's synthetic bootstrap — see
+        :mod:`aiperfopt.retraining.real_usage_data`. Everything
+        downstream (per-scenario feature computation, walk-forward CV,
+        held-out generalization check, evaluation persistence, artifact
+        saving) is identical either way; only where the samples came
+        from differs. Must be supplied together, or not at all.
+    holdout_dataset_tag:
+        Overrides the ``dataset_tag`` stored on holdout evaluation rows
+        (defaults to a tag derived from the synthetic held-out
+        scenario's name, which is only meaningful for the synthetic
+        path). Real-usage retraining passes an explicit tag (e.g.
+        ``"holdout_real_usage"``) so evaluation history stays accurate
+        about what the holdout data actually was.
+    """
+    if (scenarios is None) != (holdout_samples is None):
+        raise ValueError("scenarios and holdout_samples must be supplied together, or not at all")
+
+    if scenarios is not None:
+        assert holdout_samples is not None  # for type-checkers; guaranteed by the check above
+    else:
+        if scenario_duration_seconds <= forecasting_settings.medium_horizon_target_seconds:
+            logger.warning(
+                "scenario_duration_seconds is too short to produce medium-horizon labels",
+                extra={
+                    "scenario_duration_seconds": scenario_duration_seconds,
+                    "medium_horizon_target_seconds": forecasting_settings.medium_horizon_target_seconds,
+                },
+            )
+        scenarios = generate_training_scenarios(scenario_duration_seconds, interval_seconds)
+        holdout_samples = generate_holdout_scenario(
+            scenario_duration_seconds, interval_seconds, scenario_count=len(scenarios)
+        )
+
+    metrics = target_metrics or list(feature_config.gauge_metrics) + list(feature_config.counter_metrics)
+
+    horizons = [
+        ("short", forecasting_settings.short_horizon_target_seconds),
+        ("medium", forecasting_settings.medium_horizon_target_seconds),
+    ]
+
+    summary = TrainingRunSummary(model_version=model_version)
+    for metric_name in metrics:
+        is_counter = metric_name in feature_config.counter_metrics
+        for horizon_label, horizon_seconds in horizons:
+            outcome = train_evaluate_and_select_one(
+                engine, scenarios, holdout_samples, feature_config, forecasting_settings,
+                metric_name, horizon_label, horizon_seconds, model_version, is_counter=is_counter,
+                holdout_dataset_tag=holdout_dataset_tag,
+            )
+            summary.outcomes.append(outcome)
+
+    return summary
