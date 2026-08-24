@@ -1,7 +1,7 @@
 # Make It Actually Predict — Repair Plan
 
 **Date:** 2026-08-24
-**Status:** proposed (rev 2 — Windows added as a first-class target)
+**Status:** rev 2 — Windows added as a first-class target. **Phase 0 complete** (commit `0c7ac25`); Phases 1–10 outstanding.
 **Basis:** measured runtime behaviour on a real machine. `PROJECT_SPEC.md` and `PROJECT_HANDOFF.md` were deliberately ignored.
 
 ---
@@ -77,6 +77,9 @@ No `console_scripts`, no `__main__.py`. Fresh install → server starts → live
 
 **F9 — The dashboard has no charts.**
 `DashboardWidget` is three number tiles and text labels. For a *predictive* monitor there is nowhere to see a trend or a forecast. QtCharts is installed and used in exactly one tab (`frontend/widgets/predicted_vs_actual.py:14`).
+
+**F13 — The built wheel shipped no configuration at all.** *(found during Phase 0)*
+`config/default.yaml` and `config/recommendations.yaml` lived outside the package and resolved via `Path(__file__).resolve().parents[3]`, which only ever worked for an editable install. A built wheel contained 101 files and **zero** `.yaml`, so `pip install .` — and the PyInstaller bundle the project depends on — died at `load_settings()`. Fixed in Phase 0.
 
 **F10 — Process-metric volume.**
 26,451 `raw_process_metrics` rows per ~5 minutes ≈ 7.6M/day; at 72h retention, ~23M rows in SQLite.
@@ -158,7 +161,7 @@ Dependency-driven, not importance-driven.
 
 | # | Phase | Why here |
 |---|---|---|
-| 0 | Runnable, reproducible, cross-platform foundations | Nothing is verifiable without it |
+| 0 | ~~Runnable, reproducible, cross-platform foundations~~ **done** | Nothing is verifiable without it |
 | 1 | **Platform capability model** | Settles the metric set. Doing model work first means redoing it |
 | 2 | Test-suite honesty audit | Makes the suite trustworthy *before* we rely on it to prove fixes |
 | 3 | **Unblock the anomaly detector** | Highest single leverage — revives 8 dead surfaces |
@@ -172,7 +175,7 @@ Dependency-driven, not importance-driven.
 
 ---
 
-## Phase 0 — Runnable, reproducible, cross-platform foundations
+## Phase 0 — Runnable, reproducible, cross-platform foundations ✅ COMPLETE
 
 ### Changes Required
 
