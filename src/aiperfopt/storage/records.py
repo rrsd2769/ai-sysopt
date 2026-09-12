@@ -85,6 +85,42 @@ class ProcessEvent:
 
 
 @dataclass(slots=True)
+class ProcessMetricAggregate:
+    """One "everything else" row per poll cycle -- see schema.py's
+    ``raw_process_metrics_other`` for why this is a separate table rather
+    than a sentinel row in :class:`ProcessMetricSample`."""
+
+    timestamp: float
+    other_count: int
+    other_cpu_sum: float
+    other_mem_rss_sum: int
+    id: int | None = None
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> "ProcessMetricAggregate":
+        return cls(**{k: row[k] for k in row.keys() if k in cls.__dataclass_fields__})
+
+
+@dataclass(slots=True)
+class ProcessFeatureSummaryRecord:
+    """A durable, per-process-poll row of derived process-level features.
+
+    See ``storage/schema.py``'s ``process_feature_summaries`` table
+    docstring and ``aiperfopt.features.process_features`` for what
+    populates ``summary_values``.
+    """
+
+    timestamp: float
+    computed_at: float
+    summary_values: dict[str, float] = field(default_factory=dict)
+    id: int | None = None
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> "ProcessFeatureSummaryRecord":
+        return cls(**{k: row[k] for k in row.keys() if k in cls.__dataclass_fields__})
+
+
+@dataclass(slots=True)
 class RollupBucket:
     bucket_start: float
     bucket_seconds: int

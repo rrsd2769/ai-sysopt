@@ -38,7 +38,7 @@ def _sample(ts: float) -> SystemMetricSample:
 def test_consumer_flushes_on_batch_size(storage_engine: Engine):
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
-        storage_engine, q, _settings(batch_size=3, flush_interval_seconds=60.0), full_resolution_retention_hours=72
+        storage_engine, q, _settings(batch_size=3, flush_interval_seconds=60.0), full_resolution_retention_hours=72, process_retention_hours=6,
     )
     consumer.start()
     try:
@@ -61,7 +61,7 @@ def test_consumer_flushes_on_interval_with_partial_batch(storage_engine: Engine)
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
         storage_engine, q, _settings(batch_size=1000, flush_interval_seconds=0.1),
-        full_resolution_retention_hours=72,
+        full_resolution_retention_hours=72, process_retention_hours=6,
     )
     consumer.start()
     try:
@@ -84,7 +84,7 @@ def test_consumer_preserves_chronological_order(storage_engine: Engine):
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
         storage_engine, q, _settings(batch_size=5, flush_interval_seconds=60.0),
-        full_resolution_retention_hours=72,
+        full_resolution_retention_hours=72, process_retention_hours=6,
     )
     consumer.start()
     try:
@@ -108,7 +108,7 @@ def test_consumer_routes_all_three_record_types(storage_engine: Engine):
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
         storage_engine, q, _settings(batch_size=10, flush_interval_seconds=0.1),
-        full_resolution_retention_hours=72,
+        full_resolution_retention_hours=72, process_retention_hours=6,
     )
     consumer.start()
     try:
@@ -141,7 +141,7 @@ def test_consumer_flushes_remaining_items_on_stop(storage_engine: Engine):
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
         storage_engine, q, _settings(batch_size=1000, flush_interval_seconds=60.0),
-        full_resolution_retention_hours=72,
+        full_resolution_retention_hours=72, process_retention_hours=6,
     )
     consumer.start()
     for i in range(7):
@@ -165,7 +165,7 @@ def test_consumer_survives_storage_failure_and_keeps_running(storage_engine: Eng
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
         storage_engine, q, _settings(batch_size=2, flush_interval_seconds=60.0),
-        full_resolution_retention_hours=72,
+        full_resolution_retention_hours=72, process_retention_hours=6,
     )
     consumer.start()
     try:
@@ -184,8 +184,8 @@ def test_consumer_runs_retention_check_on_schedule(storage_engine: Engine, monke
 
     calls = []
 
-    def _fake_retention(engine, hours):
-        calls.append(hours)
+    def _fake_retention(engine, full_resolution_retention_hours, process_retention_hours, as_of=None):
+        calls.append((full_resolution_retention_hours, process_retention_hours))
         from aiperfopt.storage.rollup import PruneResult, RollupResult
 
         return RollupResult(0, 0), PruneResult(0, 0)
@@ -195,12 +195,12 @@ def test_consumer_runs_retention_check_on_schedule(storage_engine: Engine, monke
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
         storage_engine, q, _settings(retention_check_interval_seconds=0.1),
-        full_resolution_retention_hours=48,
+        full_resolution_retention_hours=48, process_retention_hours=6,
     )
     consumer.start()
     try:
         time.sleep(0.35)
         assert len(calls) >= 2
-        assert calls[0] == 48
+        assert calls[0] == (48, 6)
     finally:
         consumer.stop(timeout=2.0)

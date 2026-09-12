@@ -27,7 +27,8 @@ from aiperfopt.storage import (
 def _fast_context(tmp_path: Path) -> AppContext:
     settings = AppSettings(
         monitoring=MonitoringSettings(
-            polling_interval_seconds=0.05, process_polling_interval_seconds=0.1
+            polling_interval_seconds=0.05, process_polling_interval_seconds=0.1,
+            process_capture_top_n=20,
         ),
         forecasting=ForecastingSettings(
             short_horizon_seconds=(30, 60), medium_horizon_seconds=(120, 300),
@@ -41,7 +42,8 @@ def _fast_context(tmp_path: Path) -> AppContext:
         ),
         privacy=PrivacySettings(excluded_processes=[]),
         storage=StorageSettings(
-            database_path=tmp_path / "pipeline_test.db", full_resolution_retention_hours=72
+            database_path=tmp_path / "pipeline_test.db", full_resolution_retention_hours=72,
+            process_retention_hours=6,
         ),
         logging=LoggingSettings(level="INFO", log_dir=tmp_path / "logs", json_format=True),
         ingestion=IngestionSettings(

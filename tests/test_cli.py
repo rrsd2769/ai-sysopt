@@ -9,9 +9,12 @@ fresh install: ``doctor``.
 
 from __future__ import annotations
 
+import json
 import os
+import signal
 import subprocess
 import sys
+import time
 import tomllib
 from pathlib import Path
 
@@ -37,6 +40,8 @@ def clean_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     [
         ["doctor"],
         ["collect", "--minutes", "1"],
+        ["collect", "--forever"],
+        ["export-training-window", "--since", "0", "--out", "/tmp/export.json"],
         ["train", "--source", "real", "--version", "v2", "--deploy"],
         ["train", "--metrics", "cpu_percent", "mem_percent"],
         ["serve"],
@@ -76,6 +81,59 @@ def test_console_script_is_declared_in_packaging_metadata() -> None:
     with (_PROJECT_ROOT / "pyproject.toml").open("rb") as handle:
         pyproject = tomllib.load(handle)
     assert pyproject["project"]["scripts"]["aiperfopt"] == "aiperfopt.cli:main"
+
+
+def test_export_training_window_writes_system_metrics_and_process_summaries(
+    clean_home: Path, tmp_path: Path
+) -> None:
+    from aiperfopt.bootstrap import bootstrap
+    from aiperfopt.storage import (
+        ProcessFeatureSummaryRecord,
+        SystemMetricSample,
+        insert_process_feature_summary,
+        insert_system_metric_sample,
+    )
+
+    ctx = bootstrap()
+    now = time.time()
+    insert_system_metric_sample(
+        ctx.storage_engine, SystemMetricSample(timestamp=now, cpu_percent=12.0, mem_percent=30.0)
+    )
+    insert_process_feature_summary(
+        ctx.storage_engine,
+        ProcessFeatureSummaryRecord(
+            timestamp=now, computed_at=now, summary_values={"proc_cpu_sum": 5.0}
+        ),
+    )
+
+    out_path = tmp_path / "export.json"
+    assert main(["export-training-window", "--since", "0", "--out", str(out_path)]) == 0
+
+    payload = json.loads(out_path.read_text())
+    assert len(payload["system_metrics"]) == 1
+    assert payload["system_metrics"][0]["cpu_percent"] == 12.0
+    assert len(payload["process_feature_summaries"]) == 1
+    assert payload["process_feature_summaries"][0]["proc_cpu_sum"] == 5.0
+
+
+def test_collect_forever_stops_cleanly_on_sigterm(clean_home: Path) -> None:
+    """The Phase 2 background-collection mode: SIGTERM must flush and exit 0,
+    not be killed mid-write the way the default SIGTERM handler would."""
+    env = {**os.environ, HOME_ENV_VAR: str(clean_home)}
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "aiperfopt", "collect", "--forever"],
+        env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        time.sleep(2.0)  # let the pipeline actually start and collect something
+        proc.send_signal(signal.SIGTERM)
+        stdout, stderr = proc.communicate(timeout=15)
+        assert proc.returncode == 0, stderr
+        assert "Stopped after" in stdout
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
 
 
 def test_python_dash_m_entrypoint_works(clean_home: Path) -> None:

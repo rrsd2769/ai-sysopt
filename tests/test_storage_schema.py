@@ -20,9 +20,11 @@ def test_create_all_tables_creates_every_expected_table(tmp_path: Path):
     assert expected == {
         "raw_system_metrics",
         "raw_process_metrics",
+        "raw_process_metrics_other",
         "process_events",
         "raw_system_metrics_rollup",
         "features",
+        "process_feature_summaries",
         "forecast_predictions",
         "contention_predictions",
         "diagnoses",
@@ -56,9 +58,11 @@ def test_timestamp_columns_are_indexed(tmp_path: Path):
     expected_indexed_columns = {
         "raw_system_metrics": "timestamp",
         "raw_process_metrics": "timestamp",
+        "raw_process_metrics_other": "timestamp",
         "process_events": "timestamp",
         "raw_system_metrics_rollup": "bucket_start",
         "features": "timestamp",
+        "process_feature_summaries": "timestamp",
         "forecast_predictions": "generated_at",
         "contention_predictions": "generated_at",
         "evaluations": "evaluated_at",

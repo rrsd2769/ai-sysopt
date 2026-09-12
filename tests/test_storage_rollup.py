@@ -4,14 +4,17 @@ from sqlalchemy import Engine
 
 from aiperfopt.storage import (
     ProcessEvent,
+    ProcessMetricAggregate,
     ProcessMetricSample,
     SystemMetricSample,
     apply_retention_policy,
     get_process_events_range,
+    get_process_metric_aggregates_range,
     get_process_metrics_range,
     get_rollup_range,
     get_system_metrics_range,
     insert_process_event,
+    insert_process_metric_aggregate,
     insert_process_metric_sample,
     insert_system_metric_samples_batch,
 )
@@ -132,7 +135,7 @@ def test_apply_retention_policy_end_to_end(storage_engine: Engine):
     )
 
     rollup_result, prune_result = apply_retention_policy(
-        storage_engine, retention_hours=72, as_of=now
+        storage_engine, full_resolution_retention_hours=72, process_retention_hours=6, as_of=now
     )
 
     assert rollup_result.raw_rows_removed == 1
@@ -144,6 +147,37 @@ def test_apply_retention_policy_end_to_end(storage_engine: Engine):
 
     rollup_buckets = get_rollup_range(storage_engine)
     assert len(rollup_buckets) == 1
+
+
+def test_process_retention_is_independent_of_system_retention(storage_engine: Engine):
+    """A row too old for the (short) process window but well within the
+    (long) system window: system metrics at that timestamp survive while
+    process rows at the same timestamp are pruned -- the two retention
+    windows are separate cutoffs, not one shared cutoff (Phase 2)."""
+    now = 100_000.0
+    mid_age_ts = now - (10 * 3600)  # 10 hours old: > 6h process window, < 72h system window
+
+    insert_system_metric_samples_batch(storage_engine, [_sample(mid_age_ts, cpu=42.0)])
+    insert_process_metric_sample(
+        storage_engine,
+        ProcessMetricSample(timestamp=mid_age_ts, pid=7, name="mid", cpu_percent=5.0),
+    )
+    insert_process_metric_aggregate(
+        storage_engine,
+        ProcessMetricAggregate(timestamp=mid_age_ts, other_count=3, other_cpu_sum=1.5, other_mem_rss_sum=100),
+    )
+
+    rollup_result, prune_result = apply_retention_policy(
+        storage_engine, full_resolution_retention_hours=72, process_retention_hours=6, as_of=now
+    )
+
+    assert rollup_result.raw_rows_removed == 0  # 10h old is well within the 72h system window
+    assert prune_result.process_metric_rows_removed == 1  # but past the 6h process window
+    assert prune_result.process_aggregate_rows_removed == 1
+
+    assert len(get_system_metrics_range(storage_engine)) == 1
+    assert get_process_metrics_range(storage_engine) == []
+    assert get_process_metric_aggregates_range(storage_engine) == []
 
 
 def test_rollup_result_is_idempotent_on_reduced_source_data(storage_engine: Engine):

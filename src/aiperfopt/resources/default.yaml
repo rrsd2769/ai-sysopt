@@ -24,6 +24,11 @@ monitoring:
   # Process-level enumeration may run coarser than aggregate metrics
   # (NFR-2.2).
   process_polling_interval_seconds: 3.0
+  # Storage bound (Phase 2): top-N by CPU unioned with top-N by memory
+  # RSS are individually stored per poll; everything else becomes one
+  # aggregate row. ~2N rows/poll instead of the full process table
+  # (~180 on a typical desktop), an order-of-magnitude reduction.
+  process_capture_top_n: 20
 
 forecasting:
   # Two horizons read from a single multi-step model per metric
@@ -97,6 +102,12 @@ storage:
   database_path: data/aiperfopt.db
   # Full-resolution retention window before downsample/rollup (NFR-4.1).
   full_resolution_retention_hours: 72
+  # Process-level rows (raw_process_metrics, process_events,
+  # raw_process_metrics_other) get their own, much shorter retention
+  # (Phase 2, NFR-4.3): process detail is needed for recent attribution
+  # and for computing the durable process_feature_summaries series before
+  # it's pruned, not for indefinite per-process history.
+  process_retention_hours: 6
 
 ingestion:
   # Samples of a single record type accumulated before a batch flush

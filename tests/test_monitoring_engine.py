@@ -12,7 +12,11 @@ from aiperfopt.monitoring.queue_items import QueueItem, QueueItemKind
 
 
 def _fast_settings(**overrides) -> MonitoringSettings:
-    base = dict(polling_interval_seconds=0.05, process_polling_interval_seconds=0.1)
+    base = dict(
+        polling_interval_seconds=0.05,
+        process_polling_interval_seconds=0.1,
+        process_capture_top_n=20,
+    )
     base.update(overrides)
     return MonitoringSettings(**base)
 

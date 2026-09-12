@@ -65,6 +65,7 @@ def create_monitoring_pipeline(ctx: AppContext) -> MonitoringPipeline:
         input_queue=shared_queue,
         settings=settings.ingestion,
         full_resolution_retention_hours=settings.storage.full_resolution_retention_hours,
+        process_retention_hours=settings.storage.process_retention_hours,
     )
 
     logger.info("Monitoring pipeline assembled")

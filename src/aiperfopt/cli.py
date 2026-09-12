@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -102,29 +103,112 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def _cmd_collect(args: argparse.Namespace) -> int:
-    """Run monitoring + ingestion for a fixed duration, with no API server."""
+    """Run monitoring + ingestion, with no API server.
+
+    ``--forever`` is the mode the presentable-predictive-monitor plan's
+    Phase 2 actually wants: passive collection running unattended across
+    normal daily use for days, not a fixed lab-style window. A SIGTERM
+    handler is installed so stopping a backgrounded (``nohup ... &``)
+    process still flushes the pipeline's in-flight batch and stops the
+    monitoring threads cleanly, the same as Ctrl-C does for a foreground
+    run -- the default SIGTERM behavior would otherwise kill the process
+    without giving IngestionConsumer a chance to flush.
+    """
+    import signal
+
     from aiperfopt.pipeline import create_monitoring_pipeline
     from aiperfopt.storage.reader import get_recent_system_metrics
 
     ctx = _bootstrap(args)
     pipeline = create_monitoring_pipeline(ctx)
-    seconds = args.minutes * 60.0
 
-    print(f"Collecting for {args.minutes:g} minute(s) into {ctx.settings.storage.database_path} ...")
+    stop_requested = threading.Event()
+
+    def _handle_sigterm(signum, frame) -> None:  # type: ignore[no-untyped-def]
+        stop_requested.set()
+
+    previous_handler = signal.signal(signal.SIGTERM, _handle_sigterm)
+
+    if args.forever:
+        print(f"Collecting indefinitely into {ctx.settings.storage.database_path} (Ctrl-C or SIGTERM to stop) ...")
+    else:
+        seconds = args.minutes * 60.0
+        print(f"Collecting for {args.minutes:g} minute(s) into {ctx.settings.storage.database_path} ...")
+
     pipeline.start()
     started = time.time()
     try:
-        while time.time() - started < seconds:
-            time.sleep(min(5.0, seconds - (time.time() - started)))
-            elapsed = time.time() - started
-            print(f"  {elapsed:6.0f}s / {seconds:.0f}s", end="\r", flush=True)
+        if args.forever:
+            while not stop_requested.is_set():
+                time.sleep(0.5)
+        else:
+            while time.time() - started < seconds and not stop_requested.is_set():
+                time.sleep(min(5.0, seconds - (time.time() - started)))
+                elapsed = time.time() - started
+                print(f"  {elapsed:6.0f}s / {seconds:.0f}s", end="\r", flush=True)
     except KeyboardInterrupt:
         print("\nInterrupted - stopping cleanly.")
     finally:
         pipeline.stop()
+        signal.signal(signal.SIGTERM, previous_handler)
 
-    collected = get_recent_system_metrics(ctx.storage_engine, window_seconds=seconds + 60)
-    print(f"\nDone. {len(collected)} system samples collected over {seconds:.0f}s.")
+    elapsed_total = time.time() - started
+    if not args.forever:
+        collected = get_recent_system_metrics(ctx.storage_engine, window_seconds=elapsed_total + 60)
+        print(f"\nDone. {len(collected)} system samples collected over {elapsed_total:.0f}s.")
+    else:
+        print(f"\nStopped after {elapsed_total:.0f}s.")
+    return 0
+
+
+# --------------------------------------------------------------------------
+# export-training-window
+# --------------------------------------------------------------------------
+
+
+def _cmd_export_training_window(args: argparse.Namespace) -> int:
+    """Export system metrics + the durable process summary series for a window.
+
+    Process-level detail (``raw_process_metrics``/``process_events``) is
+    pruned after a few hours (Phase 2, NFR-4.3) so multi-day passive
+    collection stays storage-bounded, but the *derived* process summary
+    series survives that pruning in ``process_feature_summaries`` (see
+    ``aiperfopt.features.storage_bridge.summarize_and_persist_process_features``,
+    run automatically on every retention check). This command is the
+    explicit, on-demand escape hatch for pulling a training window's
+    worth of that already-durable data out to a portable file -- e.g.
+    ahead of a training run on another machine, or as a backup.
+    """
+    import json
+    from dataclasses import asdict
+
+    from aiperfopt.storage.reader import get_process_feature_summaries_range, get_system_metrics_range
+
+    ctx = _bootstrap(args)
+    end = time.time()
+
+    system_metrics = get_system_metrics_range(ctx.storage_engine, start=args.since, end=end)
+    summaries = get_process_feature_summaries_range(ctx.storage_engine, start=args.since, end=end)
+
+    payload = {
+        "exported_at": end,
+        "since": args.since,
+        "system_metrics": [asdict(s) for s in system_metrics],
+        "process_feature_summaries": [
+            {"timestamp": s.timestamp, "computed_at": s.computed_at, **s.summary_values}
+            for s in summaries
+        ],
+    }
+
+    out_path: Path = args.out
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle)
+
+    print(
+        f"Exported {len(system_metrics)} system metric row(s) and {len(summaries)} "
+        f"process summary row(s) since {args.since:.0f} to {out_path}"
+    )
     return 0
 
 
@@ -283,7 +367,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_collect = sub.add_parser("collect", help="Collect metrics for a fixed duration.")
     p_collect.add_argument("--minutes", type=float, default=15.0)
+    p_collect.add_argument(
+        "--forever", action="store_true",
+        help="Run until interrupted (Ctrl-C or SIGTERM) instead of --minutes -- "
+        "for the multi-day passive collection window.",
+    )
     p_collect.set_defaults(func=_cmd_collect)
+
+    p_export = sub.add_parser(
+        "export-training-window",
+        help="Export system metrics + the durable process summary series for a time window.",
+    )
+    p_export.add_argument(
+        "--since", type=float, required=True,
+        help="Unix epoch seconds; export everything from here to now.",
+    )
+    p_export.add_argument("--out", type=Path, required=True, help="Output JSON file path.")
+    p_export.set_defaults(func=_cmd_export_training_window, default_log_level="WARNING")
 
     p_train = sub.add_parser("train", help="Train a candidate model, optionally deploying it.")
     p_train.add_argument("--source", choices=("synthetic", "real"), default="synthetic")

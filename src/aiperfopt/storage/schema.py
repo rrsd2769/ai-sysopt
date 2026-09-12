@@ -137,6 +137,29 @@ process_events = Table(
 )
 Index("ix_process_events_timestamp", process_events.c.timestamp)
 
+# One row per poll cycle summarising every process *not* individually
+# retained in raw_process_metrics (Phase 2's storage bound: top-N by CPU
+# union top-N by memory, plus this one row for everything else). Kept as
+# its own table rather than a sentinel pid in raw_process_metrics itself,
+# since "the aggregate of everything outside the top-N" is a materially
+# different kind of row (no pid, no name, counts instead of per-process
+# values) and overloading the per-process table with a fake row would
+# make every consumer of raw_process_metrics have to know to filter it
+# out. See aiperfopt.monitoring.process_tracker for how the split is
+# computed and aiperfopt.features.process_features for how it's used to
+# reconstruct whole-system sums that the top-N truncation would otherwise
+# undercount.
+raw_process_metrics_other = Table(
+    "raw_process_metrics_other",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("timestamp", Float, nullable=False),
+    Column("other_count", Integer, nullable=False),
+    Column("other_cpu_sum", Float, nullable=False),
+    Column("other_mem_rss_sum", Integer, nullable=False),
+)
+Index("ix_raw_process_metrics_other_timestamp", raw_process_metrics_other.c.timestamp)
+
 # ---------------------------------------------------------------------------
 # Downsampled / rolled-up system metrics (FR-3.2)
 # ---------------------------------------------------------------------------
@@ -175,6 +198,29 @@ features = Table(
     Column("feature_values", JSON, nullable=False),
 )
 Index("ix_features_timestamp", features.c.timestamp)
+
+# Durable, per-process-poll process summary series (aiperfopt.features.
+# process_features). raw_process_metrics/process_events are pruned after
+# a short retention window (Phase 2, NFR-4.3) because multi-day retention
+# of full per-process detail would defeat the storage bound the truncation
+# above exists to provide -- but multi-day training (the whole point of
+# this project's pivot, see docs/plans/2026-09-12-*) needs the *derived*
+# process-level signal to survive far longer than that. This table is
+# where the ingestion consumer's retention check writes that derived
+# summary immediately before the raw rows it was computed from are
+# pruned (aiperfopt.features.storage_bridge.summarize_and_persist_process_features).
+# Not itself pruned in V1: at one row per process poll cycle with a
+# handful of float columns, it is already the downsampled form.
+process_feature_summaries = Table(
+    "process_feature_summaries",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    # The process-poll timestamp this summary describes.
+    Column("timestamp", Float, nullable=False),
+    Column("computed_at", Float, nullable=False),
+    Column("summary_values", JSON, nullable=False),
+)
+Index("ix_process_feature_summaries_timestamp", process_feature_summaries.c.timestamp)
 
 # ---------------------------------------------------------------------------
 # Model predictions (Forecasting: Phase 4, Contention: Phase 5)

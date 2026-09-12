@@ -9,10 +9,18 @@ from aiperfopt.features.storage_bridge import (
     backfill_feature_matrix,
     compute_and_store_live_feature_vector,
     compute_live_feature_vector,
+    summarize_and_persist_process_features,
 )
 from aiperfopt.storage import (
+    ProcessEvent,
+    ProcessMetricAggregate,
+    ProcessMetricSample,
     SystemMetricSample,
     get_features_range,
+    get_process_feature_summaries_range,
+    insert_process_event,
+    insert_process_metric_aggregate,
+    insert_process_metric_sample,
     insert_system_metric_samples_batch,
 )
 
@@ -47,6 +55,48 @@ def test_compute_live_feature_vector_none_when_no_data(storage_engine: Engine):
     config = FeatureEngineeringConfig()
     vector = compute_live_feature_vector(storage_engine, config)
     assert vector is None
+
+
+def test_summarize_and_persist_process_features_writes_durable_rows(storage_engine: Engine):
+    old_ts = 100.0  # older than the cutoff -> about to be pruned
+    insert_process_metric_sample(
+        storage_engine,
+        ProcessMetricSample(timestamp=old_ts, pid=1, name="a", cpu_percent=20.0, memory_rss=1000),
+    )
+    insert_process_event(
+        storage_engine, ProcessEvent(timestamp=old_ts - 5, pid=2, name="b", event_type="launch")
+    )
+    insert_process_metric_aggregate(
+        storage_engine,
+        ProcessMetricAggregate(timestamp=old_ts, other_count=3, other_cpu_sum=6.0, other_mem_rss_sum=300),
+    )
+
+    written = summarize_and_persist_process_features(storage_engine, cutoff=200.0)
+
+    assert written == 1
+    summaries = get_process_feature_summaries_range(storage_engine)
+    assert len(summaries) == 1
+    assert summaries[0].timestamp == old_ts
+    assert summaries[0].summary_values["proc_cpu_sum"] == 20.0 + 6.0
+    assert summaries[0].summary_values["proc_launch_count_30s"] == 1
+
+
+def test_summarize_and_persist_process_features_ignores_rows_at_or_after_cutoff(storage_engine: Engine):
+    insert_process_metric_sample(
+        storage_engine,
+        ProcessMetricSample(timestamp=200.0, pid=1, name="a", cpu_percent=20.0),
+    )
+
+    written = summarize_and_persist_process_features(storage_engine, cutoff=200.0)  # strict <
+
+    assert written == 0
+    assert get_process_feature_summaries_range(storage_engine) == []
+
+
+def test_summarize_and_persist_process_features_is_a_noop_with_no_process_data(storage_engine: Engine):
+    written = summarize_and_persist_process_features(storage_engine, cutoff=200.0)
+    assert written == 0
+    assert get_process_feature_summaries_range(storage_engine) == []
 
 
 def test_compute_and_store_live_feature_vector_persists_to_storage(storage_engine: Engine):

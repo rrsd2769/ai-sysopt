@@ -40,6 +40,7 @@ from aiperfopt.common.exceptions import StorageError
 from aiperfopt.storage.schema import (
     process_events,
     raw_process_metrics,
+    raw_process_metrics_other,
     raw_system_metrics,
     raw_system_metrics_rollup,
 )
@@ -68,6 +69,7 @@ class RollupResult:
 class PruneResult:
     process_metric_rows_removed: int
     process_event_rows_removed: int
+    process_aggregate_rows_removed: int = 0
 
 
 def rollup_system_metrics(
@@ -149,10 +151,14 @@ def rollup_system_metrics(
 
 
 def prune_process_level_data(engine: Engine, cutoff: float) -> PruneResult:
-    """Delete process-level rows and process events older than ``cutoff``.
+    """Delete process-level rows, process events and aggregate rows older than ``cutoff``.
 
     See the module docstring for why this is a straight prune rather than
-    a rollup.
+    a rollup. The "everything else" aggregate rows (``raw_process_metrics_
+    other``) are pruned on the same cutoff as the per-process rows they
+    were computed alongside -- they exist to make the top-N-bounded
+    per-process rows sum-correct (Phase 2), which is only meaningful while
+    those per-process rows are still present.
     """
     try:
         with engine.begin() as connection:
@@ -162,10 +168,14 @@ def prune_process_level_data(engine: Engine, cutoff: float) -> PruneResult:
             events_result = connection.execute(
                 delete(process_events).where(process_events.c.timestamp < cutoff)
             )
+            aggregates_result = connection.execute(
+                delete(raw_process_metrics_other).where(raw_process_metrics_other.c.timestamp < cutoff)
+            )
 
         result = PruneResult(
             process_metric_rows_removed=metrics_result.rowcount or 0,
             process_event_rows_removed=events_result.rowcount or 0,
+            process_aggregate_rows_removed=aggregates_result.rowcount or 0,
         )
         logger.info("Process-level data pruned", extra={"cutoff": cutoff, **result.__dict__})
         return result
@@ -175,19 +185,27 @@ def prune_process_level_data(engine: Engine, cutoff: float) -> PruneResult:
 
 def apply_retention_policy(
     engine: Engine,
-    retention_hours: float,
+    full_resolution_retention_hours: float,
+    process_retention_hours: float,
     bucket_seconds: int = DEFAULT_BUCKET_SECONDS,
     as_of: float | None = None,
 ) -> tuple[RollupResult, PruneResult]:
     """Apply the full retention policy: roll up old system metrics, prune old process data.
 
-    This is the single function a scheduler (introduced in a later phase)
-    should call periodically. ``retention_hours`` is expected to come from
-    ``AppSettings.storage.full_resolution_retention_hours`` (NFR-4.1).
+    This is the single function a scheduler (the ingestion consumer, see
+    ``aiperfopt.ingestion.consumer``) calls periodically. The two
+    retention windows are independent by design (Phase 2): process-level
+    detail needs to be pruned much sooner than system metrics to keep
+    multi-day passive collection bounded (NFR-4.3), while system-level
+    trend history is rolled up rather than deleted and can afford to stay
+    at full resolution far longer.  ``full_resolution_retention_hours``
+    and ``process_retention_hours`` are expected to come from
+    ``AppSettings.storage`` (NFR-4.1).
     """
     reference = as_of if as_of is not None else time.time()
-    cutoff = reference - (retention_hours * 3600)
+    system_cutoff = reference - (full_resolution_retention_hours * 3600)
+    process_cutoff = reference - (process_retention_hours * 3600)
 
-    rollup_result = rollup_system_metrics(engine, cutoff, bucket_seconds)
-    prune_result = prune_process_level_data(engine, cutoff)
+    rollup_result = rollup_system_metrics(engine, system_cutoff, bucket_seconds)
+    prune_result = prune_process_level_data(engine, process_cutoff)
     return rollup_result, prune_result

@@ -33,6 +33,8 @@ from aiperfopt.storage.records import (
     LogEvent,
     ModelDeploymentRecord,
     ProcessEvent,
+    ProcessFeatureSummaryRecord,
+    ProcessMetricAggregate,
     ProcessMetricSample,
     RecommendationRecord,
     RollupBucket,
@@ -47,7 +49,9 @@ from aiperfopt.storage.schema import (
     forecast_predictions,
     model_deployments,
     process_events,
+    process_feature_summaries,
     raw_process_metrics,
+    raw_process_metrics_other,
     raw_system_metrics,
     raw_system_metrics_rollup,
     recommendations,
@@ -142,6 +146,21 @@ def get_process_events_range(
     return [ProcessEvent.from_row(r) for r in rows]
 
 
+def get_process_metric_aggregates_range(
+    engine: Engine, start: float | None = None, end: float | None = None, limit: int | None = None
+) -> list[ProcessMetricAggregate]:
+    rows = _execute_range(
+        engine,
+        raw_process_metrics_other,
+        raw_process_metrics_other.c.timestamp,
+        start,
+        end,
+        limit,
+        False,
+    )
+    return [ProcessMetricAggregate.from_row(r) for r in rows]
+
+
 # --- Rollup ------------------------------------------------------------------
 
 
@@ -175,6 +194,21 @@ def get_features_range(
 def get_latest_feature_vector(engine: Engine) -> FeatureVectorRecord | None:
     rows = _execute_range(engine, features, features.c.timestamp, None, None, 1, True)
     return FeatureVectorRecord.from_row(rows[0]) if rows else None
+
+
+def get_process_feature_summaries_range(
+    engine: Engine, start: float | None = None, end: float | None = None, limit: int | None = None
+) -> list[ProcessFeatureSummaryRecord]:
+    rows = _execute_range(
+        engine,
+        process_feature_summaries,
+        process_feature_summaries.c.timestamp,
+        start,
+        end,
+        limit,
+        False,
+    )
+    return [ProcessFeatureSummaryRecord.from_row(r) for r in rows]
 
 
 # --- Predictions ---------------------------------------------------------------

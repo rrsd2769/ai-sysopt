@@ -30,23 +30,75 @@ from dataclasses import dataclass, field
 import psutil
 
 from aiperfopt.applog import get_logger
-from aiperfopt.storage.records import ProcessEvent, ProcessMetricSample
+from aiperfopt.storage.records import ProcessEvent, ProcessMetricAggregate, ProcessMetricSample
 
 logger = get_logger(__name__)
+
+# Default storage bound (Phase 2): top-N by CPU union top-N by memory RSS
+# are individually stored; used when a caller doesn't pass its own
+# top_n (e.g. direct ProcessTracker() construction in tests). Production
+# callers should pass MonitoringSettings.process_capture_top_n instead of
+# relying on this default.
+DEFAULT_CAPTURE_TOP_N = 20
 
 
 @dataclass
 class ProcessPollResult:
     metrics: list[ProcessMetricSample] = field(default_factory=list)
     events: list[ProcessEvent] = field(default_factory=list)
+    aggregate: ProcessMetricAggregate | None = None
+
+
+def bound_process_metrics(
+    metrics: list[ProcessMetricSample], top_n: int, timestamp: float
+) -> tuple[list[ProcessMetricSample], ProcessMetricAggregate]:
+    """Split ``metrics`` into the individually-stored top-N and one aggregate row.
+
+    Kept individually: the union of the top ``top_n`` processes by
+    ``cpu_percent`` and the top ``top_n`` by ``memory_rss`` -- this
+    guarantees every feature that only needs the top-K by one of those two
+    axes (e.g. "the single busiest process") is exact, never approximated
+    by the truncation. Everything else is folded into one
+    :class:`ProcessMetricAggregate` row so per-poll storage stays bounded
+    at roughly ``2 * top_n + 1`` rows regardless of how many processes are
+    actually running, while sums/counts over *all* processes (not just
+    the top-N) can still be reconstructed exactly by adding the aggregate
+    back in (see ``aiperfopt.features.process_features``).
+    """
+    if len(metrics) <= top_n * 2:
+        # Nothing to truncate -- still emit a zero aggregate row so every
+        # poll cycle produces exactly one (Phase 2 success criterion).
+        return list(metrics), ProcessMetricAggregate(
+            timestamp=timestamp, other_count=0, other_cpu_sum=0.0, other_mem_rss_sum=0
+        )
+
+    by_cpu = sorted(metrics, key=lambda m: m.cpu_percent, reverse=True)[:top_n]
+    by_mem = sorted(metrics, key=lambda m: m.memory_rss or 0, reverse=True)[:top_n]
+    kept_pids = {m.pid for m in by_cpu} | {m.pid for m in by_mem}
+
+    kept = [m for m in metrics if m.pid in kept_pids]
+    others = [m for m in metrics if m.pid not in kept_pids]
+
+    aggregate = ProcessMetricAggregate(
+        timestamp=timestamp,
+        other_count=len(others),
+        other_cpu_sum=sum(m.cpu_percent for m in others),
+        other_mem_rss_sum=sum(m.memory_rss or 0 for m in others),
+    )
+    return kept, aggregate
 
 
 class ProcessTracker:
     """Stateful per-process poller. One instance per Monitoring Engine."""
 
-    def __init__(self, excluded_process_names: frozenset[str] = frozenset()) -> None:
+    def __init__(
+        self,
+        excluded_process_names: frozenset[str] = frozenset(),
+        capture_top_n: int = DEFAULT_CAPTURE_TOP_N,
+    ) -> None:
         self._processes: dict[int, psutil.Process] = {}
         self._excluded = excluded_process_names
+        self._capture_top_n = capture_top_n
         # The very first poll establishes a baseline of already-running
         # processes; those are not "launches" (FR-1.3 concerns *new*
         # events observed during monitoring, not a dump of everything
@@ -143,6 +195,9 @@ class ProcessTracker:
                 )
 
         self._baseline_established = True
+        result.metrics, result.aggregate = bound_process_metrics(
+            result.metrics, self._capture_top_n, timestamp
+        )
         return result
 
     @property

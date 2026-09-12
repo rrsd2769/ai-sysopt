@@ -6,7 +6,8 @@ import time
 import psutil
 import pytest
 
-from aiperfopt.monitoring.process_tracker import ProcessTracker
+from aiperfopt.monitoring.process_tracker import ProcessTracker, bound_process_metrics
+from aiperfopt.storage.records import ProcessMetricSample
 
 
 def _wait_for(predicate, timeout: float = 3.0, interval: float = 0.05):
@@ -103,6 +104,71 @@ def test_exclusion_matching_is_case_insensitive():
     assert tracker._is_excluded("SLEEP") is True
     assert tracker._is_excluded("Sleep") is True
     assert tracker._is_excluded("unrelated") is False
+
+
+def _sample(pid: int, cpu: float, mem: int) -> ProcessMetricSample:
+    return ProcessMetricSample(timestamp=100.0, pid=pid, name=f"p{pid}", cpu_percent=cpu, memory_rss=mem)
+
+
+def test_bound_process_metrics_keeps_everything_under_the_bound():
+    metrics = [_sample(i, cpu=float(i), mem=i * 10) for i in range(10)]
+    kept, aggregate = bound_process_metrics(metrics, top_n=20, timestamp=100.0)
+
+    assert len(kept) == 10
+    assert aggregate.other_count == 0
+    assert aggregate.other_cpu_sum == 0.0
+    assert aggregate.other_mem_rss_sum == 0
+    assert aggregate.timestamp == 100.0
+
+
+def test_bound_process_metrics_truncates_and_aggregates_the_long_tail():
+    # 50 processes, only the union of top-2-by-cpu and top-2-by-mem should
+    # survive individually (a small top_n makes the truncation boundary
+    # exercised deterministically without needing 40+ synthetic rows).
+    metrics = [_sample(i, cpu=float(i), mem=(49 - i) * 10) for i in range(50)]
+    kept, aggregate = bound_process_metrics(metrics, top_n=2, timestamp=100.0)
+
+    kept_pids = {m.pid for m in kept}
+    # Top-2 by cpu: pids 49, 48. Top-2 by mem (mem = (49-i)*10, so smallest
+    # pid has the largest mem): pids 0, 1.
+    assert kept_pids == {49, 48, 0, 1}
+    assert len(kept) <= 2 * 2
+
+    all_pids = set(range(50))
+    other_pids = all_pids - kept_pids
+    expected_other_cpu = sum(float(pid) for pid in other_pids)
+    expected_other_mem = sum((49 - pid) * 10 for pid in other_pids)
+
+    assert aggregate.other_count == len(other_pids)
+    assert aggregate.other_cpu_sum == expected_other_cpu
+    assert aggregate.other_mem_rss_sum == expected_other_mem
+
+    # Reconciliation: kept + aggregate reconstructs the untruncated totals.
+    assert sum(m.cpu_percent for m in kept) + aggregate.other_cpu_sum == sum(m.cpu_percent for m in metrics)
+    assert sum(m.memory_rss for m in kept) + aggregate.other_mem_rss_sum == sum(
+        m.memory_rss for m in metrics
+    )
+    assert len(kept) + aggregate.other_count == len(metrics)
+
+
+def test_bound_process_metrics_caps_at_2n_plus_aggregate_regardless_of_population():
+    metrics = [_sample(i, cpu=float(i % 7), mem=(i % 5) * 100) for i in range(500)]
+    kept, aggregate = bound_process_metrics(metrics, top_n=20, timestamp=100.0)
+
+    assert len(kept) <= 40
+    assert aggregate.other_count == len(metrics) - len(kept)
+
+
+def test_second_poll_bounds_metrics_via_settings_top_n():
+    """End-to-end through ProcessTracker.poll(): a small capture_top_n
+    still yields metrics plus a reconciling aggregate on a real machine."""
+    tracker = ProcessTracker(capture_top_n=1)
+    tracker.poll()
+    time.sleep(0.15)
+    result = tracker.poll()
+
+    assert result.aggregate is not None
+    assert len(result.metrics) <= 2  # union of top-1-by-cpu and top-1-by-mem
 
 
 def test_process_disappearing_mid_poll_does_not_raise(monkeypatch):

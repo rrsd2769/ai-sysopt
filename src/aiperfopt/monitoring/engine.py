@@ -76,7 +76,9 @@ class MonitoringEngine:
     ) -> None:
         self._settings = settings
         self._queue = output_queue
-        self._process_tracker = ProcessTracker(excluded_process_names)
+        self._process_tracker = ProcessTracker(
+            excluded_process_names, capture_top_n=settings.process_capture_top_n
+        )
 
         self._stop_event = threading.Event()
         self._system_thread: threading.Thread | None = None
@@ -176,6 +178,8 @@ class MonitoringEngine:
                     self._put(QueueItem.process_metric(sample))
                 for event in result.events:
                     self._put(QueueItem.process_event(event))
+                if result.aggregate is not None:
+                    self._put(QueueItem.process_metric_aggregate(result.aggregate))
             except Exception as exc:  # noqa: BLE001 - see rationale above
                 logger.error(
                     "Process metrics collection cycle failed",

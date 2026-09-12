@@ -34,6 +34,8 @@ from aiperfopt.storage.records import (
     LogEvent,
     ModelDeploymentRecord,
     ProcessEvent,
+    ProcessFeatureSummaryRecord,
+    ProcessMetricAggregate,
     ProcessMetricSample,
     RecommendationRecord,
     RollupBucket,
@@ -48,7 +50,9 @@ from aiperfopt.storage.schema import (
     forecast_predictions,
     model_deployments,
     process_events,
+    process_feature_summaries,
     raw_process_metrics,
+    raw_process_metrics_other,
     raw_system_metrics,
     raw_system_metrics_rollup,
     recommendations,
@@ -123,6 +127,16 @@ def insert_process_events_batch(engine: Engine, events: Sequence[ProcessEvent]) 
     _insert_many(engine, process_events, events)
 
 
+def insert_process_metric_aggregate(engine: Engine, aggregate: ProcessMetricAggregate) -> int:
+    return _insert_one(engine, raw_process_metrics_other, aggregate)
+
+
+def insert_process_metric_aggregates_batch(
+    engine: Engine, aggregates: Sequence[ProcessMetricAggregate]
+) -> None:
+    _insert_many(engine, raw_process_metrics_other, aggregates)
+
+
 # --- Rollup ------------------------------------------------------------------
 
 
@@ -143,6 +157,16 @@ def insert_feature_vector(engine: Engine, record: FeatureVectorRecord) -> int:
 
 def insert_feature_vectors_batch(engine: Engine, records: Sequence[FeatureVectorRecord]) -> None:
     _insert_many(engine, features, records)
+
+
+def insert_process_feature_summary(engine: Engine, record: ProcessFeatureSummaryRecord) -> int:
+    return _insert_one(engine, process_feature_summaries, record)
+
+
+def insert_process_feature_summaries_batch(
+    engine: Engine, records: Sequence[ProcessFeatureSummaryRecord]
+) -> None:
+    _insert_many(engine, process_feature_summaries, records)
 
 
 # --- Predictions ---------------------------------------------------------------

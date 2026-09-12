@@ -83,6 +83,12 @@ class ModeSettings(BaseModel):
 class MonitoringSettings(BaseModel):
     polling_interval_seconds: float = Field(gt=0)
     process_polling_interval_seconds: float = Field(gt=0)
+    # Phase 2's storage bound: only the top-N processes by CPU, unioned
+    # with the top-N by memory RSS, are individually stored per poll --
+    # everything else is folded into one aggregate row (see
+    # aiperfopt.monitoring.process_tracker). Launch/terminate events are
+    # unaffected by this and are always recorded for every process.
+    process_capture_top_n: int = Field(gt=0)
 
     @field_validator("polling_interval_seconds", "process_polling_interval_seconds")
     @classmethod
@@ -261,6 +267,11 @@ class PrivacySettings(BaseModel):
 class StorageSettings(BaseModel):
     database_path: Path
     full_resolution_retention_hours: int = Field(gt=0)
+    # Independent, much shorter retention for process-level rows (Phase 2,
+    # NFR-4.3) -- see aiperfopt.storage.rollup.apply_retention_policy for
+    # why this is split from full_resolution_retention_hours rather than
+    # sharing one cutoff.
+    process_retention_hours: float = Field(gt=0)
 
     _abs_database_path = field_validator("database_path")(_absolute_under_app_home)
 
