@@ -17,10 +17,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Windows is a first-class target, not an afterthought: several
-        # defects are Windows-only and silent (psutil emulates getloadavg
-        # there rather than raising), so the suite has to actually run on it.
-        os: [macos-latest, windows-latest]
+        # macOS only, by decision: this project targets macOS for the
+        # remainder of its scope. The code stays portable by construction,
+        # but Windows is no longer tested or claimed -- see
+        # docs/plans/2026-09-12-presentable-predictive-monitor.md.
+        os: [macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +47,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        # macOS only -- see the backend job above.
+        os: [macos-latest]
     steps:
       - uses: actions/checkout@v4
 
