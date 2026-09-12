@@ -223,31 +223,47 @@ def resolve_diagnosis_category(
         ``ContentionSettings.anomaly_significant_threshold`` — see the
         module docstring for why this is a parameter, not a
         ``DiagnosisSettings`` field of its own.
+
+    Anomaly is a fallback, not a short-circuit (Phase 3, F2)
+    -------------------------------------------------------------
+    A high anomaly score used to be checked *first*, so it pre-empted
+    every other category even when contention was triggered and a
+    dominant resource was obvious — the anomaly score was never wrong
+    (given F1, it was effectively always ``1.0`` for real data), so this
+    made all 7 actionable categories, the SHAP explainer, and the
+    recommendation engine unreachable in practice. Contention/dominance
+    resolution now always runs first when ``triggered`` is true, and
+    always resolves to *something* (Cross-Resource at worst) — anomaly
+    only surfaces ``UNUSUAL_PATTERN_ANOMALY`` in the one case nothing
+    else had a signal to resolve from: contention wasn't triggered at
+    all. The anomaly score itself remains available on
+    ``contention_record.anomaly_score`` regardless of which category
+    this resolves to — a flag callers can still see, not a category that
+    overrides the diagnosis.
     """
+    if contention_record.triggered:
+        resource_totals = _resource_type_totals(contention_record.contributing_metrics or [])
+        total = sum(resource_totals.values())
+        if total <= 0 or not resource_totals:
+            # Contention was triggered but nothing in contributing_metrics
+            # maps to a recognized resource type (e.g. an empty/malformed
+            # payload). Cross-Resource is the taxonomy's own escape hatch
+            # (Section 12, R-9's mitigation) — refusing to diagnose here
+            # would silently drop a triggered event FR-8.3 requires resolve
+            # to *something*.
+            return DiagnosisCategory.CROSS_RESOURCE_CONTENTION
+
+        dominant_type, dominant_value = max(resource_totals.items(), key=lambda kv: kv[1])
+        if (dominant_value / total) < config.cross_resource_dominance_ratio:
+            return DiagnosisCategory.CROSS_RESOURCE_CONTENTION
+
+        if dominant_type == "cpu":
+            return _resolve_cpu_subcategory(contention_record.contributing_processes or [], config)
+        if dominant_type == "memory":
+            return _resolve_memory_subcategory(memory_rate_of_change, config)
+        return _SINGLE_RESOURCE_CATEGORY.get(dominant_type, DiagnosisCategory.CROSS_RESOURCE_CONTENTION)
+
     anomaly_score = contention_record.anomaly_score or 0.0
     if anomaly_score >= anomaly_significant_threshold:
         return DiagnosisCategory.UNUSUAL_PATTERN_ANOMALY
-
-    if not contention_record.triggered:
-        return None
-
-    resource_totals = _resource_type_totals(contention_record.contributing_metrics or [])
-    total = sum(resource_totals.values())
-    if total <= 0 or not resource_totals:
-        # Contention was triggered but nothing in contributing_metrics
-        # maps to a recognized resource type (e.g. an empty/malformed
-        # payload). Cross-Resource is the taxonomy's own escape hatch
-        # (Section 12, R-9's mitigation) — refusing to diagnose here
-        # would silently drop a triggered event FR-8.3 requires resolve
-        # to *something*.
-        return DiagnosisCategory.CROSS_RESOURCE_CONTENTION
-
-    dominant_type, dominant_value = max(resource_totals.items(), key=lambda kv: kv[1])
-    if (dominant_value / total) < config.cross_resource_dominance_ratio:
-        return DiagnosisCategory.CROSS_RESOURCE_CONTENTION
-
-    if dominant_type == "cpu":
-        return _resolve_cpu_subcategory(contention_record.contributing_processes or [], config)
-    if dominant_type == "memory":
-        return _resolve_memory_subcategory(memory_rate_of_change, config)
-    return _SINGLE_RESOURCE_CATEGORY.get(dominant_type, DiagnosisCategory.CROSS_RESOURCE_CONTENTION)
+    return None

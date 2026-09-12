@@ -46,6 +46,24 @@ def test_load_missing_artifact_raises(tmp_path: Path):
         load_anomaly_detector(tmp_path, "does_not_exist")
 
 
+def test_load_pre_phase3_artifact_raises(tmp_path: Path):
+    """A pre-Phase-3 artifact lacks ``schema_version``/``_train_means`` entirely.
+
+    Simulated by deleting those attributes after fitting, standing in
+    for an object pickled before this class carried them (unpickling
+    such an object leaves them simply absent from __dict__, same as
+    this delattr does) -- loading it must raise rather than silently
+    fall back to the old, divergent score()/score_batch() imputation.
+    """
+    detector = _trained_detector()
+    del detector.schema_version
+    del detector._train_means
+    save_anomaly_detector(detector, tmp_path, "v1")
+
+    with pytest.raises(AnomalyDetectionError):
+        load_anomaly_detector(tmp_path, "v1")
+
+
 def test_notification_emitted_when_score_meets_threshold(storage_engine: Engine):
     emitted = emit_anomaly_notification_if_significant(
         storage_engine, anomaly_score=0.9, threshold=0.7, timestamp=100.0

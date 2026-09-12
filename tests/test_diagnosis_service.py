@@ -120,13 +120,47 @@ def test_triggered_cpu_event_persists_single_process_diagnosis(storage_engine: E
     assert persisted[0].id == result.id
 
 
-def test_significant_anomaly_produces_non_actionable_diagnosis(storage_engine: Engine):
+def test_high_anomaly_with_triggered_cpu_contention_resolves_to_cpu_category(storage_engine: Engine):
+    """Phase 3, F2: a triggered resource category wins over a high anomaly score.
+
+    Same triggering row as ``test_triggered_cpu_event_persists_single_process_diagnosis``,
+    but with ``anomaly_score`` significant (0.9 >= the 0.7 threshold). Before
+    Phase 3 this used to short-circuit straight to UNUSUAL_PATTERN_ANOMALY,
+    which is exactly the F1/F2 bug: since a pre-Phase-3 detector scored
+    every real sample close to 1.0, this path was effectively the *only*
+    one ever reachable in practice, and the other 7 actionable categories
+    were dead. The anomaly score is still visible on the record; it's
+    just no longer the category.
+    """
     classifier = _cpu_classifier()
     row = pd.Series({"forecast_cpu_percent": 95.0, "current_cpu_percent": 95.0, "anomaly_score": 0.9})
     contention_record = predict_contention(
         classifier, storage_engine, row, as_of=100.0, decision_threshold=0.5,
         anomaly_dampening_factor=0.0, contributing_processes_top_n=3, model_version="v1",
     )
+    assert contention_record.triggered is True
+
+    result = diagnose_contention_event(
+        storage_engine, contention_record, pd.Series({"mem_percent_rate_of_change": 0.0}),
+        {}, _CONTENTION_SETTINGS, _DIAGNOSIS_SETTINGS, model_version="v1",
+    )
+
+    assert result is not None
+    assert result.category == DiagnosisCategory.CPU_MULTI_PROCESS.value  # no process data supplied
+    assert result.is_actionable is True
+    assert result.confidence == pytest.approx(contention_record.probability)
+    assert contention_record.anomaly_score == pytest.approx(0.9)  # still on the record, just not the category
+
+
+def test_high_anomaly_without_triggered_contention_falls_back_to_anomaly_category(storage_engine: Engine):
+    """Anomaly is the fallback when nothing else resolves: contention never triggered here."""
+    classifier = _cpu_classifier()
+    row = pd.Series({"forecast_cpu_percent": 5.0, "current_cpu_percent": 5.0, "anomaly_score": 0.9})
+    contention_record = predict_contention(
+        classifier, storage_engine, row, as_of=100.0, decision_threshold=0.5,
+        anomaly_dampening_factor=0.0, contributing_processes_top_n=3, model_version="v1",
+    )
+    assert contention_record.triggered is False
 
     result = diagnose_contention_event(
         storage_engine, contention_record, pd.Series({"mem_percent_rate_of_change": 0.0}),

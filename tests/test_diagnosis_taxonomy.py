@@ -38,10 +38,26 @@ def test_not_triggered_and_no_anomaly_resolves_to_none():
     assert result is None
 
 
-def test_significant_anomaly_wins_even_if_triggered():
+def test_triggered_resource_category_wins_over_high_anomaly():
+    """Phase 3, F2: contention/dominance resolution runs before anomaly, not after.
+
+    A high anomaly score no longer short-circuits diagnosis when
+    contention is triggered and a resource is dominant -- the resource
+    category resolves as normal, and the anomaly score remains available
+    on the record as a flag rather than replacing the category.
+    """
     record = _record(triggered=True, anomaly_score=0.95, contributing_metrics=[
         {"metric": "forecast_cpu_percent", "contribution": 0.9}
     ])
+    result = resolve_diagnosis_category(record, None, 0.7, _CONFIG)
+    assert result == DiagnosisCategory.CPU_MULTI_PROCESS
+    assert is_actionable(result) is True
+    assert record.anomaly_score == 0.95
+
+
+def test_not_triggered_with_high_anomaly_falls_back_to_anomaly_category():
+    """Anomaly is the fallback when nothing else resolves -- i.e. contention never triggered."""
+    record = _record(triggered=False, anomaly_score=0.95, contributing_metrics=None)
     result = resolve_diagnosis_category(record, None, 0.7, _CONFIG)
     assert result == DiagnosisCategory.UNUSUAL_PATTERN_ANOMALY
     assert is_actionable(result) is False

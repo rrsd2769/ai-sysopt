@@ -195,16 +195,18 @@ Fixes F1 and F2. Highest single leverage in the plan: revives the recommendation
 
 ### Success Criteria
 **Automated:**
-- [ ] `score(row)` and `score_batch(row.to_frame().T)` return identical values
-- [ ] Scoring the training matrix yields mean score < 0.3
-- [ ] On held-out **real** normal data, fewer than 10% of rows exceed the significance threshold
-- [ ] High anomaly + triggered CPU contention resolves to a **CPU** category, not the anomaly category
-- [ ] Each of the 7 actionable categories is reachable from a constructed contention record
-- [ ] Loading a pre-Phase-3 artifact raises
+- [x] `score(row)` and `score_batch(row.to_frame().T)` return identical values (`tests/test_anomaly_detector.py::test_score_batch_matches_individual_scores`)
+- [x] Scoring the training matrix yields mean score < 0.3 (`test_scoring_training_matrix_has_low_mean_score`, and again on real data in `tests/test_anomaly_calibration.py`)
+- [x] On held-out **real** normal data, fewer than 10% of rows exceed the significance threshold (`tests/test_anomaly_calibration.py::test_calibration_fits_on_real_data_and_generalizes_to_holdout`)
+- [x] High anomaly + triggered CPU contention resolves to a **CPU** category, not the anomaly category (`tests/test_diagnosis_service.py::test_high_anomaly_with_triggered_cpu_contention_resolves_to_cpu_category`, `tests/test_diagnosis_taxonomy.py::test_triggered_resource_category_wins_over_high_anomaly`)
+- [x] Each of the 7 actionable categories is reachable from a constructed contention record (`tests/test_diagnosis_taxonomy.py`, unaffected by anomaly score after the reorder)
+- [x] Loading a pre-Phase-3 artifact raises (`tests/test_anomaly_persistence_and_notifications.py::test_load_pre_phase3_artifact_raises`)
 
 **Manual:**
-- [ ] During ordinary use the "unusual behaviour" banner is **absent**
-- [ ] Recommendations table receives rows for the first time
+- [ ] During ordinary use the "unusual behaviour" banner is **absent** — not yet observable: no model is deployed on this machine (`aiperfopt doctor` reports `needs_training`), so there is no live diagnosis surface to watch yet. Revisit once Phase 5/6 deploy a real model against the now-calibratable detector.
+- [ ] Recommendations table receives rows for the first time — same blocker as above.
+
+Full backend suite: 419 passed (up from 409 at the end of Phase 2), verified locally (`pytest --ignore=tests/frontend -q`).
 
 ---
 

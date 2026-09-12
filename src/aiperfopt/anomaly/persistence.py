@@ -19,7 +19,7 @@ from pathlib import Path
 
 import joblib
 
-from aiperfopt.anomaly.detector import AnomalyDetector
+from aiperfopt.anomaly.detector import ANOMALY_ARTIFACT_SCHEMA_VERSION, AnomalyDetector
 from aiperfopt.applog import get_logger
 from aiperfopt.common.exceptions import AnomalyDetectionError
 
@@ -47,7 +47,22 @@ def load_anomaly_detector(models_dir: Path, model_version: str) -> AnomalyDetect
         raise AnomalyDetectionError(
             f"No saved anomaly detector artifact at {path}", recoverable=False, context={"path": str(path)}
         )
-    return joblib.load(path)
+    detector = joblib.load(path)
+
+    # A pre-Phase-3 artifact (pickled before ``schema_version``/
+    # ``_train_means`` existed on the class) unpickles with those
+    # attributes simply absent from its __dict__ — it would silently
+    # fall back to score()'s old 0.0-fill behavior (F1) if allowed to
+    # load. Reject it outright rather than let it score incorrectly.
+    artifact_version = getattr(detector, "schema_version", None)
+    if artifact_version != ANOMALY_ARTIFACT_SCHEMA_VERSION:
+        raise AnomalyDetectionError(
+            f"Anomaly detector artifact at {path} has schema_version {artifact_version!r}, "
+            f"expected {ANOMALY_ARTIFACT_SCHEMA_VERSION!r} — retrain to produce a compatible artifact.",
+            recoverable=False,
+            context={"path": str(path), "artifact_version": artifact_version},
+        )
+    return detector
 
 
 def anomaly_artifact_exists(models_dir: Path, model_version: str) -> bool:

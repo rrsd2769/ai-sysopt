@@ -77,3 +77,43 @@ def test_is_significant():
     detector = AnomalyDetector()
     assert detector.is_significant(0.8, threshold=0.7) is True
     assert detector.is_significant(0.5, threshold=0.7) is False
+
+
+def test_fit_sets_schema_version():
+    detector = AnomalyDetector(min_training_rows=20)
+    detector.fit(_normal_data())
+    from aiperfopt.anomaly.detector import ANOMALY_ARTIFACT_SCHEMA_VERSION
+
+    assert detector.schema_version == ANOMALY_ARTIFACT_SCHEMA_VERSION
+
+
+def test_score_imputes_missing_column_from_training_mean_not_zero():
+    """F1 regression: fit() and score() must use the same imputation.
+
+    Column 'b' is centered at 50 in training. A row missing 'b' entirely
+    should be treated as "b at its training-typical value" (roughly 50),
+    not "b is 0" -- 0 is itself a wildly atypical value for this column
+    and used to make every such row score close to the maximum.
+    """
+    detector = AnomalyDetector(min_training_rows=20)
+    detector.fit(_normal_data(n=200))
+
+    row_missing_b = pd.Series({"a": 10.0})
+    row_b_at_zero = pd.Series({"a": 10.0, "b": 0.0})
+    row_b_at_mean = pd.Series({"a": 10.0, "b": 50.0})
+
+    score_missing = detector.score(row_missing_b)
+    score_zero = detector.score(row_b_at_zero)
+    score_mean = detector.score(row_b_at_mean)
+
+    assert score_missing == pytest.approx(score_mean, abs=1e-6)
+    assert score_missing != pytest.approx(score_zero, abs=1e-6)
+
+
+def test_scoring_training_matrix_has_low_mean_score():
+    data = _normal_data(n=200)
+    detector = AnomalyDetector(min_training_rows=20)
+    detector.fit(data)
+
+    scores = detector.score_batch(data)
+    assert scores.mean() < 0.3
