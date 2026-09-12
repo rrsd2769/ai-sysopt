@@ -25,11 +25,10 @@ from sklearn.model_selection import TimeSeriesSplit
 from aiperfopt.applog import get_logger
 from aiperfopt.common.timeutils import epoch_seconds_to_utc_datetime
 from aiperfopt.forecasting.baselines import Forecaster, ForecastResult
+from aiperfopt.forecasting.dataset import NON_FEATURE_COLUMNS as _NON_FEATURE_COLUMNS
 from aiperfopt.forecasting.model import MetricForecaster
 
 logger = get_logger(__name__)
-
-_NON_FEATURE_COLUMNS = ("timestamp", "current_value", "target")
 
 
 @dataclass(frozen=True)
@@ -167,7 +166,14 @@ def run_walk_forward_evaluation(
             model_version=model_version, min_training_rows=min_training_rows,
         )
         try:
-            model.fit(train_rows[feature_cols], train_rows["target"])
+            # Fit on the delta (target - current_value), not the absolute
+            # future value -- trees cannot extrapolate an absolute level
+            # they've never seen, but "how much will this change" is a
+            # small, stationary quantity. MetricForecaster.predict()
+            # reconstructs the absolute value before returning, so every
+            # comparison below (and evaluate_forecaster_on_fold's MAE/
+            # directional-accuracy math) stays in absolute units.
+            model.fit(train_rows[feature_cols], train_rows["target"] - train_rows["current_value"])
         except Exception:  # noqa: BLE001
             logger.warning("Fold training failed, skipping fold", exc_info=True,
                             extra={"metric": metric_name, "horizon": horizon_label, "fold": fold_index})

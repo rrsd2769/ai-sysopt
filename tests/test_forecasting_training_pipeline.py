@@ -97,3 +97,59 @@ def test_held_out_scenario_never_appears_in_walk_forward_training():
     training_timestamps = {s.timestamp for samples in scenarios.values() for s in samples}
     holdout_timestamps = {s.timestamp for s in holdout}
     assert training_timestamps.isdisjoint(holdout_timestamps)
+
+
+def test_process_summaries_threaded_through_without_error(storage_engine: Engine, tmp_path: Path):
+    """Phase 5: an optional process summary can be merged into the feature
+    matrix without breaking training -- the wiring the ablation's "v2" arm
+    depends on. Omitting it (the default) is exercised by every other test
+    in this file."""
+    import pandas as pd
+
+    from aiperfopt.features.process_features import PROCESS_SUMMARY_COLUMNS
+
+    fconfig = _fast_feature_config()
+    fsettings = _fast_forecasting_settings(tmp_path / "models")
+
+    scenarios = generate_training_scenarios(duration_seconds=150, interval_seconds=2.0)
+    holdout_samples = generate_holdout_scenario(150, 2.0, scenario_count=len(scenarios))
+
+    def _fake_process_summary(samples) -> pd.DataFrame:
+        return pd.DataFrame({
+            "timestamp": [s.timestamp for s in samples],
+            **{col: 1.0 for col in PROCESS_SUMMARY_COLUMNS},
+        })
+
+    process_summaries = {name: _fake_process_summary(samples) for name, samples in scenarios.items()}
+    holdout_process_summary = _fake_process_summary(holdout_samples)
+
+    summary = train_and_evaluate_all(
+        storage_engine, fconfig, fsettings, model_version="test-v2",
+        target_metrics=["cpu_percent"], scenarios=scenarios, holdout_samples=holdout_samples,
+        process_summaries=process_summaries, holdout_process_summary=holdout_process_summary,
+        compute_feature_importance=True,
+    )
+
+    assert len(summary.outcomes) == 2  # threading a process summary through must not break anything
+    # Whether LightGBM beats the baselines on this seed/duration is not
+    # this test's concern (see test_lightgbm_artifact_saved_only_when_
+    # selected's identical handling) -- only check the SHAP importance
+    # contract when a lightgbm model actually exists to compute it on.
+    for outcome in summary.outcomes:
+        if outcome.selected_forecaster != "lightgbm":
+            continue
+        assert outcome.feature_importance  # SHAP importance populated when opted in
+        # A process-summary column should appear among the features a
+        # lightgbm model trained on the merged matrix actually used.
+        assert any(name.startswith("proc_") for name in outcome.feature_importance)
+
+
+def test_feature_importance_absent_when_not_requested(storage_engine: Engine, tmp_path: Path):
+    fconfig = _fast_feature_config()
+    fsettings = _fast_forecasting_settings(tmp_path / "models")
+
+    summary = train_and_evaluate_all(
+        storage_engine, fconfig, fsettings, model_version="test-v1",
+        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+    )
+    assert all(o.feature_importance is None for o in summary.outcomes)

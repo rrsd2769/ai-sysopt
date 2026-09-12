@@ -172,9 +172,21 @@ class LiveInferenceLoop:
             feature_record.timestamp,
         )
 
+        # Phase 5: a classifier trained since then carries its own
+        # PR-curve-fitted decision threshold (aiperfopt.contention.
+        # evaluation.fit_decision_threshold) -- prefer it over the static
+        # config constant. An older artifact (or one never run through
+        # the training pipeline's holdout step) has decision_threshold
+        # unset (None), and falls back to the config value exactly as
+        # before Phase 5.
+        decision_threshold = (
+            classifier.decision_threshold
+            if classifier.decision_threshold is not None
+            else self.contention_settings.decision_threshold
+        )
         contention_record = predict_contention(
             classifier, self.storage_engine, row, as_of=feature_record.timestamp,
-            decision_threshold=self.contention_settings.decision_threshold,
+            decision_threshold=decision_threshold,
             anomaly_dampening_factor=self.contention_settings.anomaly_dampening_factor,
             contributing_processes_top_n=self.contention_settings.contributing_processes_top_n,
             model_version=active_version,

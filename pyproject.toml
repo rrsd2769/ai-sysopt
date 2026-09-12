@@ -35,6 +35,10 @@ dependencies = [
     # --- Explainability (Phase 6) ---
     "shap>=0.45,<1",
 
+    # --- Evaluation/ablation reporting (Phase 5): PR curve, confusion
+    # matrix, and feature-importance plots for the Review 2 evidence pack.
+    "matplotlib>=3.8,<4",
+
     # --- API layer (Phase 9) ---
     "fastapi>=0.110,<1",
     "uvicorn[standard]>=0.29",

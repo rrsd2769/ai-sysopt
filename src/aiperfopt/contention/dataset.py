@@ -51,6 +51,7 @@ def build_contention_dataset(
     feature_config: FeatureEngineeringConfig,
     labeling_config: ContentionLabelingConfig,
     horizon_seconds: int,
+    process_summary: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build one scenario's contention training/evaluation rows.
 
@@ -60,8 +61,14 @@ def build_contention_dataset(
     Rows are dropped if any target metric lacks a valid forward-looking
     label within tolerance (consistent with how Forecasting's own
     dataset construction handles the tail of a series).
+
+    ``process_summary``: optional, already-aligned process-summary frame
+    (Phase 4/5) merged into the intermediate engineered feature matrix
+    used to compute the anomaly score -- see
+    :func:`aiperfopt.features.engine.compute_feature_matrix`. Omitted
+    (the default) reproduces exactly pre-Phase-5 behavior.
     """
-    fm = compute_feature_matrix(samples, feature_config)
+    fm = compute_feature_matrix(samples, feature_config, process_summary=process_summary)
     if fm.empty or not deployed_forecasters:
         return pd.DataFrame()
 

@@ -14,7 +14,9 @@ def _trained_model(min_rows: int = 10) -> MetricForecaster:
     import numpy as np
 
     rng = np.random.default_rng(1)
-    X = pd.DataFrame({"a": rng.uniform(0, 10, 40), "b": rng.uniform(0, 10, 40)})
+    X = pd.DataFrame({
+        "a": rng.uniform(0, 10, 40), "b": rng.uniform(0, 10, 40), "current_value": 0.0,
+    })
     y = X["a"] * 2 + X["b"]
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1", min_training_rows=min_rows)
     model.fit(X, y)
@@ -40,7 +42,7 @@ def test_load_round_trip_predicts_identically(tmp_path: Path):
     save_forecaster(model, tmp_path)
     loaded = load_forecaster(tmp_path, "cpu_percent", "short", "test-v1")
 
-    row = pd.Series({"a": 3.0, "b": 4.0})
+    row = pd.Series({"a": 3.0, "b": 4.0, "current_value": 0.0})
     original = model.predict(row)
     restored = loaded.predict(row)
 

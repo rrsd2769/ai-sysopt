@@ -298,17 +298,21 @@ Identical data, identical chronological split, identical model and hyperparamete
 
 ### Success Criteria
 **Automated:**
-- [ ] Holdout is strictly chronological — no future-to-past leakage, asserted
-- [ ] The threshold-rule baseline is computed and persisted
-- [ ] The decision threshold is fitted from the PR curve and stored with the curve
-- [ ] `predict()` reconstructs absolute units correctly from a delta model
-- [ ] `--ablation` produces both arms from one command on one dataset
-- [ ] `--report` regenerates every artifact from scratch
+- [x] Holdout is strictly chronological — no future-to-past leakage, asserted (pre-existing `tests/test_retraining_real_usage_data.py::test_build_real_usage_training_data_splits_chronologically`, reused unchanged by `evaluation.ablation.run_ablation`)
+- [x] The threshold-rule baseline is computed and persisted (`tests/test_contention_evaluation.py::test_evaluate_threshold_rule_baseline_flags_rows_already_over_threshold`, `test_evaluate_threshold_rule_baseline_ignores_metrics_not_in_dataset`; persisted on `ContentionTrainingSummary.threshold_rule_baseline` and written into `baseline_comparison.csv`)
+- [x] The decision threshold is fitted from the PR curve and stored with the curve (`tests/test_contention_evaluation.py::test_fit_decision_threshold_picks_a_separating_point`; stored on `ContentionClassifier.decision_threshold` and verified round-tripped through the saved artifact by `tests/test_contention_training_pipeline.py::test_fitted_decision_threshold_set_on_saved_classifier`)
+- [x] `predict()` reconstructs absolute units correctly from a delta model (`tests/test_forecasting_model.py::test_predict_reconstructs_absolute_value_from_a_delta_target`)
+- [x] `--ablation` produces both arms from one command on one dataset (`tests/test_evaluation_ablation.py::test_run_ablation_produces_both_arms_with_distinct_features`; live-data run below)
+- [x] `--report` regenerates every artifact from scratch (`tests/test_evaluation_report.py::test_write_ablation_report_produces_every_artifact`; live run wrote `dataset_summary.txt`, `ablation.csv`, `baseline_comparison.csv`, `overhead.txt` — `pr_curve_contention.png`/`confusion_matrix.png`/`feature_importance.png` are skipped, with an explicit note in `dataset_summary.txt`, when no contention classifier trains or no lightgbm forecaster is selected on a given run, rather than fabricated)
 
-**Manual:**
-- [ ] **Arm B beats Arm A on PR-AUC**, and the margin is stated plainly
-- [ ] Process features appear among the top SHAP contributors
-- [ ] If Arm B does *not* beat Arm A, that is reported honestly as the finding, with the analysis of why — a negative result rigorously obtained is presentable; a fabricated positive is not
+**Manual — measured against ~1.4 hours of real accumulated usage data on this development machine (`aiperfopt evaluate --ablation --report --metrics cpu_percent mem_percent`), 2026-09-13:**
+- [ ] **Arm B beats Arm A on PR-AUC** — not measurable this run: the contention labels came back single-class (no window in this short, largely-idle collection period crossed the labeling thresholds), so neither arm trained a classifier. This is reported honestly rather than substituted with a fabricated number; re-run once the collector has accumulated a longer window that actually contains some contention.
+- [ ] Process features appear among the top SHAP contributors — not evaluated this run (no contention classifier; the SHAP-ranked `feature_importance.png` is contention-model-agnostic but wasn't emitted because no forecast target selected LightGBM on this run's holdout split). On the one forecast target that *did* select LightGBM in an earlier run of the same command, `mem_percent`/medium-horizon, Arm B's holdout MAE was meaningfully lower than Arm A's (1.18 vs 1.70 in one run; run-to-run selection is noisy on this little data) — directionally consistent with the pivot's hypothesis, not yet a statistically solid result.
+- [x] If Arm B does *not* clearly beat Arm A, that is reported honestly as the finding, with the analysis of why — see the two bullets above; the honest result on the currently-accumulated window is "not enough data yet to say," not a claimed win.
+
+**Scope decision — production retraining still defaults to system-only (v1) features.** The training pipelines (`forecasting.training_pipeline.train_and_evaluate_all`, `contention.training_pipeline.train_contention_and_anomaly_pipeline`) gained optional `process_summaries`/`holdout_process_summary` parameters this phase so the ablation's "v2" arm could exist at all — this resolves, for the ablation specifically, the open question Phase 4's handoff left about whether real-usage training should ever see process features. It does **not** change what `aiperfopt train`/`retraining.run_retraining_on_real_usage_data` deploy by default: both still call the training pipelines with no process summary, i.e. today's v1-shaped production behavior, unchanged. Whether a deployed model should switch to process features is a decision for a later phase once the ablation has enough real data to answer it with confidence — not made here.
+
+Full backend suite: 459 passed (up from 434 at the end of Phase 4), verified locally (`pytest --ignore=tests/frontend -q`).
 
 ---
 

@@ -8,14 +8,20 @@ from aiperfopt.forecasting.model import MetricForecaster
 
 
 def _synthetic_training_frame(n: int = 60):
-    # Simple learnable relationship: target = 2*feature_a + feature_b
+    # Simple learnable relationship: target = 2*feature_a + feature_b.
+    # current_value is fixed at 0.0 so predict()'s Phase 5 reconstruction
+    # (predicted_delta + current_value) is a no-op here -- these tests are
+    # about the model learning a relationship / round-tripping correctly,
+    # not about the delta-reconstruction contract itself (see
+    # test_predict_reconstructs_absolute_value_from_a_delta_target below
+    # for that).
     import numpy as np
 
     rng = np.random.default_rng(0)
     a = rng.uniform(0, 10, n)
     b = rng.uniform(0, 10, n)
     y = 2 * a + b + rng.normal(0, 0.1, n)
-    X = pd.DataFrame({"feature_a": a, "feature_b": b})
+    X = pd.DataFrame({"feature_a": a, "feature_b": b, "current_value": 0.0})
     return X, pd.Series(y)
 
 
@@ -24,10 +30,31 @@ def test_fit_and_predict_learns_a_simple_relationship():
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1", min_training_rows=10)
     model.fit(X, y)
 
-    row = pd.Series({"feature_a": 5.0, "feature_b": 5.0})
+    row = pd.Series({"feature_a": 5.0, "feature_b": 5.0, "current_value": 0.0})
     result = model.predict(row)
     # True relationship: 2*5 + 5 = 15
     assert abs(result.predicted_value - 15.0) < 3.0
+
+
+def test_predict_reconstructs_absolute_value_from_a_delta_target():
+    """fit() is given a delta (target - current_value); predict() must add
+    current_value back so callers always see an absolute value (Phase 5)."""
+    import numpy as np
+
+    rng = np.random.default_rng(1)
+    n = 60
+    current = rng.uniform(20, 80, n)
+    delta = rng.uniform(-2, 2, n)  # small, learnable change
+    X = pd.DataFrame({"current_value": current, "other_feature": rng.uniform(0, 1, n)})
+    model = MetricForecaster("cpu_percent", "short", 45, "test-v1", min_training_rows=10)
+    model.fit(X, pd.Series(delta))
+
+    row = pd.Series({"current_value": 50.0, "other_feature": 0.5})
+    result = model.predict(row)
+    # A near-zero delta model's reconstructed prediction should land close
+    # to current_value, not near zero (which is what a bug that skipped
+    # reconstruction would produce).
+    assert abs(result.predicted_value - 50.0) < 5.0
 
 
 def test_predict_before_fit_raises():
@@ -52,7 +79,7 @@ def test_predict_handles_missing_feature_columns_gracefully():
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1", min_training_rows=10)
     model.fit(X, y)
 
-    incomplete_row = pd.Series({"feature_a": 5.0})  # feature_b missing entirely
+    incomplete_row = pd.Series({"feature_a": 5.0, "current_value": 0.0})  # feature_b missing entirely
     result = model.predict(incomplete_row)  # must not raise
     assert isinstance(result.predicted_value, float)
 

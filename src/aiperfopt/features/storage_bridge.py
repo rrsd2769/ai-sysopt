@@ -62,7 +62,7 @@ def compute_live_feature_vector(
     samples = get_recent_system_metrics(engine, window_seconds=config.min_history_seconds, as_of=as_of)
     if not samples:
         return None
-    process_summary = _aligned_process_summary(engine, samples, config.tolerance_seconds)
+    process_summary = aligned_process_summary(engine, samples, config.tolerance_seconds)
     return compute_latest_feature_vector(samples, config, process_summary=process_summary)
 
 
@@ -93,7 +93,7 @@ def backfill_feature_matrix(
     (FR-4.2). Returns the number of feature vectors computed.
     """
     samples = get_system_metrics_range(engine, start=start, end=end)
-    process_summary = _aligned_process_summary(engine, samples, config.tolerance_seconds)
+    process_summary = aligned_process_summary(engine, samples, config.tolerance_seconds)
     matrix = compute_feature_matrix(samples, config, process_summary=process_summary)
     if matrix.empty:
         logger.info("Backfill produced no feature rows", extra={"start": start, "end": end})
@@ -171,16 +171,19 @@ def read_process_summary_series(engine: Engine, start: float, end: float) -> pd.
     )
 
 
-def _aligned_process_summary(
+def aligned_process_summary(
     engine: Engine, samples: list, tolerance_seconds: float
 ) -> pd.DataFrame | None:
     """Process summary aligned onto ``samples``' own timestamps, or ``None`` if there's none.
 
-    Shared by the live (:func:`compute_live_feature_vector`) and batch
-    (:func:`backfill_feature_matrix`) paths so both feed
+    Shared by the live (:func:`compute_live_feature_vector`), batch
+    (:func:`backfill_feature_matrix`), and Phase 5 ablation
+    (:mod:`aiperfopt.evaluation.ablation`) paths so all three feed
     :func:`aiperfopt.features.engine.compute_feature_matrix` through the
     identical alignment call — the guarantee that process columns come
-    out identical between training and live for the same window.
+    out identical between training and live for the same window. Public
+    (not underscore-prefixed) since the ablation module is a legitimate
+    caller from outside this module.
     """
     if not samples:
         return None

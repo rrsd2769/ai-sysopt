@@ -21,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import f1_score, precision_score, recall_score
 from sqlalchemy import Engine
 
 from aiperfopt.anomaly.detector import AnomalyDetector
@@ -31,7 +32,11 @@ from aiperfopt.contention.config import ContentionLabelingConfig
 from aiperfopt.contention.dataset import build_contention_dataset
 from aiperfopt.contention.evaluation import (
     ContentionFoldMetrics,
+    compute_base_rate,
+    compute_pr_auc,
+    evaluate_threshold_rule_baseline,
     feature_columns_of,
+    fit_decision_threshold,
     mean_contention_metrics,
     run_contention_walk_forward_evaluation,
 )
@@ -102,6 +107,15 @@ class ContentionTrainingSummary:
     n_training_rows: int = 0
     classifier_artifact_path: str | None = None
     anomaly_artifact_path: str | None = None
+    # Phase 5: honest evaluation under class imbalance (Section 5).
+    base_rate: float | None = None
+    decision_threshold: float | None = None
+    threshold_rule_baseline: dict[str, float] | None = None
+    # Raw holdout predictions -- carried so aiperfopt.evaluation.report can
+    # draw the PR curve / confusion matrix without reloading the artifact
+    # and rebuilding the holdout dataset a second time.
+    holdout_probabilities: list[float] | None = None
+    holdout_labels: list[int] | None = None
 
 
 def _load_deployed_forecasters(
@@ -132,6 +146,8 @@ def train_contention_and_anomaly_pipeline(
     scenarios: dict[str, list[SystemMetricSample]] | None = None,
     holdout_samples: list[SystemMetricSample] | None = None,
     holdout_dataset_tag: str | None = None,
+    process_summaries: dict[str, pd.DataFrame] | None = None,
+    holdout_process_summary: pd.DataFrame | None = None,
 ) -> ContentionTrainingSummary:
     """Train Anomaly Detection and Contention Prediction together. The Phase 5 entrypoint.
 
@@ -158,6 +174,12 @@ def train_contention_and_anomaly_pipeline(
         misleading for real-usage data -- same rationale as
         :func:`aiperfopt.forecasting.training_pipeline.train_and_evaluate_all`'s
         identically-named parameter).
+    process_summaries / holdout_process_summary:
+        See :func:`aiperfopt.forecasting.training_pipeline.
+        train_evaluate_and_select_one`. Threaded into both the anomaly
+        detector's feature matrix and :func:`build_contention_dataset`'s
+        calls. Omitted (the default) reproduces exactly pre-Phase-5
+        behavior for every existing caller.
     """
     if (scenarios is None) != (holdout_samples is None):
         raise ValueError("scenarios and holdout_samples must be supplied together, or not at all")
@@ -177,7 +199,10 @@ def train_contention_and_anomaly_pipeline(
     # --- Anomaly Detection: trained on the full engineered feature matrix
     # across all non-held-out scenarios (Section 7.2: same feature
     # vectors Forecasting consumes). ---
-    all_feature_matrices = [compute_feature_matrix(samples, feature_config) for samples in scenarios.values()]
+    all_feature_matrices = [
+        compute_feature_matrix(samples, feature_config, process_summary=(process_summaries or {}).get(name))
+        for name, samples in scenarios.items()
+    ]
     combined_features = pd.concat(
         [fm for fm in all_feature_matrices if not fm.empty], ignore_index=True
     )
@@ -192,9 +217,10 @@ def train_contention_and_anomaly_pipeline(
     horizon_seconds = forecasting_settings.short_horizon_target_seconds
     per_scenario_datasets = [
         build_contention_dataset(
-            samples, deployed_forecasters, anomaly_detector, feature_config, labeling_config, horizon_seconds
+            samples, deployed_forecasters, anomaly_detector, feature_config, labeling_config, horizon_seconds,
+            process_summary=(process_summaries or {}).get(name),
         )
-        for samples in scenarios.values()
+        for name, samples in scenarios.items()
     ]
     per_scenario_datasets = [ds for ds in per_scenario_datasets if not ds.empty]
 
@@ -221,24 +247,35 @@ def train_contention_and_anomaly_pipeline(
     feature_cols = feature_columns_of(combined)
     final_classifier = ContentionClassifier(min_training_rows=forecasting_settings.min_training_rows)
     final_classifier.fit(combined[feature_cols], combined["label"])
-    classifier_path = save_contention_classifier(final_classifier, forecasting_settings.models_dir, model_version)
-    summary.classifier_artifact_path = str(classifier_path)
 
-    # --- Held-out generalization check (Section 11), same discipline as Forecasting. ---
+    # --- Held-out generalization check (Section 11), same discipline as
+    # Forecasting -- run *before* saving, since Section 5's PR-curve-fitted
+    # decision threshold is computed against this holdout and must be set
+    # on the classifier before the artifact is persisted. ---
     holdout_dataset = build_contention_dataset(
-        holdout_samples, deployed_forecasters, anomaly_detector, feature_config, labeling_config, horizon_seconds
+        holdout_samples, deployed_forecasters, anomaly_detector, feature_config, labeling_config, horizon_seconds,
+        process_summary=holdout_process_summary,
     )
+    summary.base_rate = compute_base_rate(combined["label"])
     if not holdout_dataset.empty and holdout_dataset["label"].nunique() >= 1:
         probabilities = final_classifier.predict_proba_batch(holdout_dataset[feature_cols])
-        predictions = (probabilities >= contention_settings.decision_threshold).astype(int)
-        from sklearn.metrics import f1_score, precision_score, recall_score
+        fitted_threshold, threshold_curve_metrics = fit_decision_threshold(probabilities, holdout_dataset["label"])
+        final_classifier.decision_threshold = fitted_threshold
+        summary.decision_threshold = fitted_threshold
 
+        predictions = (probabilities >= fitted_threshold).astype(int)
         holdout_metrics = {
             "precision": float(precision_score(holdout_dataset["label"], predictions, zero_division=0)),
             "recall": float(recall_score(holdout_dataset["label"], predictions, zero_division=0)),
             "f1": float(f1_score(holdout_dataset["label"], predictions, zero_division=0)),
+            "pr_auc": compute_pr_auc(probabilities, holdout_dataset["label"]),
+            "decision_threshold": fitted_threshold,
+            "base_rate": summary.base_rate,
         }
         summary.holdout_metrics = holdout_metrics
+        summary.threshold_rule_baseline = evaluate_threshold_rule_baseline(holdout_dataset, labeling_config)
+        summary.holdout_probabilities = probabilities.tolist()
+        summary.holdout_labels = holdout_dataset["label"].astype(int).tolist()
         insert_evaluations_batch(engine, [
             EvaluationRecord(
                 evaluated_at=pd.Timestamp.now(tz="UTC").timestamp(),
@@ -249,6 +286,9 @@ def train_contention_and_anomaly_pipeline(
                 extra=holdout_metrics,
             )
         ])
+
+    classifier_path = save_contention_classifier(final_classifier, forecasting_settings.models_dir, model_version)
+    summary.classifier_artifact_path = str(classifier_path)
 
     logger.info(
         "Contention/Anomaly training complete",
@@ -268,7 +308,10 @@ def _persist_contention_fold_evaluations(
             metric_name=None, horizon_label="short", fold_index=r.fold_index,
             dataset_tag="walk_forward",
             mae=None, rmse=None, directional_accuracy=None, baseline_name=None,
-            extra={"precision": r.precision, "recall": r.recall, "f1": r.f1, "n_positive": r.n_positive},
+            extra={
+                "precision": r.precision, "recall": r.recall, "f1": r.f1, "pr_auc": r.pr_auc,
+                "n_positive": r.n_positive,
+            },
         )
         for r in fold_results
     ]

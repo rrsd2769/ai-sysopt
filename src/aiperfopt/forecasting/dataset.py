@@ -52,6 +52,19 @@ from aiperfopt.common.timeutils import epoch_seconds_to_utc_datetime
 from aiperfopt.features.engine import counter_rate_per_second
 from aiperfopt.storage.records import SystemMetricSample
 
+# The only columns in a supervised dataset that are never model features:
+# ``timestamp`` (bookkeeping) and ``target`` (the label itself). Unlike an
+# earlier version of this constant, ``current_value`` is *not* excluded —
+# Phase 5 gives the model direct access to the metric's own present value
+# (see :mod:`aiperfopt.forecasting.model`'s delta-target rationale for why
+# this matters), and it needs to appear in every ``X`` a forecaster is
+# fit/predicted on for that to work. Exported so
+# :mod:`aiperfopt.forecasting.evaluation` and
+# :mod:`aiperfopt.forecasting.training_pipeline` share one definition
+# instead of maintaining independent copies that could silently drift
+# apart (a real duplicate, found while building Phase 5).
+NON_FEATURE_COLUMNS = ("timestamp", "target")
+
 
 def _value_near_target_time(
     raw_series: pd.Series, target_times: pd.DatetimeIndex, tolerance_seconds: float

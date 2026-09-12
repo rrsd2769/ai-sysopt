@@ -52,7 +52,7 @@ from aiperfopt.forecasting.baselines import (
     MovingAverageForecaster,
     NaivePersistenceForecaster,
 )
-from aiperfopt.forecasting.dataset import build_supervised_dataset
+from aiperfopt.forecasting.dataset import NON_FEATURE_COLUMNS, build_supervised_dataset
 from aiperfopt.forecasting.evaluation import (
     evaluate_forecaster_on_fold,
     mean_metrics_by_model,
@@ -88,6 +88,12 @@ class MetricHorizonOutcome:
     holdout_directional_accuracy: float | None
     artifact_path: str | None = None
     is_counter: bool = False
+    # Phase 5's evidence pack (aiperfopt.evaluation.report): mean |SHAP
+    # value| per feature over the holdout set, for the winning LightGBM
+    # model only. Only populated when the caller opts in via
+    # ``compute_feature_importance`` -- computing SHAP on every ordinary
+    # training/retraining run would be pure overhead nobody asked for.
+    feature_importance: dict[str, float] | None = None
 
 
 @dataclass
@@ -193,6 +199,9 @@ def train_evaluate_and_select_one(
     model_version: str,
     is_counter: bool = False,
     holdout_dataset_tag: str | None = None,
+    process_summaries: dict[str, pd.DataFrame] | None = None,
+    holdout_process_summary: pd.DataFrame | None = None,
+    compute_feature_importance: bool = False,
 ) -> MetricHorizonOutcome:
     """Full pipeline for one (metric, horizon) pair: walk-forward eval, selection,
     held-out generalization check, and artifact persistence if LightGBM wins.
@@ -201,12 +210,24 @@ def train_evaluate_and_select_one(
     byte counts) — see :mod:`aiperfopt.forecasting.dataset`'s module
     docstring for why getting this wrong silently breaks both the
     LightGBM target and the moving-average baseline for that metric.
+
+    ``process_summaries`` / ``holdout_process_summary``: optional, keyed
+    by scenario name (matching ``scenarios``) / for the holdout set
+    respectively — an already-aligned process-summary frame (see
+    :func:`aiperfopt.features.storage_bridge.aligned_process_summary`) to
+    merge into that scenario's feature matrix, Phase 4-style. Omitted
+    (the default) reproduces exactly pre-Phase-5 behavior: every existing
+    caller of this function is unaffected. This is the hook Phase 5's
+    ablation (:mod:`aiperfopt.evaluation.ablation`) uses to give the
+    "system + process" arm real process data — synthetic scenarios have
+    none, so this is only meaningful against real-usage data.
     """
     tolerance = feature_config.tolerance_seconds
 
     per_scenario_datasets = []
-    for samples in scenarios.values():
-        fm = compute_feature_matrix(samples, feature_config)
+    for scenario_name, samples in scenarios.items():
+        process_summary = (process_summaries or {}).get(scenario_name)
+        fm = compute_feature_matrix(samples, feature_config, process_summary=process_summary)
         ds = build_supervised_dataset(
             samples, fm, metric_name, horizon_seconds, tolerance, is_counter=is_counter
         )
@@ -254,7 +275,7 @@ def train_evaluate_and_select_one(
 
     # Held-out generalization check (Section 11) — the scenario reserved
     # here never appeared in any walk-forward training fold above.
-    holdout_fm = compute_feature_matrix(holdout_samples, feature_config)
+    holdout_fm = compute_feature_matrix(holdout_samples, feature_config, process_summary=holdout_process_summary)
     holdout_dataset = build_supervised_dataset(
         holdout_samples, holdout_fm, metric_name, horizon_seconds, tolerance, is_counter=is_counter
     )
@@ -262,14 +283,14 @@ def train_evaluate_and_select_one(
     artifact_path = None
     holdout_mae = holdout_rmse = holdout_directional = None
 
-    feature_cols = [c for c in combined.columns if c not in ("timestamp", "current_value", "target")]
+    feature_cols = [c for c in combined.columns if c not in NON_FEATURE_COLUMNS]
 
     if selected == "lightgbm":
         final_model = MetricForecaster(
             metric_name=metric_name, horizon_label=horizon_label, horizon_seconds=horizon_seconds,
             model_version=model_version, min_training_rows=forecasting_settings.min_training_rows,
         )
-        final_model.fit(combined[feature_cols], combined["target"])
+        final_model.fit(combined[feature_cols], combined["target"] - combined["current_value"])
         final_model.set_confidence_from_validation(
             rmse=summary["lightgbm"]["rmse"], target_std=float(combined["target"].std())
         )
@@ -278,6 +299,10 @@ def train_evaluate_and_select_one(
         deployed_forecaster: Forecaster = final_model
     else:
         deployed_forecaster = baseline_factories_for(metric_name, horizon_seconds, is_counter=is_counter)[selected]()
+
+    feature_importance = None
+    if compute_feature_importance and selected == "lightgbm" and not holdout_dataset.empty:
+        feature_importance = _shap_feature_importance(final_model, holdout_dataset[feature_cols])
 
     if not holdout_dataset.empty:
         holdout_history = _combined_raw_history({HELD_OUT_SCENARIO_NAME: holdout_samples}, metric_name)
@@ -313,8 +338,21 @@ def train_evaluate_and_select_one(
         walk_forward_summary=summary, selected_forecaster=selected,
         holdout_mae=holdout_mae, holdout_rmse=holdout_rmse,
         holdout_directional_accuracy=holdout_directional, artifact_path=artifact_path,
-        is_counter=is_counter,
+        is_counter=is_counter, feature_importance=feature_importance,
     )
+
+
+def _shap_feature_importance(model: MetricForecaster, X: pd.DataFrame) -> dict[str, float]:
+    """Mean |SHAP value| per feature over ``X`` — Phase 5's evidence-pack
+    feature ranking (expected to show process features ranking highly for
+    the "system + process" ablation arm)."""
+    import numpy as np
+    import shap  # imported lazily: only paid when a caller opts in
+
+    explainer = shap.TreeExplainer(model.booster)
+    shap_values = explainer.shap_values(X.astype(float))
+    mean_abs = np.abs(shap_values).mean(axis=0)
+    return dict(zip(X.columns, (float(v) for v in mean_abs)))
 
 
 def train_and_evaluate_all(
@@ -328,6 +366,9 @@ def train_and_evaluate_all(
     scenarios: dict[str, list[SystemMetricSample]] | None = None,
     holdout_samples: list[SystemMetricSample] | None = None,
     holdout_dataset_tag: str | None = None,
+    process_summaries: dict[str, pd.DataFrame] | None = None,
+    holdout_process_summary: pd.DataFrame | None = None,
+    compute_feature_importance: bool = False,
 ) -> TrainingRunSummary:
     """Train and evaluate every (metric, horizon) combination. The Phase 4 entrypoint.
 
@@ -369,6 +410,10 @@ def train_and_evaluate_all(
         path). Real-usage retraining passes an explicit tag (e.g.
         ``"holdout_real_usage"``) so evaluation history stays accurate
         about what the holdout data actually was.
+    process_summaries / holdout_process_summary:
+        See :func:`train_evaluate_and_select_one`. Omitted (the default)
+        reproduces exactly pre-Phase-5 behavior for every existing
+        caller.
     """
     if (scenarios is None) != (holdout_samples is None):
         raise ValueError("scenarios and holdout_samples must be supplied together, or not at all")
@@ -404,6 +449,8 @@ def train_and_evaluate_all(
                 engine, scenarios, holdout_samples, feature_config, forecasting_settings,
                 metric_name, horizon_label, horizon_seconds, model_version, is_counter=is_counter,
                 holdout_dataset_tag=holdout_dataset_tag,
+                process_summaries=process_summaries, holdout_process_summary=holdout_process_summary,
+                compute_feature_importance=compute_feature_importance,
             )
             summary.outcomes.append(outcome)
 

@@ -15,6 +15,10 @@ models/
 *.db-wal
 *.db-shm
 
+# Phase 5 evidence pack (aiperfopt evaluate --report) -- regenerated on
+# demand from accumulated real-usage data, not committed.
+results/
+
 # Tooling
 .pytest_cache/
 .mypy_cache/

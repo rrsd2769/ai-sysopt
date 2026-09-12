@@ -14,7 +14,12 @@ from aiperfopt.features import FeatureEngineeringConfig
 from aiperfopt.forecasting.persistence import artifact_exists as forecasting_artifact_exists
 from aiperfopt.forecasting.training_pipeline import train_and_evaluate_all
 from aiperfopt.anomaly.persistence import anomaly_artifact_exists
-from aiperfopt.contention.persistence import contention_artifact_exists
+from aiperfopt.contention.persistence import contention_artifact_exists, load_contention_classifier
+from aiperfopt.features.process_features import PROCESS_SUMMARY_COLUMNS
+from aiperfopt.forecasting.training_pipeline import (
+    generate_holdout_scenario,
+    generate_training_scenarios,
+)
 from aiperfopt.storage import get_evaluations_range
 
 
@@ -138,3 +143,70 @@ def test_interleave_scenario_chunks_mixes_scenarios_in_early_rows():
 def test_interleave_scenario_chunks_empty_input():
     result = _interleave_scenario_chunks([], n_chunks=4)
     assert result.empty
+
+
+# --- Phase 5: fitted decision threshold, base rate, threshold-rule baseline ---
+
+
+def test_fitted_decision_threshold_set_on_saved_classifier(storage_engine: Engine, tmp_path: Path):
+    fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
+
+    forecast_summary = train_and_evaluate_all(
+        storage_engine, fconfig, fsettings, model_version="test-v1",
+        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+    )
+    short_outcomes = {o.metric_name: o for o in forecast_summary.outcomes if o.horizon_label == "short"}
+
+    summary = train_contention_and_anomaly_pipeline(
+        storage_engine, fconfig, fsettings, csettings, labeling_config, short_outcomes,
+        model_version="test-v1", scenario_duration_seconds=150, interval_seconds=2.0,
+    )
+
+    if summary.classifier_artifact_path is None:
+        return  # single-class training data on this seed -- nothing to assert
+
+    assert summary.base_rate is not None
+    assert summary.threshold_rule_baseline is not None
+    assert summary.decision_threshold is not None
+
+    classifier = load_contention_classifier(tmp_path / "models", "test-v1")
+    # The saved artifact must carry the *same* fitted threshold the
+    # training summary reports -- api/live_state.py reads it off the
+    # loaded classifier at inference time, not off the summary.
+    assert classifier.decision_threshold == summary.decision_threshold
+
+
+def test_process_summaries_threaded_through_without_error(storage_engine: Engine, tmp_path: Path):
+    """Phase 5: supplying a process summary must not break the pipeline --
+    this is the wiring the ablation's "v2" arm depends on."""
+    fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
+
+    scenarios = generate_training_scenarios(duration_seconds=150, interval_seconds=2.0)
+    holdout_samples = generate_holdout_scenario(150, 2.0, scenario_count=len(scenarios))
+
+    def _fake_process_summary(samples) -> "pd.DataFrame":
+        import pandas as pd
+
+        return pd.DataFrame({
+            "timestamp": [s.timestamp for s in samples],
+            **{col: 1.0 for col in PROCESS_SUMMARY_COLUMNS},
+        })
+
+    process_summaries = {name: _fake_process_summary(samples) for name, samples in scenarios.items()}
+    holdout_process_summary = _fake_process_summary(holdout_samples)
+
+    forecast_summary = train_and_evaluate_all(
+        storage_engine, fconfig, fsettings, model_version="test-v2",
+        target_metrics=["cpu_percent"], scenarios=scenarios, holdout_samples=holdout_samples,
+        process_summaries=process_summaries, holdout_process_summary=holdout_process_summary,
+    )
+    short_outcomes = {o.metric_name: o for o in forecast_summary.outcomes if o.horizon_label == "short"}
+    assert "cpu_percent" in short_outcomes
+
+    summary = train_contention_and_anomaly_pipeline(
+        storage_engine, fconfig, fsettings, csettings, labeling_config, short_outcomes,
+        model_version="test-v2", scenarios=scenarios, holdout_samples=holdout_samples,
+        process_summaries=process_summaries, holdout_process_summary=holdout_process_summary,
+    )
+    assert summary.n_training_rows > 0
+    assert anomaly_artifact_exists(tmp_path / "models", "test-v2")

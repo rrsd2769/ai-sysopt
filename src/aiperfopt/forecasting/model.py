@@ -80,6 +80,18 @@ class MetricForecaster:
         Feature Engineering's explicit "leave it None" gap policy usable
         all the way through to training without a silent imputation step
         in between.
+
+        ``y`` is expected to be a *delta* (``target - current_value``),
+        not an absolute future value — see :func:`predict`/
+        :func:`predict_batch` for the reconstruction this implies. A
+        model with no feature carrying its own current level has no way
+        to extrapolate an absolute level it has never seen at training
+        time; predicting "how much will this change" instead is a small,
+        stationary quantity every input's magnitude is centered near
+        zero for, which is exactly what a tree ensemble can learn
+        (Phase 5). ``X`` is expected to include a ``current_value``
+        column as an ordinary feature (Phase 5 stopped excluding it —
+        see :data:`aiperfopt.forecasting.dataset.NON_FEATURE_COLUMNS`).
         """
         if len(X) < self.min_training_rows:
             raise ForecastingError(
@@ -101,15 +113,20 @@ class MetricForecaster:
                 context={"metric": self.metric_name, "horizon": self.horizon_label},
             )
         x = row.reindex(self.feature_columns).to_frame().T.astype(float)
-        predicted = float(self.booster.predict(x)[0])
-        return ForecastResult(predicted, self.confidence, self.model_version)
+        predicted_delta = float(self.booster.predict(x)[0])
+        # Reconstruct the absolute value the booster was trained to predict
+        # a delta from -- see fit()'s docstring. Every caller already puts
+        # current_value on the row it hands to predict() (it's a real
+        # feature column now), so this never needs a fallback.
+        return ForecastResult(predicted_delta + float(row["current_value"]), self.confidence, self.model_version)
 
     def predict_batch(self, X: pd.DataFrame) -> pd.Series:
         """Vectorized prediction over many rows at once — used by the evaluation harness."""
         if self.booster is None:
             raise ForecastingError("predict_batch() called before fit()", recoverable=False)
         aligned = X.reindex(columns=self.feature_columns).astype(float)
-        return pd.Series(self.booster.predict(aligned), index=X.index)
+        predicted_delta = pd.Series(self.booster.predict(aligned), index=X.index)
+        return predicted_delta + X["current_value"].astype(float)
 
     def set_confidence_from_validation(self, rmse: float, target_std: float) -> None:
         """Derive this model's confidence scalar from measured walk-forward RMSE.

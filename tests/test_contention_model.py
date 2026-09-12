@@ -88,3 +88,13 @@ def test_predict_proba_handles_missing_feature_gracefully():
     incomplete_row = pd.Series({"feature_a": 50.0})  # feature_b missing
     proba = classifier.predict_proba(incomplete_row)  # must not raise
     assert 0.0 <= proba <= 1.0
+
+
+def test_decision_threshold_defaults_to_none_and_is_settable():
+    """Phase 5: unset means "never fitted" -- callers fall back to the
+    configured constant in that case (see aiperfopt.api.live_state)."""
+    classifier = ContentionClassifier()
+    assert classifier.decision_threshold is None
+
+    classifier.decision_threshold = 0.62
+    assert classifier.decision_threshold == pytest.approx(0.62)

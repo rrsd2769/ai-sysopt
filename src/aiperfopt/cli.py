@@ -277,6 +277,75 @@ def _cmd_train(args: argparse.Namespace) -> int:
 
 
 # --------------------------------------------------------------------------
+# evaluate
+# --------------------------------------------------------------------------
+
+
+def _cmd_evaluate(args: argparse.Namespace) -> int:
+    """Run Phase 5's ablation (system-only vs system+process features)
+    against real accumulated usage data, optionally writing the Review 2
+    evidence pack to disk.
+
+    Deliberately real-data-only, not synthetic -- synthetic scenarios have
+    no process data source at all, so a synthetic-data ablation would
+    compare a config against itself (see
+    :mod:`aiperfopt.evaluation.ablation`'s module docstring).
+    """
+    from aiperfopt.common.exceptions import RetrainingError
+    from aiperfopt.contention.config import ContentionLabelingConfig
+    from aiperfopt.features.config import FeatureEngineeringConfig
+    from aiperfopt.evaluation.ablation import run_ablation
+    from aiperfopt.evaluation.report import write_ablation_report
+
+    if not (args.ablation or args.report):
+        print("Nothing to do: pass --ablation (print results) and/or --report (write results/ artifacts).")
+        return 1
+
+    ctx = _bootstrap(args)
+    feature_config = FeatureEngineeringConfig()
+    labeling_config = ContentionLabelingConfig()
+
+    print(f"Running ablation ({args.version!r}) against real accumulated usage data ...")
+    try:
+        report = run_ablation(
+            ctx.storage_engine, feature_config, ctx.settings.forecasting, ctx.settings.contention,
+            labeling_config, target_metrics=args.metrics, model_version_prefix=args.version,
+            holdout_fraction=args.holdout_fraction, min_total_rows=args.min_rows, since=args.since,
+        )
+    except RetrainingError as exc:
+        print(f"Evaluation failed: {exc}")
+        return 1
+
+    print("-" * 60)
+    print(f"dataset: {report.dataset_summary}")
+    for arm_name, arm in report.arms.items():
+        contention = arm.contention_summary
+        if contention is not None and contention.holdout_metrics:
+            hm = contention.holdout_metrics
+            print(
+                f"  [{arm_name}] contention: pr_auc={hm.get('pr_auc'):.3f} f1={hm.get('f1'):.3f} "
+                f"precision={hm.get('precision'):.3f} recall={hm.get('recall'):.3f} "
+                f"threshold={contention.decision_threshold:.3f}"
+            )
+        else:
+            print(f"  [{arm_name}] contention: no classifier trained (insufficient/single-class data)")
+        for outcome in arm.forecast_summary.outcomes:
+            persistence_mae = outcome.walk_forward_summary.get("naive_persistence", {}).get("mae")
+            print(
+                f"  [{arm_name}] forecast {outcome.metric_name}/{outcome.horizon_label}: "
+                f"mae={outcome.holdout_mae} persistence_mae={persistence_mae} selected={outcome.selected_forecaster}"
+            )
+
+    if args.report:
+        written = write_ablation_report(report, args.out_dir)
+        print(f"\nWrote {len(written)} file(s) to {args.out_dir}:")
+        for path in written:
+            print(f"  {path}")
+
+    return 0
+
+
+# --------------------------------------------------------------------------
 # serve / ui / run
 # --------------------------------------------------------------------------
 
@@ -395,6 +464,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_train.add_argument("--deploy", action="store_true", help="Activate the trained version.")
     p_train.add_argument("--confirmed-by", default="cli", dest="confirmed_by")
     p_train.set_defaults(func=_cmd_train, default_log_level="WARNING")
+
+    p_evaluate = sub.add_parser(
+        "evaluate", help="Run Phase 5's ablation (system-only vs system+process) on real usage data.",
+    )
+    p_evaluate.add_argument("--ablation", action="store_true", help="Print the two-arm comparison.")
+    p_evaluate.add_argument("--report", action="store_true", help="Also write the results/ evidence pack.")
+    p_evaluate.add_argument("--out-dir", type=Path, default=Path("results"), dest="out_dir")
+    p_evaluate.add_argument(
+        "--metrics", nargs="*", default=["cpu_percent", "mem_percent"],
+        help="Target metrics to evaluate forecasters for.",
+    )
+    p_evaluate.add_argument("--version", default="eval", help="Model version prefix for this evaluation run.")
+    p_evaluate.add_argument("--holdout-fraction", type=float, default=0.2, dest="holdout_fraction")
+    p_evaluate.add_argument("--min-rows", type=int, default=1, dest="min_rows")
+    p_evaluate.add_argument(
+        "--since", type=float, default=None,
+        help="Unix epoch seconds; only use accumulated data from here to now.",
+    )
+    p_evaluate.set_defaults(func=_cmd_evaluate, default_log_level="WARNING")
 
     p_serve = sub.add_parser("serve", help="Run the API server with monitoring and live inference.")
     p_serve.set_defaults(func=_cmd_serve)

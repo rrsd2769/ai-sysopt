@@ -14,6 +14,13 @@ from dataclasses import dataclass
 
 from aiperfopt.features.process_features import PROCESS_SUMMARY_COLUMNS
 
+# The system-only gauges, named separately from PROCESS_SUMMARY_COLUMNS
+# so Phase 5's ablation (aiperfopt.evaluation.ablation) can build a "v1"
+# config (`FeatureEngineeringConfig(gauge_metrics=SYSTEM_GAUGE_METRICS)`)
+# for the "what did the model have before the pivot" arm, without
+# duplicating this tuple a second time.
+SYSTEM_GAUGE_METRICS: tuple[str, ...] = ("cpu_percent", "mem_percent", "swap_percent", "load_avg_1")
+
 
 @dataclass(frozen=True)
 class FeatureEngineeringConfig:
@@ -58,9 +65,7 @@ class FeatureEngineeringConfig:
     lookback_windows_seconds: tuple[int, ...] = (30, 120)
     tolerance_seconds: float = 5.0
     max_gap_seconds: float = 30.0
-    gauge_metrics: tuple[str, ...] = (
-        "cpu_percent", "mem_percent", "swap_percent", "load_avg_1", *PROCESS_SUMMARY_COLUMNS,
-    )
+    gauge_metrics: tuple[str, ...] = (*SYSTEM_GAUGE_METRICS, *PROCESS_SUMMARY_COLUMNS)
     counter_metrics: tuple[str, ...] = (
         "disk_read_bytes",
         "disk_write_bytes",

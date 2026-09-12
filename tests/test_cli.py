@@ -44,6 +44,9 @@ def clean_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         ["export-training-window", "--since", "0", "--out", "/tmp/export.json"],
         ["train", "--source", "real", "--version", "v2", "--deploy"],
         ["train", "--metrics", "cpu_percent", "mem_percent"],
+        ["evaluate", "--ablation"],
+        ["evaluate", "--ablation", "--report"],
+        ["evaluate", "--report", "--out-dir", "/tmp/results", "--metrics", "cpu_percent"],
         ["serve"],
         ["ui"],
         ["run"],
@@ -65,6 +68,19 @@ def test_train_defaults_are_the_documented_ones() -> None:
     assert args.version == "v1"
     assert args.metrics == ["cpu_percent", "mem_percent"]
     assert args.deploy is False
+
+
+def test_evaluate_defaults_are_the_documented_ones() -> None:
+    args = build_parser().parse_args(["evaluate"])
+    assert args.ablation is False
+    assert args.report is False
+    assert args.metrics == ["cpu_percent", "mem_percent"]
+    assert args.out_dir == Path("results")
+    assert args.holdout_fraction == 0.2
+
+
+def test_evaluate_without_ablation_or_report_is_a_no_op_error(clean_home: Path) -> None:
+    assert main(["evaluate"]) == 1
 
 
 def test_doctor_succeeds_on_a_completely_fresh_install(clean_home: Path, capsys) -> None:

@@ -60,6 +60,14 @@ class ContentionClassifier:
     model: LogisticRegression | None = field(default=None, repr=False)
     scaler: StandardScaler | None = field(default=None, repr=False)
     feature_columns: list[str] = field(default_factory=list)
+    # The Phase 5 PR-curve-fitted decision threshold (see
+    # aiperfopt.contention.evaluation.fit_decision_threshold), set by the
+    # training pipeline after holdout evaluation -- not by fit() itself,
+    # since fitting it needs held-out predictions this object doesn't have
+    # access to. None means "never fitted" (an artifact trained before
+    # Phase 5, or a classifier used outside the training pipeline);
+    # callers fall back to the configured constant in that case.
+    decision_threshold: float | None = None
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
         if len(X) < self.min_training_rows:
