@@ -57,32 +57,42 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     print(f"platform         : {_platform.system()} {_platform.release()} ({sys.platform})")
     print(f"{HOME_ENV_VAR:<17}: {app_home()}")
 
+    # Everything below is diagnostic, not authoritative -- `doctor`'s whole
+    # purpose is to explain what's wrong with an install, so it must never
+    # itself end in an unhandled traceback. A previous version only guarded
+    # the bootstrap call; a readiness-check failure on a real CI runner
+    # (exit code 1, i.e. an uncaught exception -- `doctor` never *returns*
+    # 1 itself) escaped uncaught because of that gap. Everything after
+    # bootstrap is now inside the same guard.
     try:
         ctx = _bootstrap(args)
+
+        s = ctx.settings
+        print(f"database         : {s.storage.database_path}")
+        print(f"models dir       : {s.forecasting.models_dir}")
+        print(f"active version   : {s.retraining.active_version_file}")
+        print(f"log dir          : {s.logging.log_dir}")
+
+        from aiperfopt.features.config import FeatureEngineeringConfig
+        from aiperfopt.readiness import assess_readiness
+
+        result = assess_readiness(ctx.storage_engine, FeatureEngineeringConfig(), s.retraining)
+        print("-" * 60)
+        print(f"state            : {result.state.value}")
+        print(f"model version    : {result.active_model_version or '(none deployed)'}")
+        print(f"history          : {result.history_seconds:.0f}s of {result.history_seconds_required:.0f}s needed")
+        print(f"\n{result.detail}")
     except Exception as exc:  # noqa: BLE001 - doctor reports failures, never raises them
-        print(f"\nFAILED to load configuration/storage: {exc}")
+        import traceback
+
+        print(f"\nFAILED: {exc}")
+        traceback.print_exc()
         return 2
 
-    s = ctx.settings
-    print(f"database         : {s.storage.database_path}")
-    print(f"models dir       : {s.forecasting.models_dir}")
-    print(f"active version   : {s.retraining.active_version_file}")
-    print(f"log dir          : {s.logging.log_dir}")
-
-    from aiperfopt.features.config import FeatureEngineeringConfig
-    from aiperfopt.readiness import assess_readiness
-
-    result = assess_readiness(ctx.storage_engine, FeatureEngineeringConfig(), s.retraining)
-    print("-" * 60)
-    print(f"state            : {result.state.value}")
-    print(f"model version    : {result.active_model_version or '(none deployed)'}")
-    print(f"history          : {result.history_seconds:.0f}s of {result.history_seconds_required:.0f}s needed")
-    print(f"\n{result.detail}")
-
     # "Not ready yet" is a normal, actionable state, not a broken install --
-    # only the configuration/storage failure handled above is worth a
-    # non-zero exit, so that `aiperfopt doctor` in CI checks installability
-    # rather than whether someone has collected data yet.
+    # only the failure handled above is worth a non-zero exit, so that
+    # `aiperfopt doctor` in CI checks installability rather than whether
+    # someone has collected data yet.
     return 0
 
 
