@@ -248,15 +248,19 @@ Per system-metric timestamp, derived from `raw_process_metrics` and `process_eve
 
 ### Success Criteria
 **Automated:**
-- [ ] Process summary columns are **identical** between the training path and the live path for the same window — asserted directly, not by inspection
-- [ ] **Causality:** every feature at time *t* is computable from samples with timestamp ≤ *t*; no future sample alters a past feature value
-- [ ] `proc_young_cpu_sum` is non-zero in a window containing a launch with CPU, and zero in a window without
-- [ ] A gap in process sampling yields `None`, never a stale carried-forward value
-- [ ] Loading a `v1` feature-set model against a `v2` matrix raises
-- [ ] SHAP explainer rows carry the full `v2` column set
+- [x] Process summary columns are **identical** between the training path and the live path for the same window — asserted directly, not by inspection (`tests/test_features_storage_bridge.py::test_live_and_backfill_produce_identical_process_columns_for_same_window`; structurally guaranteed by both `compute_live_feature_vector`/`backfill_feature_matrix` routing through the same `_aligned_process_summary` → `align_process_summary_to_timestamps` call, `tests/test_features_process_features.py::test_align_is_identical_whether_called_for_training_or_live`)
+- [x] **Causality:** every feature at time *t* is computable from samples with timestamp ≤ *t*; no future sample alters a past feature value (`tests/test_features_process_features.py::test_align_never_uses_a_future_poll`, `tests/test_features_engine.py::test_process_summary_columns_are_causal_like_any_other_gauge`)
+- [x] `proc_young_cpu_sum` is non-zero in a window containing a launch with CPU, and zero in a window without (pre-existing `tests/test_features_process_features.py::test_young_process_features_reflect_only_recently_created_processes` / `test_young_process_features_are_zero_with_no_recent_launches`, unaffected by this phase's alignment step)
+- [x] A gap in process sampling yields `None`, never a stale carried-forward value (`tests/test_features_process_features.py::test_align_yields_nan_not_a_stale_value_beyond_tolerance`)
+- [x] Loading a `v1` feature-set model against a `v2` matrix raises (`tests/test_anomaly_persistence_and_notifications.py::test_load_pre_phase4_artifact_raises`, `tests/test_forecasting_persistence.py::test_load_v1_feature_set_artifact_against_v2_raises` — both `AnomalyDetector` and `MetricForecaster` fit directly on the engineered matrix, so both carry the version check, mirroring Phase 3's `schema_version` sentinel-default pattern)
+- [x] SHAP explainer rows carry the full `v2` column set (`tests/test_diagnosis_explainer.py::test_shap_and_lightweight_explanations_carry_the_full_v2_column_set` — no source change needed in `diagnosis/explainer.py`: both tiers already read whatever `forecaster.feature_columns` the trained model has, so this is a property of that existing genericity, verified directly)
 
 **Manual:**
-- [ ] Launching an application visibly moves the young-process features in a live feature vector
+- [ ] Launching an application visibly moves the young-process features in a live feature vector — not exercised end-to-end this session: no model is deployed yet (`aiperfopt doctor` still reports `needs_training`, per Phase 3's handoff), so there is no running live-inference loop to watch. The underlying mechanism is covered by automated tests (`test_features_storage_bridge.py::test_compute_live_feature_vector_includes_process_columns_when_available` and the young-process unit tests above); revisit once Phase 5/6 deploy a model.
+
+**Scope decision — synthetic-scenario and real-usage retraining are not wired to process features (yet).** `contention/dataset.py::build_contention_dataset` and both `contention/training_pipeline.py`/`forecasting/training_pipeline.py` call `compute_feature_matrix(samples, feature_config)` directly on in-memory `list[SystemMetricSample]` scenarios — synthetic scenarios have no process data source at all, and `retraining/pipeline.py`'s real-usage path builds the same `SystemMetricSample`-shaped `scenarios` dict rather than routing through `features/storage_bridge.py`. Only `storage_bridge.py`'s two functions (`compute_live_feature_vector`, `backfill_feature_matrix` — the live and ad-hoc-backfill paths this phase's plan text names) were wired to align and merge process columns; `compute_feature_matrix`'s new `process_summary` parameter simply defaults to `None` everywhere else, producing exactly today's v1-shaped output for those callers. This mirrors Phase 3's calibration-path scope decision: if a future phase needs real-usage retraining (Phase 8) to train on process features too, `build_real_usage_training_data`/the training pipelines would need to be threaded with a process summary the same way `storage_bridge.py` now is — that wiring decision still needs to be made explicitly; it was not made here.
+
+Full backend suite: 434 passed (up from 419 at the end of Phase 3), verified locally (`pytest --ignore=tests/frontend -q`).
 
 ---
 

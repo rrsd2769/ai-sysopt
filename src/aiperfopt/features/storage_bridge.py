@@ -24,9 +24,14 @@ from aiperfopt.features.engine import (
     compute_latest_feature_vector,
     feature_matrix_to_records,
 )
-from aiperfopt.features.process_features import PROCESS_SUMMARY_COLUMNS, compute_process_summary_series
+from aiperfopt.features.process_features import (
+    PROCESS_SUMMARY_COLUMNS,
+    align_process_summary_to_timestamps,
+    compute_process_summary_series,
+)
 from aiperfopt.storage.reader import (
     get_process_events_range,
+    get_process_feature_summaries_range,
     get_process_metric_aggregates_range,
     get_process_metrics_range,
     get_recent_system_metrics,
@@ -55,7 +60,10 @@ def compute_live_feature_vector(
     ``None`` purely for lack of history.
     """
     samples = get_recent_system_metrics(engine, window_seconds=config.min_history_seconds, as_of=as_of)
-    return compute_latest_feature_vector(samples, config)
+    if not samples:
+        return None
+    process_summary = _aligned_process_summary(engine, samples, config.tolerance_seconds)
+    return compute_latest_feature_vector(samples, config, process_summary=process_summary)
 
 
 def compute_and_store_live_feature_vector(
@@ -85,7 +93,8 @@ def backfill_feature_matrix(
     (FR-4.2). Returns the number of feature vectors computed.
     """
     samples = get_system_metrics_range(engine, start=start, end=end)
-    matrix = compute_feature_matrix(samples, config)
+    process_summary = _aligned_process_summary(engine, samples, config.tolerance_seconds)
+    matrix = compute_feature_matrix(samples, config, process_summary=process_summary)
     if matrix.empty:
         logger.info("Backfill produced no feature rows", extra={"start": start, "end": end})
         return 0
@@ -105,6 +114,81 @@ def _records_to_frame(records: list, columns: tuple[str, ...]) -> pd.DataFrame:
     if not records:
         return pd.DataFrame(columns=list(columns))
     return pd.DataFrame([{c: getattr(r, c) for c in columns} for r in records])
+
+
+def read_process_summary_series(engine: Engine, start: float, end: float) -> pd.DataFrame:
+    """Per-poll-timestamp process summary covering ``[start, end]``, from whichever source has it.
+
+    Phase 2's independent process retention window means a long
+    historical range can straddle two different sources: rows older than
+    the process-retention cutoff have already been summarized and their
+    raw rows pruned (only ``process_feature_summaries`` survives for
+    them — see :func:`summarize_and_persist_process_features`), while
+    rows newer than the cutoff are still present as raw
+    ``raw_process_metrics``/``process_events``/``raw_process_metrics_other``
+    and haven't been summarized yet. This reads both and combines them
+    into one frame shaped like
+    :func:`aiperfopt.features.process_features.compute_process_summary_series`'s
+    output — the only shape
+    :func:`aiperfopt.features.process_features.align_process_summary_to_timestamps`
+    needs, regardless of which source a given poll came from.
+    """
+    persisted = get_process_feature_summaries_range(engine, start=start, end=end)
+    persisted_df = pd.DataFrame(
+        [
+            {"timestamp": r.timestamp, **{c: r.summary_values.get(c) for c in PROCESS_SUMMARY_COLUMNS}}
+            for r in persisted
+        ]
+    ) if persisted else pd.DataFrame(columns=["timestamp", *PROCESS_SUMMARY_COLUMNS])
+
+    metrics = get_process_metrics_range(engine, start=start, end=end)
+    raw_df = pd.DataFrame(columns=["timestamp", *PROCESS_SUMMARY_COLUMNS])
+    if metrics:
+        metrics_df = _records_to_frame(
+            metrics, ("timestamp", "pid", "cpu_percent", "memory_rss", "num_threads", "create_time")
+        )
+        events_df = _records_to_frame(
+            get_process_events_range(engine, start=start, end=end), ("timestamp", "event_type")
+        )
+        aggregates_df = _records_to_frame(
+            get_process_metric_aggregates_range(engine, start=start, end=end),
+            ("timestamp", "other_count", "other_cpu_sum", "other_mem_rss_sum"),
+        )
+        raw_df = compute_process_summary_series(metrics_df, events_df, aggregates_df)
+
+    non_empty = [df for df in (persisted_df, raw_df) if not df.empty]
+    if not non_empty:
+        return pd.DataFrame(columns=["timestamp", *PROCESS_SUMMARY_COLUMNS])
+    combined = pd.concat(non_empty, ignore_index=True)
+    # The two sources shouldn't overlap in timestamp by construction
+    # (Phase 2 always summarizes a poll immediately before pruning its raw
+    # rows) — keep() the raw-computed value on the rare chance both exist
+    # for the same poll, since it's the more direct computation.
+    return (
+        combined.drop_duplicates(subset="timestamp", keep="last")
+        .sort_values("timestamp")
+        .reset_index(drop=True)
+    )
+
+
+def _aligned_process_summary(
+    engine: Engine, samples: list, tolerance_seconds: float
+) -> pd.DataFrame | None:
+    """Process summary aligned onto ``samples``' own timestamps, or ``None`` if there's none.
+
+    Shared by the live (:func:`compute_live_feature_vector`) and batch
+    (:func:`backfill_feature_matrix`) paths so both feed
+    :func:`aiperfopt.features.engine.compute_feature_matrix` through the
+    identical alignment call — the guarantee that process columns come
+    out identical between training and live for the same window.
+    """
+    if not samples:
+        return None
+    timestamps = [s.timestamp for s in samples]
+    summary = read_process_summary_series(engine, start=min(timestamps), end=max(timestamps))
+    if summary.empty:
+        return None
+    return align_process_summary_to_timestamps(summary, timestamps, tolerance_seconds)
 
 
 def summarize_and_persist_process_features(engine: Engine, cutoff: float) -> int:

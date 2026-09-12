@@ -46,6 +46,19 @@ def test_load_missing_artifact_raises(tmp_path: Path):
         load_anomaly_detector(tmp_path, "does_not_exist")
 
 
+def test_load_pre_phase4_artifact_raises(tmp_path: Path):
+    """A pre-Phase-4 artifact lacks ``feature_set_version`` entirely (same
+    unpickling-absence trap as schema_version, above) -- loading it must
+    raise rather than silently score a v2 matrix with v1 feature_columns,
+    dropping every process column via _prepare's reindex."""
+    detector = _trained_detector()
+    del detector.feature_set_version
+    save_anomaly_detector(detector, tmp_path, "v1")
+
+    with pytest.raises(AnomalyDetectionError):
+        load_anomaly_detector(tmp_path, "v1")
+
+
 def test_load_pre_phase3_artifact_raises(tmp_path: Path):
     """A pre-Phase-3 artifact lacks ``schema_version``/``_train_means`` entirely.
 

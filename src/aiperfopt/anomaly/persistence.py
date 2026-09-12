@@ -22,6 +22,7 @@ import joblib
 from aiperfopt.anomaly.detector import ANOMALY_ARTIFACT_SCHEMA_VERSION, AnomalyDetector
 from aiperfopt.applog import get_logger
 from aiperfopt.common.exceptions import AnomalyDetectionError
+from aiperfopt.features.config import FEATURE_SET_VERSION
 
 logger = get_logger(__name__)
 
@@ -61,6 +62,21 @@ def load_anomaly_detector(models_dir: Path, model_version: str) -> AnomalyDetect
             f"expected {ANOMALY_ARTIFACT_SCHEMA_VERSION!r} — retrain to produce a compatible artifact.",
             recoverable=False,
             context={"path": str(path), "artifact_version": artifact_version},
+        )
+
+    # A pre-Phase-4 artifact (fit before the process-summary gauge
+    # columns existed) unpickles with ``feature_set_version`` absent from
+    # its __dict__, same class-attribute-default trap as above — see
+    # ``_UNVERSIONED_FEATURE_SET`` in detector.py. Reject it rather than
+    # let ``_prepare``'s reindex silently drop every v2-only column a
+    # live v2 matrix now offers.
+    artifact_feature_set = getattr(detector, "feature_set_version", None)
+    if artifact_feature_set != FEATURE_SET_VERSION:
+        raise AnomalyDetectionError(
+            f"Anomaly detector artifact at {path} has feature_set_version {artifact_feature_set!r}, "
+            f"expected {FEATURE_SET_VERSION!r} — retrain to produce a compatible artifact.",
+            recoverable=False,
+            context={"path": str(path), "artifact_feature_set_version": artifact_feature_set},
         )
     return detector
 

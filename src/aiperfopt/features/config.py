@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from aiperfopt.features.process_features import PROCESS_SUMMARY_COLUMNS
+
 
 @dataclass(frozen=True)
 class FeatureEngineeringConfig:
@@ -40,7 +42,12 @@ class FeatureEngineeringConfig:
         instantaneous rate — the resulting rate feature is ``None``.
     gauge_metrics:
         Metrics used as-is (lag/rolling statistics computed directly on
-        the raw value).
+        the raw value). Includes the Phase 4 process-summary columns
+        (:data:`aiperfopt.features.process_features.PROCESS_SUMMARY_COLUMNS`)
+        alongside the original system-metric gauges — once
+        :func:`aiperfopt.features.engine.compute_feature_matrix` is given
+        an aligned process summary, these get the same lag/rolling/rate
+        treatment for free, no separate machinery needed.
     counter_metrics:
         Cumulative OS counters. These are rate-transformed
         (bytes/sec-style derivative) before any lag/rolling statistics
@@ -51,7 +58,9 @@ class FeatureEngineeringConfig:
     lookback_windows_seconds: tuple[int, ...] = (30, 120)
     tolerance_seconds: float = 5.0
     max_gap_seconds: float = 30.0
-    gauge_metrics: tuple[str, ...] = ("cpu_percent", "mem_percent", "swap_percent", "load_avg_1")
+    gauge_metrics: tuple[str, ...] = (
+        "cpu_percent", "mem_percent", "swap_percent", "load_avg_1", *PROCESS_SUMMARY_COLUMNS,
+    )
     counter_metrics: tuple[str, ...] = (
         "disk_read_bytes",
         "disk_write_bytes",
@@ -72,4 +81,4 @@ class FeatureEngineeringConfig:
         return max(self.lookback_windows_seconds) + self.tolerance_seconds
 
 
-FEATURE_SET_VERSION = "v1"
+FEATURE_SET_VERSION = "v2"

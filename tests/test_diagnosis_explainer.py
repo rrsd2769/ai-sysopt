@@ -103,6 +103,37 @@ def test_shap_forecast_explanation_matches_real_tree_shap_values():
         assert abs(attribution.value - expected[attribution.feature_name]) < 1e-9
 
 
+def test_shap_and_lightweight_explanations_carry_the_full_v2_column_set():
+    """Phase 4 success criterion: once a forecaster is trained on the v2
+    feature set (system gauges + process-summary columns), both
+    explanation tiers must carry every one of those columns -- not a
+    subset. explain_forecast doesn't hardcode a column list; it reads
+    whatever forecaster.feature_columns the trained model actually has,
+    so this is a property of that genericity, verified directly rather
+    than assumed."""
+    rng = np.random.default_rng(2)
+    n = 150
+    v2_columns = {
+        "cpu_percent_lag_30s": rng.uniform(0, 100, n),
+        "cpu_percent_roll_mean_30s": rng.uniform(0, 100, n),
+        "proc_cpu_sum_roll_mean_30s": rng.uniform(0, 100, n),
+        "proc_young_cpu_sum_lag_30s": rng.uniform(0, 50, n),
+    }
+    X = pd.DataFrame(v2_columns)
+    y = X["cpu_percent_lag_30s"] * 0.5 + X["proc_cpu_sum_roll_mean_30s"] * 0.3
+    forecaster = MetricForecaster(
+        metric_name="cpu_percent", horizon_label="short", horizon_seconds=45, model_version="v2"
+    )
+    forecaster.fit(X, y)
+    feature_row = pd.Series({col: 50.0 for col in v2_columns})
+
+    lightweight = explain_forecast("cpu_percent", forecaster, feature_row, use_shap=False, top_n=10)
+    shap_result = explain_forecast("cpu_percent", forecaster, feature_row, use_shap=True, top_n=10)
+
+    assert {f.feature_name for f in lightweight.top_features} == set(v2_columns)
+    assert {f.feature_name for f in shap_result.top_features} == set(v2_columns)
+
+
 def test_baseline_forecaster_explanation_is_not_applicable_with_honest_note():
     baseline = NaivePersistenceForecaster(model_version="baseline-naive_persistence")
     feature_row = pd.Series({"cpu_percent_lag_30s": 80.0})

@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 
 import math
+import pandas as pd
 import pytest
 
 from aiperfopt.features.config import FeatureEngineeringConfig
@@ -178,6 +179,59 @@ def test_compute_latest_feature_vector_matches_last_row_of_batch_matrix():
             assert value == pytest.approx(full_value), f"mismatch on {key}"
 
 
+def test_process_summary_columns_get_the_same_gauge_treatment():
+    """Phase 4: an aligned process_summary frame's columns must be
+    treated exactly like any other configured gauge metric — lag/
+    rolling/rate features come for free, no separate formula path."""
+    config = FeatureEngineeringConfig(lookback_windows_seconds=(30,), tolerance_seconds=2.0)
+    base = time.time() - 100
+    samples = [
+        SystemMetricSample(timestamp=base + i * 2.0, cpu_percent=0.0, mem_percent=0.0)
+        for i in range(50)
+    ]
+    process_summary = pd.DataFrame(
+        {"timestamp": [s.timestamp for s in samples], "proc_cpu_sum": [42.0] * 50}
+    )
+
+    matrix = compute_feature_matrix(samples, config, process_summary=process_summary)
+
+    assert "proc_cpu_sum_roll_mean_30s" in matrix.columns
+    assert (matrix["proc_cpu_sum_roll_mean_30s"] == 42.0).all()
+
+
+def test_process_summary_none_leaves_process_columns_absent():
+    """No process data available (e.g. a synthetic training scenario) must
+    not fabricate process feature columns."""
+    config = FeatureEngineeringConfig()
+    samples = _regular_samples(20)
+    matrix = compute_feature_matrix(samples, config, process_summary=None)
+    assert not any(c.startswith("proc_cpu_sum") for c in matrix.columns)
+
+
+def test_process_summary_columns_are_causal_like_any_other_gauge():
+    """A future process value must not change a past row's engineered
+    feature -- the same causality guarantee _feature_bundle already gives
+    every gauge, now verified for a merged-in process column too."""
+    config = FeatureEngineeringConfig(lookback_windows_seconds=(30,), tolerance_seconds=2.0)
+    base = time.time() - 100
+    samples = [
+        SystemMetricSample(timestamp=base + i * 2.0, cpu_percent=0.0, mem_percent=0.0)
+        for i in range(30)
+    ]
+    timestamps = [s.timestamp for s in samples]
+
+    summary_before = pd.DataFrame({"timestamp": timestamps, "proc_cpu_sum": [10.0] * 30})
+    summary_after = summary_before.copy()
+    summary_after.loc[summary_after.index[-1], "proc_cpu_sum"] = 9999.0  # only the last row changes
+
+    matrix_before = compute_feature_matrix(samples, config, process_summary=summary_before)
+    matrix_after = compute_feature_matrix(samples, config, process_summary=summary_after)
+
+    # Every row except the last (whose own current value legitimately
+    # differs) must be unaffected by that future change.
+    pd.testing.assert_frame_equal(matrix_before.iloc[:-1], matrix_after.iloc[:-1])
+
+
 def test_feature_matrix_to_records_round_trips_shape():
     config = FeatureEngineeringConfig()
     samples = _regular_samples(20)
@@ -186,7 +240,7 @@ def test_feature_matrix_to_records_round_trips_shape():
 
     assert len(records) == 20
     assert all(r.computed_at == 1234.0 for r in records)
-    assert all(r.feature_set_version == "v1" for r in records)
+    assert all(r.feature_set_version == "v2" for r in records)
     assert all(isinstance(r.feature_values, dict) for r in records)
 
 

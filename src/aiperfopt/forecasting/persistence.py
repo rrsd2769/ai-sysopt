@@ -27,6 +27,7 @@ import lightgbm as lgb
 
 from aiperfopt.applog import get_logger
 from aiperfopt.common.exceptions import ForecastingError
+from aiperfopt.features.config import FEATURE_SET_VERSION
 from aiperfopt.forecasting.model import MetricForecaster
 
 logger = get_logger(__name__)
@@ -56,6 +57,7 @@ def save_forecaster(forecaster: MetricForecaster, models_dir: Path) -> Path:
         "horizon_seconds": forecaster.horizon_seconds,
         "model_version": forecaster.model_version,
         "feature_columns": forecaster.feature_columns,
+        "feature_set_version": forecaster.feature_set_version,
         "confidence": forecaster.confidence,
     }
     (target_dir / _METADATA_FILENAME).write_text(json.dumps(metadata, indent=2))
@@ -82,6 +84,24 @@ def load_forecaster(
         )
 
     metadata = json.loads(metadata_path.read_text())
+
+    # A pre-Phase-4 artifact's metadata.json predates this key entirely,
+    # so ``.get`` returns None here rather than a real version string —
+    # naturally distinct from the current ``FEATURE_SET_VERSION``, no
+    # separate sentinel needed the way the pickled AnomalyDetector artifact
+    # does (see aiperfopt.anomaly.detector's class-attribute-default note).
+    # Loading it against a v2 feature matrix would otherwise silently
+    # reindex away every process column this forecaster never learned.
+    artifact_feature_set = metadata.get("feature_set_version")
+    if artifact_feature_set != FEATURE_SET_VERSION:
+        raise ForecastingError(
+            f"Forecaster artifact at {target_dir} has feature_set_version "
+            f"{artifact_feature_set!r}, expected {FEATURE_SET_VERSION!r} — retrain to "
+            "produce a compatible artifact.",
+            recoverable=False,
+            context={"path": str(target_dir), "artifact_feature_set_version": artifact_feature_set},
+        )
+
     forecaster = MetricForecaster(
         metric_name=metadata["metric_name"],
         horizon_label=metadata["horizon_label"],
@@ -90,6 +110,7 @@ def load_forecaster(
     )
     forecaster.booster = lgb.Booster(model_file=str(model_path))
     forecaster.feature_columns = metadata["feature_columns"]
+    forecaster.feature_set_version = artifact_feature_set
     forecaster.confidence = metadata["confidence"]
     return forecaster
 

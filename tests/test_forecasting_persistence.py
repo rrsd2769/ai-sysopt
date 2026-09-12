@@ -60,6 +60,25 @@ def test_load_missing_artifact_raises(tmp_path: Path):
         load_forecaster(tmp_path, "cpu_percent", "short", "does_not_exist")
 
 
+def test_load_v1_feature_set_artifact_against_v2_raises(tmp_path: Path):
+    """A forecaster whose metadata.json predates FEATURE_SET_VERSION="v2"
+    (Phase 4's process columns) must be rejected -- loading it silently
+    would mean predict()'s reindex(self.feature_columns) drops every
+    process column a v2 live feature vector now offers."""
+    import json
+
+    model = _trained_model()
+    target_dir = save_forecaster(model, tmp_path)
+
+    metadata_path = target_dir / "metadata.json"
+    metadata = json.loads(metadata_path.read_text())
+    del metadata["feature_set_version"]
+    metadata_path.write_text(json.dumps(metadata))
+
+    with pytest.raises(ForecastingError):
+        load_forecaster(tmp_path, "cpu_percent", "short", "test-v1")
+
+
 def test_different_horizons_and_metrics_do_not_collide(tmp_path: Path):
     short_model = _trained_model()
     short_model.horizon_label = "short"

@@ -29,7 +29,16 @@ import lightgbm as lgb
 import pandas as pd
 
 from aiperfopt.common.exceptions import ForecastingError
+from aiperfopt.features.config import FEATURE_SET_VERSION
 from aiperfopt.forecasting.baselines import ForecastResult
+
+# Sentinel distinct from any real ``FEATURE_SET_VERSION`` string — a
+# forecaster fit before this field existed (or loaded from a metadata.json
+# without it) reads as unversioned rather than silently matching the
+# current version. Same dataclass-default trap as
+# ``aiperfopt.anomaly.detector.AnomalyDetector.schema_version``: only
+# ``fit()`` ever stamps the real value.
+_UNVERSIONED_FEATURE_SET = ""
 
 DEFAULT_LGBM_PARAMS: dict = {
     "objective": "regression",
@@ -57,6 +66,7 @@ class MetricForecaster:
 
     booster: lgb.Booster | None = field(default=None, repr=False)
     feature_columns: list[str] = field(default_factory=list)
+    feature_set_version: str = _UNVERSIONED_FEATURE_SET
     confidence: float | None = None
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
@@ -80,6 +90,7 @@ class MetricForecaster:
             )
 
         self.feature_columns = list(X.columns)
+        self.feature_set_version = FEATURE_SET_VERSION
         train_set = lgb.Dataset(X, label=y, free_raw_data=False)
         self.booster = lgb.train(self.params, train_set, num_boost_round=self.num_boost_round)
 

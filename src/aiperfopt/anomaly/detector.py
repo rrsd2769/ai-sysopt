@@ -32,6 +32,7 @@ import pandas as pd
 from sklearn.ensemble import IsolationForest
 
 from aiperfopt.common.exceptions import AnomalyDetectionError
+from aiperfopt.features.config import FEATURE_SET_VERSION
 
 DEFAULT_ISOLATION_FOREST_PARAMS: dict = {
     "n_estimators": 100,
@@ -62,6 +63,19 @@ _NORMALIZATION_SIGMA = 3.0
 ANOMALY_ARTIFACT_SCHEMA_VERSION = 2
 _UNVERSIONED = 0
 
+# Same trap, same fix, for a different axis of skew: this detector is fit
+# directly on Feature Engineering's full engineered matrix (see module
+# docstring), so a v1-trained artifact's ``feature_columns`` silently
+# lacks Phase 4's process columns. ``_prepare``'s ``reindex`` would drop
+# any v2-only columns a live v2 matrix offers rather than raising, which
+# is exactly the kind of silent train/serve skew Phase 3 fixed for
+# imputation — ``load_anomaly_detector`` checks this against the current
+# ``FEATURE_SET_VERSION`` the same way it checks ``schema_version``: the
+# field's default is a sentinel distinct from any real version string,
+# not "the current one", so a pre-Phase-4 artifact reads as unversioned
+# rather than silently matching.
+_UNVERSIONED_FEATURE_SET = ""
+
 
 @dataclass
 class AnomalyDetector:
@@ -73,6 +87,7 @@ class AnomalyDetector:
     model: IsolationForest | None = field(default=None, repr=False)
     feature_columns: list[str] = field(default_factory=list)
     schema_version: int = _UNVERSIONED
+    feature_set_version: str = _UNVERSIONED_FEATURE_SET
     _train_means: pd.Series | None = field(default=None, repr=False)
     _train_score_mean: float | None = None
     _train_score_std: float | None = None
@@ -129,6 +144,7 @@ class AnomalyDetector:
         self._train_score_mean = float(np.mean(raw_scores))
         self._train_score_std = float(np.std(raw_scores)) or 1e-9  # avoid div-by-zero
         self.schema_version = ANOMALY_ARTIFACT_SCHEMA_VERSION
+        self.feature_set_version = FEATURE_SET_VERSION
 
     def score(self, row: pd.Series) -> float:
         """Normalized anomaly score for one row: 0 (typical) to 1 (highly anomalous)."""

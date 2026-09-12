@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import math
+
 import pandas as pd
 
 from aiperfopt.features.process_features import (
     PROCESS_SUMMARY_COLUMNS,
+    align_process_summary_to_timestamps,
     compute_process_summary_series,
 )
 
@@ -147,6 +150,79 @@ def test_aggregate_row_corrects_whole_population_sums_but_not_top_k():
     assert result["proc_count_active"] == 2 + 5
     assert result["proc_cpu_top1"] == 50.0  # unaffected by the aggregate
     assert result["proc_cpu_top1_share"] == 50.0 / 75.0
+
+
+def test_align_uses_the_most_recent_poll_at_or_before_each_eval_timestamp():
+    metrics = _metrics_df(
+        [
+            {"timestamp": 100.0, "pid": 1, "cpu_percent": 10.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0},
+            {"timestamp": 110.0, "pid": 1, "cpu_percent": 40.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0},
+        ]
+    )
+    summary = compute_process_summary_series(metrics, _events_df([]), _aggregates_df([]))
+
+    aligned = align_process_summary_to_timestamps(summary, [101.0, 112.0], tolerance_seconds=5.0)
+
+    row_101 = aligned[aligned["timestamp"] == 101.0].iloc[0]
+    row_112 = aligned[aligned["timestamp"] == 112.0].iloc[0]
+    assert row_101["proc_cpu_sum"] == 10.0  # nearest poll <= 101 is t=100
+    assert row_112["proc_cpu_sum"] == 40.0  # nearest poll <= 112 is t=110
+
+
+def test_align_never_uses_a_future_poll():
+    """A poll strictly after the eval timestamp must never be used (causality)."""
+    metrics = _metrics_df(
+        [{"timestamp": 200.0, "pid": 1, "cpu_percent": 99.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0}]
+    )
+    summary = compute_process_summary_series(metrics, _events_df([]), _aggregates_df([]))
+
+    aligned = align_process_summary_to_timestamps(summary, [199.0], tolerance_seconds=50.0)
+
+    row = aligned.iloc[0]
+    assert all(pd.isna(row[col]) for col in PROCESS_SUMMARY_COLUMNS)
+
+
+def test_align_yields_nan_not_a_stale_value_beyond_tolerance():
+    metrics = _metrics_df(
+        [{"timestamp": 100.0, "pid": 1, "cpu_percent": 10.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0}]
+    )
+    summary = compute_process_summary_series(metrics, _events_df([]), _aggregates_df([]))
+
+    aligned = align_process_summary_to_timestamps(summary, [100.0, 200.0], tolerance_seconds=5.0)
+
+    row_100 = aligned[aligned["timestamp"] == 100.0].iloc[0]
+    row_200 = aligned[aligned["timestamp"] == 200.0].iloc[0]
+    assert row_100["proc_cpu_sum"] == 10.0
+    assert all(pd.isna(row_200[col]) for col in PROCESS_SUMMARY_COLUMNS)
+
+
+def test_align_with_empty_summary_yields_all_nan_rows():
+    empty_summary = pd.DataFrame(columns=["timestamp", *PROCESS_SUMMARY_COLUMNS])
+    aligned = align_process_summary_to_timestamps(empty_summary, [1.0, 2.0], tolerance_seconds=5.0)
+    assert sorted(aligned["timestamp"].tolist()) == [1.0, 2.0]
+    for col in PROCESS_SUMMARY_COLUMNS:
+        assert aligned[col].isna().all()
+
+
+def test_align_is_identical_whether_called_for_training_or_live():
+    """The same (summary, eval_timestamps, tolerance) must produce the
+    same output regardless of which caller invokes it -- the property
+    that makes the training and live paths structurally incapable of
+    diverging (both storage_bridge functions route through this one
+    call)."""
+    metrics = _metrics_df(
+        [
+            {"timestamp": 100.0, "pid": 1, "cpu_percent": 10.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0},
+            {"timestamp": 103.0, "pid": 1, "cpu_percent": 12.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0},
+        ]
+    )
+    summary = compute_process_summary_series(metrics, _events_df([]), _aggregates_df([]))
+    eval_ts = [100.0, 101.5, 103.0, 106.0]
+
+    result_a = align_process_summary_to_timestamps(summary, eval_ts, tolerance_seconds=3.0)
+    result_b = align_process_summary_to_timestamps(summary, list(eval_ts), tolerance_seconds=3.0)
+
+    pd.testing.assert_frame_equal(result_a, result_b)
 
 
 def test_gap_between_polls_does_not_interpolate_a_missing_timestamp():

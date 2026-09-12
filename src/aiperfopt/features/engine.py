@@ -147,9 +147,22 @@ def _feature_bundle(
 
 
 def compute_feature_matrix(
-    samples: Sequence[SystemMetricSample], config: FeatureEngineeringConfig
+    samples: Sequence[SystemMetricSample],
+    config: FeatureEngineeringConfig,
+    process_summary: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Compute one feature row per input raw sample. The single source of truth (FR-4.2).
+
+    ``process_summary`` (Phase 4), if given, is a process-summary frame
+    already aligned one-to-one onto these samples' own timestamps (see
+    :func:`aiperfopt.features.process_features.align_process_summary_to_timestamps`)
+    — its columns are joined onto the raw sample frame *before* the
+    gauge/counter loop below runs, so any of its column names already
+    present in ``config.gauge_metrics`` get the same lag/rolling/rate
+    treatment as any other gauge, with no separate formula path. Passing
+    ``None`` (the default) computes system-metrics-only features exactly
+    as before Phase 4 — e.g. for synthetic scenarios, which have no
+    process data to align.
 
     Returns a DataFrame with a ``timestamp`` column plus one column per
     engineered feature. Empty input returns an empty DataFrame with no
@@ -158,6 +171,9 @@ def compute_feature_matrix(
     df = _samples_to_frame(samples)
     if df.empty:
         return pd.DataFrame()
+
+    if process_summary is not None and not process_summary.empty:
+        df = df.join(process_summary.set_index("timestamp"), on="timestamp")
 
     feature_columns: dict[str, pd.Series] = {}
 
@@ -196,7 +212,9 @@ def _row_to_feature_values(row: pd.Series) -> dict[str, float]:
 
 
 def compute_latest_feature_vector(
-    samples: Sequence[SystemMetricSample], config: FeatureEngineeringConfig
+    samples: Sequence[SystemMetricSample],
+    config: FeatureEngineeringConfig,
+    process_summary: pd.DataFrame | None = None,
 ) -> FeatureVectorRecord | None:
     """Feature vector for the most recent sample in ``samples`` — the live-inference call.
 
@@ -205,9 +223,10 @@ def compute_latest_feature_vector(
     :attr:`FeatureEngineeringConfig.min_history_seconds`) — this function
     does not fetch data itself, keeping it testable without storage (see
     :func:`compute_live_feature_vector` for the storage-backed
-    convenience wrapper).
+    convenience wrapper). ``process_summary``: see
+    :func:`compute_feature_matrix`.
     """
-    matrix = compute_feature_matrix(samples, config)
+    matrix = compute_feature_matrix(samples, config, process_summary=process_summary)
     if matrix.empty:
         return None
 
