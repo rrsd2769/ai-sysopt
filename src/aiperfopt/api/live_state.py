@@ -48,7 +48,7 @@ from aiperfopt.applog import get_logger
 from aiperfopt.common.exceptions import AppError, ModelDeploymentError
 from aiperfopt.config.settings import ContentionSettings, DiagnosisSettings, ForecastingSettings, RetrainingSettings
 from aiperfopt.contention.dataset import build_live_contention_input_row
-from aiperfopt.contention.persistence import load_contention_classifier
+from aiperfopt.contention.persistence import contention_artifact_exists, load_contention_classifier
 from aiperfopt.contention.prediction import predict_contention
 from aiperfopt.diagnosis.service import diagnose_contention_event
 from aiperfopt.features.config import FeatureEngineeringConfig
@@ -58,8 +58,14 @@ from aiperfopt.recommendation.catalog import RecommendationCatalog
 from aiperfopt.recommendation.service import generate_recommendations
 from aiperfopt.retraining.deployment import get_active_model_version, rollback_to_last_known_good
 from aiperfopt.storage.reader import get_recent_system_metrics
-from aiperfopt.storage.records import ContentionPredictionRecord, DiagnosisRecord, RecommendationRecord, SystemMetricSample
-from aiperfopt.storage.writer import insert_contention_prediction
+from aiperfopt.storage.records import (
+    ContentionPredictionRecord,
+    DiagnosisRecord,
+    ForecastPredictionRecord,
+    RecommendationRecord,
+    SystemMetricSample,
+)
+from aiperfopt.storage.writer import insert_contention_prediction, insert_forecast_predictions_batch
 
 logger = get_logger(__name__)
 
@@ -72,6 +78,7 @@ class LiveState:
     latest_metrics: SystemMetricSample | None = None
     feature_vector: dict[str, float] | None = None
     active_model_version: str | None = None
+    forecasts: list[ForecastPredictionRecord] | None = None
     contention: ContentionPredictionRecord | None = None
     diagnosis: DiagnosisRecord | None = None
     recommendation: RecommendationRecord | None = None
@@ -156,8 +163,8 @@ class LiveInferenceLoop:
         if active_version is None:
             return state  # nothing deployed yet (Phase 8 never confirmed one) — NFR-11.1
 
-        forecasters, classifier, anomaly_detector = self._load_active_models(active_version, state)
-        if forecasters is None or classifier is None or anomaly_detector is None:
+        forecasters, anomaly_detector, classifier = self._load_active_models(active_version, state)
+        if forecasters is None or anomaly_detector is None:
             return state  # NFR-5.3's fallback already attempted inside _load_active_models
 
         row = build_live_contention_input_row(
@@ -166,11 +173,21 @@ class LiveInferenceLoop:
         if row is None:
             return state  # a target metric has no usable current value this cycle
 
+        forecast_records = self._build_forecast_records(
+            row, feature_record.timestamp, list(forecasters.keys()), active_version
+        )
+        if forecast_records:
+            insert_forecast_predictions_batch(self.storage_engine, forecast_records)
+        state.forecasts = forecast_records
+
         anomaly_score = float(row["anomaly_score"])
         state.anomaly_notification = emit_anomaly_notification_if_significant(
             self.storage_engine, anomaly_score, self.contention_settings.anomaly_significant_threshold,
             feature_record.timestamp,
         )
+
+        if classifier is None:
+            return state  # Phase 6: this version's training data was single-class -- nothing to classify yet
 
         # Phase 5: a classifier trained since then carries its own
         # PR-curve-fitted decision threshold (aiperfopt.contention.
@@ -205,17 +222,70 @@ class LiveInferenceLoop:
         state.recommendation = generate_recommendations(self.storage_engine, diagnosis, self.catalog)
         return state
 
+    def _build_forecast_records(
+        self, row: Any, generated_at: float, metric_names: list[str], model_version: str
+    ) -> list[ForecastPredictionRecord]:
+        """One :class:`ForecastPredictionRecord` per deployed forecaster (Phase 7 / F5).
+
+        ``row`` already carries each target's ``forecast_{metric}``/
+        ``confidence_{metric}`` columns (:func:`build_live_contention_input_row`
+        computed them once, for the classifier) — reused here rather than
+        calling ``forecaster.predict()`` a second time. Horizon comes from
+        settings, not the forecaster object: ``_load_active_models`` always
+        resolves forecasters with ``horizon_label="short"``, and a deployed
+        *baseline* forecaster (Section 10.7's contingency plan) carries no
+        ``horizon_seconds``/``horizon_label`` attribute of its own.
+        """
+        horizon_label = "short"
+        horizon_seconds = self.forecasting_settings.short_horizon_target_seconds
+        records: list[ForecastPredictionRecord] = []
+        for metric_name in metric_names:
+            predicted_value = row.get(f"forecast_{metric_name}")
+            if predicted_value is None:
+                continue
+            confidence = row.get(f"confidence_{metric_name}")
+            if isinstance(confidence, float) and confidence != confidence:
+                confidence = None  # NaN -> None; pandas coerces a per-metric None to NaN in a float Series
+            records.append(
+                ForecastPredictionRecord(
+                    generated_at=generated_at,
+                    target_timestamp=generated_at + horizon_seconds,
+                    metric_name=metric_name,
+                    horizon_label=horizon_label,
+                    horizon_seconds=horizon_seconds,
+                    predicted_value=float(predicted_value),
+                    model_version=model_version,
+                    confidence=confidence if confidence is None else float(confidence),
+                )
+            )
+        return records
+
     def _load_active_models(
         self, active_version: str, state: LiveState
-    ) -> tuple[dict[str, Any] | None, Any, Any]:
-        """Load forecasters/classifier/detector for the active version.
+    ) -> tuple[dict[str, Any] | None, Any, Any | None]:
+        """Load the forecasters/anomaly detector (required) and contention
+        classifier (optional) for the active version.
 
-        On any load failure (a missing/corrupted artifact — the concrete
-        "deployment failure" NFR-5.3 has in mind), attempts one automatic
-        rollback to the last known-good version and reports which
-        happened via ``state.error`` — never raises out to the caller,
-        since one bad model must not stop the loop (mirrors Monitoring's
-        own per-source degradation, FR-1.4).
+        A *missing* contention classifier is not a load failure: Phase 6's
+        quality gate deliberately allows deploying a version whose
+        accumulated training data was still single-class for contention,
+        in which case ``train_contention_and_anomaly_pipeline`` never
+        trains or saves one at all (an expected, honest outcome — see
+        Phase 5/6's handoffs). That must degrade to "no contention
+        prediction/diagnosis/recommendation this cycle" (NFR-11.1), not
+        trigger the same automatic-rollback path a genuinely
+        missing/corrupted forecaster or anomaly-detector artifact does —
+        the anomaly detector, unlike the classifier, is unconditionally
+        trained and saved on every training run, so *its* absence does
+        mean real corruption. Persisting forecasts (Phase 7 / F5) must not
+        be held hostage to contention ever having trained a classifier.
+
+        On any load failure of the required models (a missing/corrupted
+        artifact — the concrete "deployment failure" NFR-5.3 has in
+        mind), attempts one automatic rollback to the last known-good
+        version and reports which happened via ``state.error`` — never
+        raises out to the caller, since one bad model must not stop the
+        loop (mirrors Monitoring's own per-source degradation, FR-1.4).
         """
         try:
             forecasters = resolve_deployed_forecasters(
@@ -225,9 +295,13 @@ class LiveInferenceLoop:
             if not forecasters:
                 state.error = f"model version {active_version!r} has no usable short-horizon forecasters"
                 return None, None, None
-            classifier = load_contention_classifier(self.forecasting_settings.models_dir, active_version)
             anomaly_detector = load_anomaly_detector(self.forecasting_settings.models_dir, active_version)
-            return forecasters, classifier, anomaly_detector
+            classifier = (
+                load_contention_classifier(self.forecasting_settings.models_dir, active_version)
+                if contention_artifact_exists(self.forecasting_settings.models_dir, active_version)
+                else None
+            )
+            return forecasters, anomaly_detector, classifier
         except (AppError, OSError, FileNotFoundError) as exc:
             logger.error(
                 "Failed to load active model version, attempting rollback",

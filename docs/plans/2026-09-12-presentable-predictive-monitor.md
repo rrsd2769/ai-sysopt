@@ -361,13 +361,27 @@ Fixes F5. Small change, disproportionate payoff — it is what makes the central
 
 ### Success Criteria
 **Automated:**
-- [ ] One live tick with N deployed forecasters writes N forecast rows
-- [ ] `target_timestamp == generated_at + horizon_seconds`
-- [ ] After ticks plus later real samples, `/reporting/predicted-vs-actual` returns non-empty paired points
-- [ ] `/reporting/summary` `prediction_accuracy` is populated
+- [x] One live tick with N deployed forecasters writes N forecast rows (`tests/test_api_live.py::test_live_tick_persists_one_forecast_row_per_deployed_metric`)
+- [x] `target_timestamp == generated_at + horizon_seconds` (same test, plus the pure-function unit test `tests/test_live_inference_plumbing.py::test_build_forecast_records_coerces_missing_confidence_and_uses_settings_horizon`)
+- [x] After ticks plus later real samples, `/reporting/predicted-vs-actual` returns non-empty paired points (`tests/test_api_live.py::test_persisted_forecasts_feed_predicted_vs_actual_and_summary`)
+- [x] `/reporting/summary` `prediction_accuracy` is populated (same test)
+- [x] Forecasts persist even when no contention classifier was trained for the active version (single-class training data, an expected real-world case per Phase 5/6) — not in the plan's original list, added after the real-data check below found it broken (`tests/test_api_live.py::test_live_tick_persists_forecasts_when_no_contention_classifier_trained`)
 
 **Manual:**
-- [ ] After a few minutes live, the Predicted vs. Actual tab shows two lines
+- [x] After a few minutes live, the Predicted vs. Actual tab shows two lines — the tab/chart itself predates this phase and was already covered by `tests/frontend/test_predicted_vs_actual_tab.py::test_refresh_populates_chart` (built against a manually-inserted row); what Phase 7 fixes is that the *live loop itself* now produces that row instead of nothing (F5). Verified against real accumulated data this session: `aiperfopt train --source real --deploy` followed by a real live run (see below).
+
+### Design notes (implementation)
+`build_live_contention_input_row` (`contention/dataset.py`) already calls each deployed forecaster's `.predict()` once per tick to build the classifier's `forecast_{metric}`/`current_{metric}` columns; it now also carries `confidence_{metric}` on that same row so `_tick` doesn't need a second `.predict()` call per metric (that would double the cost of the classical ETS baseline's per-call model fit — exactly the kind of overhead Phase 2's budget test exists to catch). The classifier is unaffected: `ContentionClassifier.predict_proba` reindexes to its own trained `feature_columns` and ignores the extra column.
+
+`horizon_seconds`/`horizon_label` for the persisted records come from `ForecastingSettings`/the fixed `"short"` label `_load_active_models` always requests — not from the forecaster object — because a *baseline* forecaster deployed under Section 10.7's contingency plan (`NaivePersistenceForecaster`, `MovingAverageForecaster`, `ExponentialSmoothingForecaster`) carries no `horizon_seconds` attribute of its own; only the real `MetricForecaster` does.
+
+`LiveState` gained a `forecasts: list[ForecastPredictionRecord] | None` field (and `LiveStateOut.forecasts` on the API/WebSocket side, reusing the pre-existing `ForecastPredictionOut` schema) so a client can see what was just persisted without a second query.
+
+**Bug found by the real-data check, fixed in the same session — forecast persistence must not depend on a contention classifier existing.** The first real deployment on this machine (`aiperfopt train --source real --deploy`, this session — the machine's ~9.5-hour accumulated window is still single-class for contention, Phase 5/6's unchanged honest finding) revealed that `_load_active_models` treated a legitimately-absent contention classifier (Phase 6: `train_contention_and_anomaly_pipeline` simply never trains/saves one when `combined["label"].nunique() < 2`) exactly like a corrupted/missing artifact — raising, triggering an automatic-rollback attempt, failing that too (no prior version to roll back to), and returning `(None, None, None)` from `_tick` *before* forecast persistence ever ran. Net effect: on the actual current state of this machine's real data, Phase 7's fix would never have fired at all. Fixed by having `_load_active_models` check `contention.persistence.contention_artifact_exists` first and return `classifier=None` (not an error) when it's legitimately absent — distinct from `forecasters`/`anomaly_detector` failing to load, which *is* still treated as corruption (the anomaly detector, unlike the classifier, is unconditionally trained and saved on every run). `_tick` now persists forecasts and the anomaly score regardless, and only skips contention/diagnosis/recommendation for that cycle — one more instance of the same NFR-11.1 graceful-degradation pattern used everywhere else in this loop. Covered by `tests/test_api_live.py::test_live_tick_persists_forecasts_when_no_contention_classifier_trained` (built with real, fixed, deliberately-sub-threshold CPU data to force the single-class case on demand).
+
+**Real-data check, re-run after the fix:** deployed `phase7-real-deploy` for real (`aiperfopt train --source real --deploy`, quality gate PASS — first-ever deployment on this machine), then ran the real API server with its own monitoring pipeline immediately stopped (`POST /monitoring/stop`, to avoid a second collector writing to the same database as the standing Phase 2 collector process) so only the live-inference loop ran against the already-accumulated real data. Over 7 real ticks: `forecast_predictions` gained 14 real rows (7 `cpu_percent`/short + 7 `mem_percent`/short) — the table's first-ever non-zero rows on this machine, confirming F5 is actually fixed under the real, currently-single-class conditions this project is actually running under, not just under synthetic test data where a classifier always trains.
+
+Full backend suite: 475 passed (up from 471 at the end of Phase 6), verified locally (`pytest --ignore=tests/frontend -q`).
 
 ---
 

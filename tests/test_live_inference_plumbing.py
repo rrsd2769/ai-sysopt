@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.config.settings import ContentionSettings, ForecastingSettings
@@ -128,6 +129,7 @@ def test_build_live_contention_input_row_feeds_a_real_prediction(storage_engine:
     assert row is not None
     assert "forecast_cpu_percent" in row
     assert "current_cpu_percent" in row
+    assert "confidence_cpu_percent" in row  # Phase 7: persisted alongside the forecast
     assert "anomaly_score" in row
     assert 0.0 <= row["anomaly_score"] <= 1.0
 
@@ -150,3 +152,41 @@ def test_build_live_contention_input_row_returns_none_with_no_forecasters(storag
 
     row = build_live_contention_input_row(recent, feature_vector, {}, AnomalyDetector(), fconfig)
     assert row is None
+
+
+def test_build_forecast_records_coerces_missing_confidence_and_uses_settings_horizon(tmp_path: Path):
+    """A deployed *baseline* forecaster (Section 10.7's contingency plan) has
+    no ``confidence``/``horizon_seconds`` attribute of its own -- Phase 7's
+    persistence must read those from the row / settings, not the forecaster
+    object, and turn pandas' NaN-for-missing-confidence back into ``None``."""
+    from types import SimpleNamespace
+
+    import pandas as pd
+
+    from aiperfopt.api.live_state import LiveInferenceLoop
+    from aiperfopt.config.settings import ForecastingSettings
+
+    fsettings = ForecastingSettings(
+        short_horizon_seconds=(10, 20), medium_horizon_seconds=(30, 60),
+        walk_forward_splits=2, min_training_rows=15, models_dir=tmp_path / "models",
+        directional_stability_threshold=0.02, baseline_improvement_margin=0.05,
+    )
+    stub_loop = SimpleNamespace(forecasting_settings=fsettings)
+
+    row = pd.Series({
+        "forecast_cpu_percent": 55.0, "confidence_cpu_percent": math.nan,
+        "forecast_mem_percent": 40.0, "confidence_mem_percent": 0.8,
+    })
+
+    records = LiveInferenceLoop._build_forecast_records(
+        stub_loop, row, generated_at=1000.0, metric_names=["cpu_percent", "mem_percent"], model_version="v1"
+    )
+
+    by_metric = {r.metric_name: r for r in records}
+    assert by_metric["cpu_percent"].confidence is None
+    assert by_metric["mem_percent"].confidence == pytest.approx(0.8)
+    for record in records:
+        assert record.horizon_label == "short"
+        assert record.horizon_seconds == fsettings.short_horizon_target_seconds
+        assert record.target_timestamp == pytest.approx(1000.0 + fsettings.short_horizon_target_seconds)
+        assert record.model_version == "v1"

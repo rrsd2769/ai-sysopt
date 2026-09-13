@@ -172,6 +172,7 @@ class LiveStateOut(BaseModel):
     latest_metrics: SystemMetricSampleOut | None = None
     feature_vector: dict[str, float | None] | None = None
     active_model_version: str | None = None
+    forecasts: list[ForecastPredictionOut] | None = None
     contention: ContentionPredictionOut | None = None
     diagnosis: DiagnosisOut | None = None
     recommendation: RecommendationOut | None = None

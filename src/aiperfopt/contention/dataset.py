@@ -159,6 +159,16 @@ def build_live_contention_input_row(
     so ``current_{metric}``/history lookups line up with the same moment
     the engineered features and forecasts describe.
 
+    Also carries a ``confidence_{metric}`` column per target — not one of
+    the classifier's model features (``ContentionClassifier.predict_proba``
+    reindexes to its own trained ``feature_columns`` and ignores it), but
+    the live-inference loop needs each forecaster's per-call confidence to
+    persist alongside its prediction (Phase 7), and this is the one place
+    that already calls ``forecaster.predict()`` per metric — recomputing
+    it a second time downstream would double the cost of the classical
+    (Holt/ETS) baseline's per-tick fit, which Phase 2's overhead budget
+    exists precisely to keep in check.
+
     Returns ``None`` if there are no deployed forecasters, or if any
     target metric has no valid raw sample to read a current value from
     (mirrors ``build_contention_dataset``'s per-metric emptiness check,
@@ -170,7 +180,7 @@ def build_live_contention_input_row(
     feature_row = pd.Series(feature_vector.feature_values)
     anomaly_score = float(anomaly_detector.score(feature_row))
 
-    result: dict[str, float] = {"timestamp": feature_vector.timestamp, "anomaly_score": anomaly_score}
+    result: dict[str, float | None] = {"timestamp": feature_vector.timestamp, "anomaly_score": anomaly_score}
 
     for metric_name, forecaster in deployed_forecasters.items():
         is_counter = metric_name in feature_config.counter_metrics
@@ -208,5 +218,6 @@ def build_live_contention_input_row(
 
         result[f"forecast_{metric_name}"] = forecast_result.predicted_value
         result[f"current_{metric_name}"] = current_value
+        result[f"confidence_{metric_name}"] = forecast_result.confidence
 
     return pd.Series(result)
