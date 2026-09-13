@@ -52,7 +52,7 @@ class LiveWebSocketClient(QObject):
     def __init__(self, settings: FrontendSettings | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.settings = settings or FrontendSettings()
-        self._socket = QWebSocket()
+        self._socket = QWebSocket(parent=self)
         self._socket.connected.connect(self._on_connected)
         self._socket.disconnected.connect(self._on_disconnected)
         self._socket.errorOccurred.connect(self._on_error)

@@ -33,6 +33,17 @@ class _CallableRunnable(QRunnable):
         super().__init__()
         self._fn = fn
         self.signals = _WorkerSignals()
+        # ``QRunnable`` auto-deletes itself on the *worker* thread right
+        # after ``run()`` returns (the default). That would drop the last
+        # Python reference to ``self.signals`` -- a QObject affine to the
+        # UI thread -- from the worker thread, destroying it there instead
+        # of on its own thread. That race is a real, intermittent SIGSEGV
+        # source (same class of bug as the unparented QWebSocket fix
+        # elsewhere in this module's sibling ``live_client.py``), observed
+        # here as flaky crashes in ``tests/frontend/test_retraining_panel.py``.
+        # We manage the runnable's lifetime ourselves instead, via
+        # ``_schedule_signals_cleanup`` below.
+        self.setAutoDelete(False)
 
     def run(self) -> None:
         try:
@@ -54,11 +65,20 @@ def run_in_background(
     Qt's queued-connection signal delivery (the default across threads)
     is what gets ``on_success``/``on_error`` safely back onto the UI
     thread -- no manual locking needed for this simple "one call, one
-    result" shape.
+    result" shape. The runnable and its signals object are only ever torn
+    down via ``deleteLater()``, triggered from a slot that itself only
+    runs after delivery on the UI thread -- so destruction always happens
+    on the thread the signals object lives on, never the worker thread.
     """
     runnable = _CallableRunnable(fn)
     if on_success is not None:
         runnable.signals.succeeded.connect(on_success)
     if on_error is not None:
         runnable.signals.failed.connect(on_error)
+
+    def _cleanup(*_args: Any) -> None:
+        runnable.signals.deleteLater()
+
+    runnable.signals.succeeded.connect(_cleanup)
+    runnable.signals.failed.connect(_cleanup)
     (pool or QThreadPool.globalInstance()).start(runnable)

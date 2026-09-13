@@ -451,20 +451,24 @@ Fixes F6 and F9. Makes the product visually presentable and the test suite scree
 
 ### Success Criteria
 **Automated:**
-- [ ] `QT_QPA_PLATFORM=offscreen pytest tests/frontend -q` exits **0** on three consecutive runs
-- [ ] Full `pytest -q` completes with no fatal error
+- [x] `QT_QPA_PLATFORM=offscreen pytest tests/frontend -q` exits **0** on three consecutive runs (confirmed: 47 passed each time, ~14.4s)
+- [x] Full `pytest -q` completes with no fatal error (485 backend + 47 frontend, no crashes)
 - [ ] The chart renders actual and forecast series from a `LiveStateOut` payload
 - [ ] Each readiness state renders its own banner text
-- [ ] `server_fixture` raises if the server thread fails to join
+- [x] `server_fixture` raises if the server thread fails to join (implemented, `tests/frontend/server_fixture.py`; not covered by a dedicated test since it requires deliberately wedging the server thread)
 
 **Manual:**
 - [ ] During replay of a recorded event, the forecast line rises **before** the actual line
 - [ ] The contention strip crosses its threshold ahead of the spike
 - [ ] A fresh install shows "no model trained", not a green "Live"
 
----
+### Design notes (crash fix)
 
-## Phase 10 — Evidence pack for Review 2
+**Fixing the three F6-named sites (`live_client.py:55` QWebSocket parenting, `server_fixture.py:76` shutdown ordering, `api/app.py:87` closing-loop guard) was necessary but not sufficient.** After applying those three, `tests/frontend -q` still segfaulted (SIGSEGV, exit 139) specifically in `test_retraining_panel.py::test_run_and_confirm_full_round_trip`, reproducibly (~60% of runs) and confirmed via `git stash` to pre-date this session's changes entirely — a second, previously-undiagnosed crash, not one of F6's three named causes.
+
+**Root cause: `frontend/workers.py`'s `_CallableRunnable` destroyed a UI-thread-affine `QObject` from a worker thread.** `QRunnable.setAutoDelete(True)` is the default, so `QThreadPool` deleted each `_CallableRunnable` immediately after `run()` returned -- on the *worker* thread. That dropped the last Python reference to `self.signals` (a `_WorkerSignals` `QObject` created with UI-thread affinity), so its C++ destructor ran on the wrong thread, racing against the UI thread's event loop delivering the still-queued `succeeded`/`failed` signal. This is the same bug *class* as the unparented `QWebSocket` (a Qt object destroyed/manipulated off its own thread), just a second, independent instance of it, in a different file, not one of the three lines the plan's F6 entry named. A red herring during diagnosis: the crash trace's "current thread" (the actual fault site) was inside Qt's event loop (`pytestqt.qt_compat.exec`), with the SQLAlchemy-looking frame in a *different* thread's snapshot at the same instant -- easy to misread as a SQLAlchemy/threading bug, which is not what it was. (A same-hypothesis detour into Apple Accelerate BLAS thread-safety, tested via `VECLIB_MAXIMUM_THREADS=1`, was ruled out: it did not reduce the crash rate.)
+
+**Fix:** `setAutoDelete(False)` plus explicit `deleteLater()` on the signals object, wired as an extra connection on the same `succeeded`/`failed` signals so cleanup only runs *after* the real callback has been delivered, and always via the object's own thread's event loop (`deleteLater()`'s defined behavior). Validated: 8/8 clean runs of the previously-flaky test (down from ~23s per run when it hung near its 20s timeout, to ~4s), then 3/3 clean full-suite runs (47 passed each, ~14.4s). — Evidence pack for Review 2
 
 ### Overview
 Assembles the six required answers from work already done. Nothing new is invented here; this phase is about making the evidence presentable and reproducible.

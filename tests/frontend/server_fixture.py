@@ -72,5 +72,9 @@ def running_backend(tmp_path: Path, ctx: AppContext | None = None, auto_start: b
     try:
         yield base_url, ctx
     finally:
+        app.state.live_loop.stop()
+        app.state.monitoring_pipeline.stop()
         server.should_exit = True
         thread.join(timeout=5.0)
+        if thread.is_alive():
+            raise RuntimeError("Test backend thread did not shut down in time")

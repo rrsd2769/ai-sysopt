@@ -83,10 +83,16 @@ def create_app(
         loop = asyncio.get_running_loop()
 
         def _broadcast(state: LiveState) -> None:
+            if loop.is_closed():
+                return
             payload_model = _live_state_to_schema(state)
-            asyncio.run_coroutine_threadsafe(
-                connection_manager.broadcast(payload_model.model_dump(mode="json")), loop
-            )
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    connection_manager.broadcast(payload_model.model_dump(mode="json")), loop
+                )
+            except RuntimeError:
+                # Loop closed between the check above and this call (shutdown race).
+                pass
 
         live_loop.on_update = _broadcast
 
