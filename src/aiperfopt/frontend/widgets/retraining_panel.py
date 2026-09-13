@@ -80,6 +80,12 @@ class RetrainingPanel(QWidget):
         self._reasons_list = QListWidget()
         result_layout.addWidget(self._reasons_list)
 
+        result_layout.addWidget(QLabel("Quality gate (Phase 6 -- blocks deployment even if confirmed):"))
+        self._gate_label = QLabel("--")
+        result_layout.addWidget(self._gate_label)
+        self._gate_criteria_list = QListWidget()
+        result_layout.addWidget(self._gate_criteria_list)
+
         decision_row = QHBoxLayout()
         self._confirm_button = QPushButton("Confirm deployment")
         self._confirm_button.setEnabled(False)
@@ -137,6 +143,26 @@ class RetrainingPanel(QWidget):
         self._reasons_list.clear()
         for reason in comparison.get("reasons") or []:
             self._reasons_list.addItem(reason)
+
+        gate = candidate["gate"]
+        self._gate_label.setText("PASS" if gate["passed"] else "FAIL -- deployment will be refused")
+        self._gate_criteria_list.clear()
+        for c in gate.get("forecast_criteria") or []:
+            status = "pass" if c["passed"] else "FAIL"
+            self._gate_criteria_list.addItem(
+                f"[{status}] {c['metric_name']}/{c['horizon_label']}: mae={c['candidate_mae']} "
+                f"(persistence={c['persistence_mae']}) directional={c['candidate_directional_accuracy']}"
+                + (f" -- {c['note']}" if c.get("note") else "")
+            )
+        contention_criterion = gate.get("contention_criterion")
+        if contention_criterion is not None:
+            status = "pass" if contention_criterion["passed"] else "FAIL"
+            self._gate_criteria_list.addItem(
+                f"[{status}] contention: f1={contention_criterion['candidate_f1']} "
+                f"(threshold-rule baseline={contention_criterion['baseline_f1']})"
+                + (f" -- {contention_criterion['note']}" if contention_criterion.get("note") else "")
+            )
+
         self._confirm_button.setEnabled(True)
         self._reject_button.setEnabled(True)
 
@@ -149,6 +175,7 @@ class RetrainingPanel(QWidget):
             return self._api_client.confirm_deployment(
                 candidate_version=self._pending_candidate["model_version"],
                 comparison=self._pending_candidate["comparison"],
+                gate=self._pending_candidate["gate"],
                 confirmed=confirmed,
             )
 

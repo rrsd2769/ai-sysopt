@@ -111,7 +111,7 @@ def test_retraining_round_trip(tmp_path: Path):
             assert candidate["model_version"] == "v1"
 
             deployment = client.confirm_deployment(
-                candidate_version="v1", comparison=candidate["comparison"], confirmed=True,
+                candidate_version="v1", comparison=candidate["comparison"], gate=candidate["gate"], confirmed=True,
             )
             assert deployment["decision"] == "deployed"
             assert client.get_active_model_version()["active_model_version"] == "v1"

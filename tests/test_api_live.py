@@ -49,6 +49,7 @@ def test_live_loop_produces_real_prediction_after_deployment(tmp_path: Path):
         candidate = r.json()
         client.post("/retraining/confirm", json={
             "candidate_version": candidate["model_version"], "comparison": candidate["comparison"],
+            "gate": candidate["gate"],
             "confirmed": True,
         })
 
@@ -71,6 +72,7 @@ def test_websocket_receives_broadcast_state(tmp_path: Path):
         candidate = r.json()
         client.post("/retraining/confirm", json={
             "candidate_version": candidate["model_version"], "comparison": candidate["comparison"],
+            "gate": candidate["gate"],
             "confirmed": True,
         })
         client.post("/live/start")

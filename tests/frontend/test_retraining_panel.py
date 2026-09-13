@@ -35,6 +35,10 @@ def test_run_and_confirm_full_round_trip(qtbot, tmp_path: Path):
 
         qtbot.waitUntil(lambda: panel._confirm_button.isEnabled(), timeout=30000)
         assert "v1" in panel._recommendation_label.text()
+        # Phase 6: the quality gate is shown per-target with real numbers,
+        # not just a pass/fail label.
+        assert panel._gate_label.text() == "PASS"
+        assert panel._gate_criteria_list.count() > 0
 
         panel._confirm(True)
         # Generous timeouts: under heavy machine load (e.g. the full test

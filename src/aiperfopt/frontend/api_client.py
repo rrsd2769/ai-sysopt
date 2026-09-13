@@ -228,12 +228,12 @@ class ApiClient:
         )
 
     def confirm_deployment(
-        self, candidate_version: str, comparison: dict, confirmed: bool, confirmed_by: str = "human"
+        self, candidate_version: str, comparison: dict, gate: dict, confirmed: bool, confirmed_by: str = "human"
     ) -> dict:
         return self._post(
             "/retraining/confirm",
             {
-                "candidate_version": candidate_version, "comparison": comparison,
+                "candidate_version": candidate_version, "comparison": comparison, "gate": gate,
                 "confirmed": confirmed, "confirmed_by": confirmed_by,
             },
         )

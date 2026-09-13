@@ -219,7 +219,7 @@ def _cmd_export_training_window(args: argparse.Namespace) -> int:
 
 def _cmd_train(args: argparse.Namespace) -> int:
     """Train a candidate model and, with --deploy, activate it."""
-    from aiperfopt.common.exceptions import RetrainingError
+    from aiperfopt.common.exceptions import ModelDeploymentError, RetrainingError
     from aiperfopt.contention.config import ContentionLabelingConfig
     from aiperfopt.features.config import FeatureEngineeringConfig
     from aiperfopt.retraining.deployment import confirm_deployment
@@ -264,14 +264,23 @@ def _cmd_train(args: argparse.Namespace) -> int:
     if comparison.contention_comparison is not None:
         print(f"  contention f1  : {comparison.contention_comparison.candidate_f1}")
 
+    gate = candidate.skill_gate
+    print(f"quality gate     : {'PASS' if gate.passed else 'FAIL'}")
+    for reason in gate.reasons:
+        print(f"  - {reason}")
+
     if not args.deploy:
         print("\nNot deployed (pass --deploy to activate this version).")
         return 0
 
-    record = confirm_deployment(
-        ctx.storage_engine, ctx.settings.retraining, candidate.model_version, comparison,
-        confirmed=True, confirmed_by=args.confirmed_by,
-    )
+    try:
+        record = confirm_deployment(
+            ctx.storage_engine, ctx.settings.retraining, candidate.model_version, comparison, gate,
+            confirmed=True, confirmed_by=args.confirmed_by,
+        )
+    except ModelDeploymentError as exc:
+        print(f"\nDeployment refused: {exc}")
+        return 1
     print(f"\nDeployed {record.candidate_version!r} (previous: {record.previous_version!r}).")
     return 0
 

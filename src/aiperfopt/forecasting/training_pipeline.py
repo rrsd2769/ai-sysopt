@@ -94,6 +94,14 @@ class MetricHorizonOutcome:
     # ``compute_feature_importance`` -- computing SHAP on every ordinary
     # training/retraining run would be pure overhead nobody asked for.
     feature_importance: dict[str, float] | None = None
+    # Phase 6's quality gate needs a persistence-baseline number measured
+    # on the *same* holdout set the deployed model was scored on (not the
+    # walk-forward CV mean, which is a different data slice) -- otherwise
+    # "beats persistence" would be comparing two different evaluations.
+    # ``NaivePersistenceForecaster`` is stateless, so this costs one extra
+    # cheap prediction pass, not a second training run.
+    holdout_persistence_mae: float | None = None
+    holdout_persistence_directional_accuracy: float | None = None
 
 
 @dataclass
@@ -304,12 +312,19 @@ def train_evaluate_and_select_one(
     if compute_feature_importance and selected == "lightgbm" and not holdout_dataset.empty:
         feature_importance = _shap_feature_importance(final_model, holdout_dataset[feature_cols])
 
+    holdout_persistence_mae = holdout_persistence_directional = None
+
     if not holdout_dataset.empty:
         holdout_history = _combined_raw_history({HELD_OUT_SCENARIO_NAME: holdout_samples}, metric_name)
         if is_counter:
                 holdout_history = counter_rate_per_second(holdout_history, max_gap_seconds=30.0)
         holdout_mae, holdout_rmse, holdout_directional = evaluate_forecaster_on_fold(
             deployed_forecaster, holdout_dataset,
+            forecasting_settings.directional_stability_threshold,
+            raw_history=holdout_history,
+        )
+        holdout_persistence_mae, _, holdout_persistence_directional = evaluate_forecaster_on_fold(
+            NaivePersistenceForecaster(), holdout_dataset,
             forecasting_settings.directional_stability_threshold,
             raw_history=holdout_history,
         )
@@ -339,6 +354,8 @@ def train_evaluate_and_select_one(
         holdout_mae=holdout_mae, holdout_rmse=holdout_rmse,
         holdout_directional_accuracy=holdout_directional, artifact_path=artifact_path,
         is_counter=is_counter, feature_importance=feature_importance,
+        holdout_persistence_mae=holdout_persistence_mae,
+        holdout_persistence_directional_accuracy=holdout_persistence_directional,
     )
 
 

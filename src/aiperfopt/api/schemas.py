@@ -221,15 +221,46 @@ class RetrainingComparisonOut(BaseModel):
     contention_comparison: ContentionComparisonOut | None = None
 
 
+class ForecastGateCriterionOut(BaseModel):
+    metric_name: str
+    horizon_label: str
+    candidate_mae: float | None
+    persistence_mae: float | None
+    candidate_directional_accuracy: float | None
+    passed: bool
+    note: str | None = None
+
+
+class ContentionGateCriterionOut(BaseModel):
+    candidate_f1: float | None
+    baseline_f1: float | None
+    passed: bool
+    note: str | None = None
+
+
+class SkillGateOut(BaseModel):
+    """Phase 6's absolute quality bar -- see :func:`aiperfopt.retraining.
+    comparison.evaluate_skill_gate`. Unlike ``RetrainingComparisonOut``'s
+    ``recommendation`` (advisory), ``passed=False`` here blocks
+    ``/retraining/confirm`` even with ``confirmed=True``."""
+
+    passed: bool
+    reasons: list[str]
+    forecast_criteria: list[ForecastGateCriterionOut]
+    contention_criterion: ContentionGateCriterionOut | None = None
+
+
 class RetrainingCandidateOut(BaseModel):
     model_version: str
     data_source: str
     comparison: RetrainingComparisonOut
+    gate: SkillGateOut
 
 
 class ConfirmDeploymentRequest(BaseModel):
     candidate_version: str = Field(min_length=1)
     comparison: RetrainingComparisonOut
+    gate: SkillGateOut
     confirmed: bool
     confirmed_by: str = "human"
 

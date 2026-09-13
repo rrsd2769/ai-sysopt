@@ -232,6 +232,27 @@ class RetrainingSettings(BaseModel):
     # for real data — the most recent slice, never an earlier one, to
     # avoid future-to-past leakage (Section 11, ADL-10).
     real_usage_holdout_fraction: float = Field(gt=0.0, lt=1.0)
+    # Phase 6's quality gate (Section 11's precision-favoring stance,
+    # extended from "don't regress vs. the active version" to "clear the
+    # absolute bar every deployed model must meet"): a candidate forecaster
+    # must beat the *persistence* baseline's holdout MAE by at least this
+    # relative fraction. Deliberately separate from
+    # ``ForecastingSettings.baseline_improvement_margin`` (which governs
+    # LightGBM-vs-baseline model *selection*) -- this margin instead gates
+    # *deployment* of whichever model was selected, baseline or not.
+    forecasting_mae_margin: float = Field(default=0.05, ge=0.0, lt=1.0)
+    # A candidate forecaster's holdout directional accuracy must exceed
+    # 0.5 (chance) by at least this much to pass the gate.
+    directional_accuracy_margin: float = Field(default=0.05, ge=0.0, lt=0.5)
+    # A candidate contention classifier's holdout F1 (both measured on
+    # the same holdout, see aiperfopt.contention.training_pipeline) may
+    # trail the threshold-rule baseline's F1 by at most this many
+    # absolute F1 points and still pass the gate -- a tolerance, not a
+    # required margin of superiority, since F1's [0, 1] ceiling means an
+    # already-excellent (even perfect) baseline on an easy holdout can be
+    # legitimately impossible to "beat by a margin" (see
+    # aiperfopt.retraining.comparison.evaluate_skill_gate).
+    contention_f1_margin: float = Field(default=0.05, ge=0.0, lt=1.0)
 
     _abs_active_version_file = field_validator("active_version_file")(_absolute_under_app_home)
 

@@ -44,7 +44,12 @@ from aiperfopt.contention.training_pipeline import (
 )
 from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.forecasting.training_pipeline import TrainingRunSummary, train_and_evaluate_all
-from aiperfopt.retraining.comparison import RetrainingComparison, compare_candidate_to_active
+from aiperfopt.retraining.comparison import (
+    RetrainingComparison,
+    SkillGateResult,
+    compare_candidate_to_active,
+    evaluate_skill_gate,
+)
 from aiperfopt.retraining.deployment import get_active_model_version
 from aiperfopt.retraining.real_usage_data import REAL_USAGE_SCENARIO_NAME, build_real_usage_training_data
 from aiperfopt.storage.records import SystemMetricSample
@@ -61,6 +66,7 @@ class RetrainingCandidate:
     forecast_summary: TrainingRunSummary
     contention_summary: ContentionTrainingSummary | None
     comparison: RetrainingComparison
+    skill_gate: SkillGateResult
 
 
 def _short_horizon_outcomes(forecast_summary: TrainingRunSummary) -> dict:
@@ -120,10 +126,16 @@ def _run_retraining(
         engine, new_model_version, forecast_summary, contention_summary,
         active_version, retraining_settings.regression_tolerance,
     )
+    skill_gate = evaluate_skill_gate(
+        forecast_summary, contention_summary,
+        retraining_settings.forecasting_mae_margin, retraining_settings.directional_accuracy_margin,
+        retraining_settings.contention_f1_margin,
+    )
 
     return RetrainingCandidate(
         model_version=new_model_version, data_source=data_source,
-        forecast_summary=forecast_summary, contention_summary=contention_summary, comparison=comparison,
+        forecast_summary=forecast_summary, contention_summary=contention_summary,
+        comparison=comparison, skill_gate=skill_gate,
     )
 
 

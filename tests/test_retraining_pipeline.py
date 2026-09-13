@@ -100,7 +100,9 @@ def test_second_candidate_compares_against_first_deployed_version(storage_engine
         storage_engine, fconfig, fsettings, csettings, labeling_config, rsettings,
         new_model_version="rt-v1", target_metrics=["cpu_percent"],
     )
-    confirm_deployment(storage_engine, rsettings, "rt-v1", first_candidate.comparison, confirmed=True)
+    confirm_deployment(
+        storage_engine, rsettings, "rt-v1", first_candidate.comparison, first_candidate.skill_gate, confirmed=True
+    )
     assert get_active_model_version(rsettings) == "rt-v1"
 
     # Retrain again on the same underlying data/settings -- should be a
@@ -125,7 +127,9 @@ def test_full_confirm_and_active_version_persists_across_calls(storage_engine: E
         storage_engine, fconfig, fsettings, csettings, labeling_config, rsettings,
         new_model_version="rt-v1", target_metrics=["cpu_percent"],
     )
-    record = confirm_deployment(storage_engine, rsettings, "rt-v1", candidate.comparison, confirmed=True)
+    record = confirm_deployment(
+        storage_engine, rsettings, "rt-v1", candidate.comparison, candidate.skill_gate, confirmed=True
+    )
 
     assert record.decision == "deployed"
     # A fresh read of the pointer file (simulating a separate process/request)

@@ -79,6 +79,17 @@ retraining:
   # Fraction of accumulated real-usage history reserved as a
   # chronological (most-recent) holdout for the generalization check.
   real_usage_holdout_fraction: 0.2
+  # Phase 6 quality gate: a candidate forecaster's holdout MAE must beat
+  # the persistence baseline's (same holdout) by at least this relative
+  # fraction to be deployable at all, confirmation notwithstanding.
+  forecasting_mae_margin: 0.05
+  # Phase 6 quality gate: holdout directional accuracy must exceed
+  # 0.5 + this margin.
+  directional_accuracy_margin: 0.05
+  # Phase 6 quality gate: a candidate contention classifier's holdout F1
+  # (same holdout) may trail the threshold-rule baseline's F1 by at most
+  # this many absolute F1 points and still pass.
+  contention_f1_margin: 0.05
 
 api:
   host: 127.0.0.1

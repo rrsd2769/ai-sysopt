@@ -22,7 +22,7 @@ from aiperfopt.applog import get_logger
 from aiperfopt.common.exceptions import ModelDeploymentError
 from aiperfopt.config.settings import RetrainingSettings
 from aiperfopt.retraining.active_version import read_active_version, write_active_version
-from aiperfopt.retraining.comparison import RetrainingComparison
+from aiperfopt.retraining.comparison import RetrainingComparison, SkillGateResult
 from aiperfopt.storage.reader import get_model_deployments_range
 from aiperfopt.storage.records import ModelDeploymentRecord
 from aiperfopt.storage.writer import insert_model_deployment
@@ -40,6 +40,7 @@ def confirm_deployment(
     retraining_settings: RetrainingSettings,
     candidate_version: str,
     comparison: RetrainingComparison,
+    skill_gate: SkillGateResult,
     confirmed: bool,
     confirmed_by: str = "human",
 ) -> ModelDeploymentRecord:
@@ -47,12 +48,24 @@ def confirm_deployment(
 
     Parameters
     ----------
+    skill_gate:
+        Phase 6's absolute quality bar (:func:`aiperfopt.retraining.
+        comparison.evaluate_skill_gate`), computed once alongside
+        ``comparison`` when the candidate was produced. Unlike
+        ``comparison.recommendation``, this is not advisory: a failing
+        gate raises :class:`~aiperfopt.common.exceptions.
+        ModelDeploymentError` below even when ``confirmed=True`` --
+        human confirmation remains necessary but stops being sufficient
+        (Section 11's precision-favoring, trust-first stance). The audit
+        trail (FR-11.2, R-8) still records the attempt before raising, a
+        "gate_failed" decision alongside "deployed"/"rejected"/"rollback".
     confirmed:
         The actual decision. This function does not infer a decision
         from ``comparison.recommendation`` -- the recommendation is
         advisory only (ADL-23); a human may confirm a "reject"
         recommendation or decline a "deploy" one, and either is recorded
-        faithfully either way.
+        faithfully either way. Irrelevant to whether the skill gate
+        blocks deployment: that check happens regardless of ``confirmed``.
     confirmed_by:
         Free-text identifying who/what confirmed this. Phase 9's API
         layer should pass a real identifier once authentication exists
@@ -62,9 +75,38 @@ def confirm_deployment(
     Returns
     -------
     The persisted :class:`ModelDeploymentRecord`, with the active-version
-    pointer file already updated if ``confirmed`` is True.
+    pointer file already updated if ``confirmed`` is True and the gate
+    passed.
+
+    Raises
+    ------
+    ModelDeploymentError
+        If ``skill_gate.passed`` is False -- the active-version pointer
+        is never written in this case, regardless of ``confirmed``.
     """
     previous_version = get_active_model_version(retraining_settings)
+
+    if not skill_gate.passed:
+        record = ModelDeploymentRecord(
+            decided_at=time.time(),
+            candidate_version=candidate_version,
+            previous_version=previous_version,
+            decision="gate_failed",
+            recommendation=comparison.recommendation,
+            confirmed_by=confirmed_by,
+            comparison_summary={"comparison": comparison.as_dict(), "skill_gate": skill_gate.as_dict()},
+        )
+        record.id = insert_model_deployment(engine, record)
+        logger.warning(
+            "Deployment refused -- quality gate failed",
+            extra={"candidate_version": candidate_version, "reasons": skill_gate.reasons},
+        )
+        raise ModelDeploymentError(
+            f"Quality gate failed for candidate {candidate_version!r}: " + "; ".join(skill_gate.reasons),
+            recoverable=True,
+            context={"candidate_version": candidate_version, "reasons": skill_gate.reasons},
+        )
+
     decision = "deployed" if confirmed else "rejected"
 
     if confirmed:
@@ -77,7 +119,7 @@ def confirm_deployment(
         decision=decision,
         recommendation=comparison.recommendation,
         confirmed_by=confirmed_by,
-        comparison_summary=comparison.as_dict(),
+        comparison_summary={"comparison": comparison.as_dict(), "skill_gate": skill_gate.as_dict()},
     )
     record.id = insert_model_deployment(engine, record)
 

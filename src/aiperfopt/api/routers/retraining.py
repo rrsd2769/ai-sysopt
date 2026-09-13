@@ -18,18 +18,28 @@ from aiperfopt.api.dependencies import get_app_context
 from aiperfopt.api.schemas import (
     ConfirmDeploymentRequest,
     ContentionComparisonOut,
+    ContentionGateCriterionOut,
+    ForecastGateCriterionOut,
     MetricComparisonOut,
     ModelDeploymentOut,
     RetrainingCandidateOut,
     RetrainingComparisonOut,
     RetrainRequest,
     RollbackRequest,
+    SkillGateOut,
 )
 from aiperfopt.bootstrap import AppContext
 from aiperfopt.common.exceptions import ModelDeploymentError, RetrainingError
 from aiperfopt.contention.config import ContentionLabelingConfig
 from aiperfopt.features.config import FeatureEngineeringConfig
-from aiperfopt.retraining.comparison import ContentionComparison, MetricComparison, RetrainingComparison
+from aiperfopt.retraining.comparison import (
+    ContentionComparison,
+    ContentionGateCriterion,
+    ForecastGateCriterion,
+    MetricComparison,
+    RetrainingComparison,
+    SkillGateResult,
+)
 from aiperfopt.retraining.deployment import (
     confirm_deployment,
     get_active_model_version,
@@ -108,6 +118,59 @@ def _comparison_from_request(comparison: RetrainingComparisonOut) -> RetrainingC
     )
 
 
+def _gate_out(gate: SkillGateResult) -> SkillGateOut:
+    return SkillGateOut(
+        passed=gate.passed,
+        reasons=gate.reasons,
+        forecast_criteria=[
+            ForecastGateCriterionOut(
+                metric_name=c.metric_name, horizon_label=c.horizon_label,
+                candidate_mae=c.candidate_mae, persistence_mae=c.persistence_mae,
+                candidate_directional_accuracy=c.candidate_directional_accuracy,
+                passed=c.passed, note=c.note,
+            )
+            for c in gate.forecast_criteria
+        ],
+        contention_criterion=(
+            None
+            if gate.contention_criterion is None
+            else ContentionGateCriterionOut(
+                candidate_f1=gate.contention_criterion.candidate_f1,
+                baseline_f1=gate.contention_criterion.baseline_f1,
+                passed=gate.contention_criterion.passed, note=gate.contention_criterion.note,
+            )
+        ),
+    )
+
+
+def _gate_from_request(gate: SkillGateOut) -> SkillGateResult:
+    """Reconstruct a domain :class:`SkillGateResult` from what the client sends
+    back -- same round-trip-what-was-shown rationale as
+    :func:`_comparison_from_request` (ADL-23)."""
+    return SkillGateResult(
+        passed=gate.passed,
+        reasons=gate.reasons,
+        forecast_criteria=[
+            ForecastGateCriterion(
+                metric_name=c.metric_name, horizon_label=c.horizon_label,
+                candidate_mae=c.candidate_mae, persistence_mae=c.persistence_mae,
+                candidate_directional_accuracy=c.candidate_directional_accuracy,
+                passed=c.passed, note=c.note,
+            )
+            for c in gate.forecast_criteria
+        ],
+        contention_criterion=(
+            None
+            if gate.contention_criterion is None
+            else ContentionGateCriterion(
+                candidate_f1=gate.contention_criterion.candidate_f1,
+                baseline_f1=gate.contention_criterion.baseline_f1,
+                passed=gate.contention_criterion.passed, note=gate.contention_criterion.note,
+            )
+        ),
+    )
+
+
 @router.get("/active-version")
 def active_version(ctx: Annotated[AppContext, Depends(get_app_context)]) -> dict:
     return {"active_model_version": get_active_model_version(ctx.settings.retraining)}
@@ -136,17 +199,21 @@ def run_retraining(body: RetrainRequest, ctx: Annotated[AppContext, Depends(get_
 
     return RetrainingCandidateOut(
         model_version=candidate.model_version, data_source=candidate.data_source,
-        comparison=_comparison_out(candidate.comparison),
+        comparison=_comparison_out(candidate.comparison), gate=_gate_out(candidate.skill_gate),
     )
 
 
 @router.post("/confirm", response_model=ModelDeploymentOut)
 def confirm(body: ConfirmDeploymentRequest, ctx: Annotated[AppContext, Depends(get_app_context)]):
     comparison = _comparison_from_request(body.comparison)
-    record = confirm_deployment(
-        ctx.storage_engine, ctx.settings.retraining, body.candidate_version, comparison,
-        confirmed=body.confirmed, confirmed_by=body.confirmed_by,
-    )
+    gate = _gate_from_request(body.gate)
+    try:
+        record = confirm_deployment(
+            ctx.storage_engine, ctx.settings.retraining, body.candidate_version, comparison, gate,
+            confirmed=body.confirmed, confirmed_by=body.confirmed_by,
+        )
+    except ModelDeploymentError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return record
 
 
