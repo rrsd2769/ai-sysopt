@@ -405,14 +405,27 @@ Constraints:
 
 ### Success Criteria
 **Automated:**
-- [ ] A recorded session replays to produce **identical feature vectors** to the original, at 1× and at 10×
-- [ ] Replay writes nothing to the primary database
-- [ ] Replay refuses to start while monitoring is running
-- [ ] A replayed contention event produces the same prediction and diagnosis as the original recording
+- [x] A recorded session replays to produce **identical feature vectors** to the original, at 1× and at 10× (`tests/test_replay.py::test_replay_produces_identical_feature_vectors_at_different_speeds`)
+- [x] Replay writes nothing to the primary database (`tests/test_replay.py::test_replay_writes_nothing_to_primary_database`)
+- [x] Replay refuses to start while monitoring is running (`tests/test_replay.py::test_replay_refuses_while_primary_engine_looks_active`, and the inverse `test_replay_proceeds_when_primary_engine_is_stale`)
+- [x] A replayed contention event produces the same prediction and diagnosis as the original recording (`tests/test_replay.py::test_replayed_contention_event_matches_original_prediction_and_diagnosis`)
 
 **Manual:**
-- [ ] A recorded pressure event replays end-to-end with the REPLAY badge visible
-- [ ] Machine load during replay is negligible
+- [ ] A recorded pressure event replays end-to-end with the REPLAY badge visible — blocked on Phase 9's UI (the badge doesn't exist yet)
+- [x] Machine load during replay is negligible — verified via CLI: replaying a 118s recorded session at 50× completes in ~3.8s wall time (`aiperfopt record --minutes N --out ...` then `aiperfopt replay --session ... --speed 50`), no busy-wait, no CPU spin between ticks
+
+### Design notes (implementation)
+New module `src/aiperfopt/replay/`: `session.py` (`RecordedSession`, `record_session`, `save_session`/`load_session`) and `player.py` (`replay_session`, the monitoring-active guard). Two new CLI commands, `aiperfopt record --minutes N --out session.json` and `aiperfopt replay --session session.json [--speed N] [--replay-db path]`, following the existing thin-wrapper pattern in `cli.py`.
+
+**Timestamps are shifted, never rescaled.** `RecordedSession.shifted(delta)` moves every record's timestamp by the same constant `delta` — it does not divide anything by `speed`. This is deliberate: Feature Engineering (`aiperfopt.features.engine`) computes every lag/rolling-window feature purely from timestamp *deltas* between samples (via a pandas time index, `_dt` — see `aiperfopt.common.timeutils`), never from wall-clock time or absolute time-of-day. A pure linear shift therefore leaves every feature value a downstream computation would produce completely unchanged, regardless of how far the whole session is moved. `speed` controls exactly one separate thing: how fast, in real wall-clock seconds, `replay_session`'s insertion loop sleeps between writing successive system-metric ticks (`(next_tick_ts - previous_tick_ts) / speed`) — a pure playback-pacing knob for a live demo, not a transformation of the stored data. This is what makes "identical feature vectors at 1× and 10×" true by construction rather than by coincidence: the two runs write byte-identical timestamp values to their respective replay databases; only the real time spent sleeping between writes differs.
+
+**The monitoring-active guard reuses `aiperfopt.readiness.STALE_AFTER_SECONDS`**, the exact staleness threshold `assess_readiness` already uses to answer the inverse question ("has monitoring stopped?" — `ReadinessState.COLLECTING` when the newest sample is older than this). `replay.player.is_monitoring_active(engine)` is the direct converse: a system-metric sample fresher than that threshold means something is actively writing. There is no cross-process lock file or PID registry — none existed anywhere in the codebase before this phase, and this heuristic is both consistent with the one already governing `aiperfopt doctor`'s readiness state and sufficient for the plan's stated constraint (never runs `replay` concurrently with a real writer). `aiperfopt replay` passes its own bootstrapped primary `storage_engine` as `primary_engine`; the replay database itself is a distinct file the guard never inspects.
+
+**Process-level rows are bucketed onto the system-metric tick they'd have arrived alongside.** The real `MonitoringEngine` runs two independent polling threads (system + process) feeding one shared queue (Section 7.1, ADL-18); replay has no live threads to reproduce that interleaving from, so `_bucket_by_system_tick` attaches every process metric/event/aggregate row to the first system-metric sample at or after its own timestamp, and writes both together in the same batch — close enough to the original interleaving for the live-inference loop's per-cycle reads to see a coherent picture, without inventing a synthetic sub-tick ordering the recording never actually captured.
+
+**Tests mock `time.sleep`, not the timestamp math.** Every test in `tests/test_replay.py` patches `aiperfopt.replay.player.time.sleep` to a no-op via an autouse fixture — pacing delay is orthogonal to correctness (see above), so mocking it out keeps the suite fast (full file: well under a second of real sleep) while still exercising the exact same code path a real `aiperfopt replay --speed 1` run takes, just without the wait. The identical-feature-vectors test explicitly does *not* rely on the mock for its assertion (it would pass even with real sleeping, just slower) — it replays the same session at speed 1.0 and 10.0 into two separate databases with the same fixed `anchor_end`, then asserts `compute_live_feature_vector` returns the same values from both, at the exact same `as_of`.
+
+Full backend suite: 485 passed (up from 475 at the end of Phase 7), verified locally (`pytest --ignore=tests/frontend -q`, ~255s, no flakiness).
 
 ---
 

@@ -147,3 +147,14 @@ class FrontendError(AppError):
 
 class ReportingError(AppError):
     """Reporting / Analytics failure (Section 7.1, item 14)."""
+
+
+class ReplayError(AppError):
+    """Replay mode failure (Phase 8 of the presentable-predictive-monitor plan).
+
+    Covers both "refused to start" (monitoring pipeline appears active, or
+    a session has nothing to replay) and "nothing recorded" cases.
+    Default ``recoverable=False`` at most raise sites: these are always
+    surfaced directly to whoever ran ``aiperfopt record``/``aiperfopt
+    replay``, never something a background loop should degrade past.
+    """

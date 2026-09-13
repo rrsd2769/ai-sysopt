@@ -213,6 +213,74 @@ def _cmd_export_training_window(args: argparse.Namespace) -> int:
 
 
 # --------------------------------------------------------------------------
+# record / replay
+# --------------------------------------------------------------------------
+
+
+def _cmd_record(args: argparse.Namespace) -> int:
+    """Capture a window of already-collected real history into a portable session file."""
+    from aiperfopt.common.exceptions import ReplayError
+    from aiperfopt.replay.session import record_session, save_session
+
+    ctx = _bootstrap(args)
+    try:
+        session = record_session(ctx.storage_engine, minutes=args.minutes)
+    except ReplayError as exc:
+        print(f"Recording failed: {exc}")
+        return 1
+
+    save_session(session, args.out)
+    print(
+        f"Recorded {len(session.system_metrics)} system sample(s) "
+        f"({session.duration_seconds:.0f}s span) to {args.out}"
+    )
+    return 0
+
+
+def _cmd_replay(args: argparse.Namespace) -> int:
+    """Replay a recorded session into a separate database, standing in for the collector.
+
+    Refuses to run if the primary database looks like it has an active
+    monitoring pipeline writing to it (see
+    ``aiperfopt.replay.player.assert_monitoring_not_active``) -- replay and
+    a live collector must never write to the same database concurrently.
+    """
+    from aiperfopt.common.exceptions import ReplayError
+    from aiperfopt.replay.player import replay_session
+    from aiperfopt.replay.session import load_session
+    from aiperfopt.storage import create_all_tables, create_storage_engine
+
+    ctx = _bootstrap(args)
+    session = load_session(args.session)
+
+    primary_path = ctx.settings.storage.database_path
+    replay_db_path = args.replay_db or primary_path.with_name(f"{primary_path.stem}-replay{primary_path.suffix}")
+    replay_engine = create_storage_engine(replay_db_path)
+    create_all_tables(replay_engine)
+
+    print(
+        f"Replaying {len(session.system_metrics)} system sample(s) "
+        f"({session.duration_seconds:.0f}s span) at {args.speed:g}x into {replay_db_path} ..."
+    )
+
+    def _progress(done: int, total: int) -> None:
+        print(f"  tick {done}/{total}", end="\r", flush=True)
+
+    try:
+        summary = replay_session(
+            session, replay_engine, speed=args.speed, primary_engine=ctx.storage_engine, on_tick=_progress,
+        )
+    except ReplayError as exc:
+        print(f"\nReplay refused: {exc}")
+        return 1
+    finally:
+        replay_engine.dispose()
+
+    print(f"\nDone. Replayed into {replay_db_path} (span {summary.start:.0f}-{summary.end:.0f}).")
+    return 0
+
+
+# --------------------------------------------------------------------------
 # train
 # --------------------------------------------------------------------------
 
@@ -462,6 +530,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_export.add_argument("--out", type=Path, required=True, help="Output JSON file path.")
     p_export.set_defaults(func=_cmd_export_training_window, default_log_level="WARNING")
+
+    p_record = sub.add_parser(
+        "record", help="Capture a window of already-collected history into a portable session file.",
+    )
+    p_record.add_argument("--minutes", type=float, required=True)
+    p_record.add_argument("--out", type=Path, required=True)
+    p_record.set_defaults(func=_cmd_record, default_log_level="WARNING")
+
+    p_replay = sub.add_parser(
+        "replay", help="Replay a recorded session into a separate database (never the primary one).",
+    )
+    p_replay.add_argument("--session", type=Path, required=True)
+    p_replay.add_argument("--speed", type=float, default=1.0, help="Playback rate; 1.0 = real time.")
+    p_replay.add_argument(
+        "--replay-db", type=Path, default=None, dest="replay_db",
+        help="Defaults to '<primary db>-replay.<ext>' next to the primary database.",
+    )
+    p_replay.set_defaults(func=_cmd_replay, default_log_level="WARNING")
 
     p_train = sub.add_parser("train", help="Train a candidate model, optionally deploying it.")
     p_train.add_argument("--source", choices=("synthetic", "real"), default="synthetic")
