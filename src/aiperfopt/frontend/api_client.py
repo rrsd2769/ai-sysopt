@@ -106,6 +106,9 @@ class ApiClient:
     def live_status(self) -> dict:
         return self._get("/live/status")
 
+    def get_readiness(self) -> dict:
+        return self._get("/readiness")
+
     def start_live_inference(self) -> dict:
         return self._post("/live/start")
 

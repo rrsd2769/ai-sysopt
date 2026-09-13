@@ -411,7 +411,7 @@ Constraints:
 - [x] A replayed contention event produces the same prediction and diagnosis as the original recording (`tests/test_replay.py::test_replayed_contention_event_matches_original_prediction_and_diagnosis`)
 
 **Manual:**
-- [ ] A recorded pressure event replays end-to-end with the REPLAY badge visible — blocked on Phase 9's UI (the badge doesn't exist yet)
+- [ ] A recorded pressure event replays end-to-end with the REPLAY badge visible — the badge now exists (Phase 9 sub-part 5: `StorageSettings.is_replay` → `ReadinessState.REPLAY` → dashboard banner, covered end-to-end by `tests/frontend/test_main_window.py::test_replay_backend_shows_the_replay_banner_end_to_end`); this box stays unchecked until an actual `aiperfopt replay` run against a real replay-configured server is watched live in the desktop app, not just exercised via a synthetic `is_replay=True` test backend
 - [x] Machine load during replay is negligible — verified via CLI: replaying a 118s recorded session at 50× completes in ~3.8s wall time (`aiperfopt record --minutes N --out ...` then `aiperfopt replay --session ... --speed 50`), no busy-wait, no CPU spin between ticks
 
 ### Design notes (implementation)
@@ -451,16 +451,16 @@ Fixes F6 and F9. Makes the product visually presentable and the test suite scree
 
 ### Success Criteria
 **Automated:**
-- [x] `QT_QPA_PLATFORM=offscreen pytest tests/frontend -q` exits **0** on three consecutive runs (confirmed: 47 passed each time, ~14.4s)
-- [x] Full `pytest -q` completes with no fatal error (485 backend + 47 frontend, no crashes)
-- [ ] The chart renders actual and forecast series from a `LiveStateOut` payload
-- [ ] Each readiness state renders its own banner text
+- [x] `QT_QPA_PLATFORM=offscreen pytest tests/frontend -q` exits **0** on three consecutive runs (sub-part 1: 47 passed each time, ~14.4s; re-confirmed after sub-parts 2-5: 63 passed each time, ~14.3-15.3s, 3/3 clean)
+- [x] Full `pytest -q` completes with no fatal error (488 backend + 63 frontend, no crashes — backend count up from 485 for the three new `is_replay`/`REPLAY`-state tests added this session)
+- [x] The chart renders actual and forecast series from a `LiveStateOut` payload (`frontend/widgets/live_chart.py`; `tests/frontend/test_live_chart_widget.py`)
+- [x] Each readiness state renders its own banner text (`tests/frontend/test_formatting.py::test_readiness_banner_text_for_each_state`, `tests/frontend/test_dashboard_widget.py`'s readiness tests)
 - [x] `server_fixture` raises if the server thread fails to join (implemented, `tests/frontend/server_fixture.py`; not covered by a dedicated test since it requires deliberately wedging the server thread)
 
 **Manual:**
-- [ ] During replay of a recorded event, the forecast line rises **before** the actual line
-- [ ] The contention strip crosses its threshold ahead of the spike
-- [ ] A fresh install shows "no model trained", not a green "Live"
+- [ ] During replay of a recorded event, the forecast line rises **before** the actual line — still needs an actual `aiperfopt replay` run watched live; not attempted this session
+- [ ] The contention strip crosses its threshold ahead of the spike — same, not attempted this session
+- [x] A fresh install shows "no model trained", not a green "Live" — now provably true rather than eyeballed: `tests/frontend/test_main_window.py::test_start_polls_readiness_and_updates_the_dashboard_banner` runs a real `MainWindow` against a real backend with history but no deployed model and asserts the banner literally reads "No model trained"; a regression back to the old hardcoded "Live" banner would fail it
 
 ### Design notes (crash fix)
 
@@ -469,6 +469,18 @@ Fixes F6 and F9. Makes the product visually presentable and the test suite scree
 **Root cause: `frontend/workers.py`'s `_CallableRunnable` destroyed a UI-thread-affine `QObject` from a worker thread.** `QRunnable.setAutoDelete(True)` is the default, so `QThreadPool` deleted each `_CallableRunnable` immediately after `run()` returned -- on the *worker* thread. That dropped the last Python reference to `self.signals` (a `_WorkerSignals` `QObject` created with UI-thread affinity), so its C++ destructor ran on the wrong thread, racing against the UI thread's event loop delivering the still-queued `succeeded`/`failed` signal. This is the same bug *class* as the unparented `QWebSocket` (a Qt object destroyed/manipulated off its own thread), just a second, independent instance of it, in a different file, not one of the three lines the plan's F6 entry named. A red herring during diagnosis: the crash trace's "current thread" (the actual fault site) was inside Qt's event loop (`pytestqt.qt_compat.exec`), with the SQLAlchemy-looking frame in a *different* thread's snapshot at the same instant -- easy to misread as a SQLAlchemy/threading bug, which is not what it was. (A same-hypothesis detour into Apple Accelerate BLAS thread-safety, tested via `VECLIB_MAXIMUM_THREADS=1`, was ruled out: it did not reduce the crash rate.)
 
 **Fix:** `setAutoDelete(False)` plus explicit `deleteLater()` on the signals object, wired as an extra connection on the same `succeeded`/`failed` signals so cleanup only runs *after* the real callback has been delivered, and always via the object's own thread's event loop (`deleteLater()`'s defined behavior). Validated: 8/8 clean runs of the previously-flaky test (down from ~23s per run when it hung near its 20s timeout, to ~4s), then 3/3 clean full-suite runs (47 passed each, ~14.4s). — Evidence pack for Review 2
+
+### Design notes (sub-parts 2-5)
+
+**There was no backend concept of "replay mode" anywhere before this session — F9's plan bullet ("REPLAY" as a readiness state) implicitly required inventing one.** `aiperfopt replay` (Phase 8) writes to a wholly separate database file and has no marker the API server could detect automatically, and a custom `--replay-db` path means the filename can't be sniffed reliably either. Resolved by adding an explicit `StorageSettings.is_replay: bool = False`, set via `AIPERFOPT_STORAGE__IS_REPLAY=true` when pointing a running API server at a replay database for a demo — matching the project's existing layered env-var config convention (NFR-12.1) rather than inferring it. `assess_readiness` now takes this as a fourth argument; when `True` it unconditionally overrides the reported state to a new `ReadinessState.REPLAY`, regardless of what the underlying data assessment would have said (NO_DATA included) — the plan's requirement is an indicator that is unmistakable *whenever replayed data is being served*, not only when replay also happens to be READY. The underlying `detail`/`can_predict` are still carried through beneath the REPLAY wrapper, so a replay that hasn't accumulated enough history yet is honestly distinguishable from one that's actively predicting.
+
+**`LiveStateOut` carries no history — only the current tick's snapshot** (see `aiperfopt.api.live_state`'s own module docstring: Phases 3-8 are one-shot, this loop is the first cadenced one, and its wire format is exactly one point in time). `LiveTrendChart` therefore keeps its own client-side rolling buffer (a `deque(maxlen=300)` per metric) fed by successive `update_state()` calls, unlike `PredictedVsActualChart`, which renders an already-complete history fetched in one REST call. Each tick's forecast is drawn as a fresh two-point dashed segment from "now" to that forecast's target timestamp, replacing the previous tick's segment rather than accumulating a history of past forecasts — this is what makes the flagship "solid line arrives where dashed line said it would" visible tick-over-tick.
+
+**The confidence band is a display heuristic, not a statistical interval.** `ForecastPredictionOut.confidence` is a single 0-1 model-derived scalar (`aiperfopt.forecasting.model.ForecastModel.set_confidence_from_validation`, explicitly flagged "uncalibrated" per ADL-11), not an upper/lower bound. `LiveTrendChart` widens the shaded band linearly as confidence drops toward 0, capped at ±15 percentage points, so a low-confidence forecast visibly hedges more than a high-confidence one — deliberately not presented as a calibrated prediction interval, since the underlying number isn't one.
+
+**Readiness is polled independently of the WebSocket stream**, on its own 3s `QTimer` in `MainWindow`, not piggybacked on each `LiveStateOut` broadcast — it answers "can this system predict right now, and why not," a question the live-inference tick's payload doesn't carry an answer to at all, and this way the banner still updates even if the live loop itself is stopped or the websocket briefly drops.
+
+**Two of the three manual criteria (forecast leading actual during a real replay; contention strip crossing threshold ahead of a spike) were not attempted this session** — both require actually running `aiperfopt replay` against a server configured with `AIPERFOPT_STORAGE__IS_REPLAY=true` and watching the live desktop app, which needs a real display session, not just `pytest-qt`'s offscreen platform plugin. The third ("fresh install shows 'no model trained', not a green 'Live'") was upgraded from manual-eyeball to an automated end-to-end test instead (`test_start_polls_readiness_and_updates_the_dashboard_banner`), which is strictly stronger.
 
 ### Overview
 Assembles the six required answers from work already done. Nothing new is invented here; this phase is about making the evidence presentable and reproducible.

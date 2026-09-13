@@ -293,6 +293,15 @@ class StorageSettings(BaseModel):
     # why this is split from full_resolution_retention_hours rather than
     # sharing one cutoff.
     process_retention_hours: float = Field(gt=0)
+    # Phase 9 F9: explicit, operator-set flag (AIPERFOPT_STORAGE__IS_REPLAY)
+    # for pointing a running API server at a replay database for a demo.
+    # Not auto-detected from database_path's filename -- `aiperfopt replay
+    # --replay-db` accepts an arbitrary path, so sniffing the name would
+    # silently stop working the moment someone uses a custom one. This is
+    # the one signal readiness.assess_readiness has for "am I serving
+    # replayed data right now," so the UI can show an honest REPLAY badge
+    # instead of an indistinguishable "Live".
+    is_replay: bool = False
 
     _abs_database_path = field_validator("database_path")(_absolute_under_app_home)
 

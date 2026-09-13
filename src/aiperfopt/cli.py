@@ -77,7 +77,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
         from aiperfopt.features.config import FeatureEngineeringConfig
         from aiperfopt.readiness import assess_readiness
 
-        result = assess_readiness(ctx.storage_engine, FeatureEngineeringConfig(), s.retraining)
+        result = assess_readiness(ctx.storage_engine, FeatureEngineeringConfig(), s.retraining, s.storage.is_replay)
         print("-" * 60)
         print(f"state            : {result.state.value}")
         print(f"model version    : {result.active_model_version or '(none deployed)'}")

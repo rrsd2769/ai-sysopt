@@ -98,6 +98,50 @@ def test_error_state_shows_error_banner(qtbot):
     assert "storage unavailable" in widget._status_banner.text()
 
 
+def test_readiness_drives_the_banner_text_and_color(qtbot):
+    widget = DashboardWidget()
+    qtbot.addWidget(widget)
+
+    widget.update_readiness({
+        "state": "collecting", "detail": "Collecting - 30s of 300s needed.",
+        "history_seconds": 30.0, "history_seconds_required": 300.0, "can_predict": False,
+    })
+    assert "Collecting" in widget._status_banner.text()
+
+    widget.update_readiness({
+        "state": "ready", "detail": "Ready.", "history_seconds": 300.0,
+        "history_seconds_required": 300.0, "can_predict": True,
+    })
+    assert widget._status_banner.text() == "Live"
+
+
+def test_replay_readiness_state_shows_unmistakable_replay_banner(qtbot):
+    widget = DashboardWidget()
+    qtbot.addWidget(widget)
+
+    widget.update_readiness({
+        "state": "replay", "detail": "REPLAY - Ready.", "history_seconds": 300.0,
+        "history_seconds_required": 300.0, "can_predict": True,
+    })
+    assert widget._status_banner.text() == "REPLAY"
+
+
+def test_live_state_error_overrides_readiness_banner(qtbot):
+    widget = DashboardWidget()
+    qtbot.addWidget(widget)
+
+    widget.update_readiness({
+        "state": "ready", "detail": "Ready.", "history_seconds": 300.0,
+        "history_seconds_required": 300.0, "can_predict": True,
+    })
+    widget.update_state(dict(_BASE_STATE, error="storage unavailable"))
+    assert "storage unavailable" in widget._status_banner.text()
+
+    # Clearing the error falls back to the last-known readiness, not "Live".
+    widget.update_state(_BASE_STATE)
+    assert widget._status_banner.text() == "Live"
+
+
 def test_recommendation_cards_are_cleared_between_updates(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)

@@ -41,7 +41,9 @@ def readiness(ctx: Annotated[AppContext, Depends(get_app_context)]) -> Readiness
     system that is merely still collecting data no longer looks identical
     to one that is working.
     """
-    result = assess_readiness(ctx.storage_engine, FeatureEngineeringConfig(), ctx.settings.retraining)
+    result = assess_readiness(
+        ctx.storage_engine, FeatureEngineeringConfig(), ctx.settings.retraining, ctx.settings.storage.is_replay,
+    )
     return ReadinessOut(
         state=result.state.value,
         detail=result.detail,

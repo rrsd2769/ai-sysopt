@@ -83,3 +83,31 @@ def test_history_plus_active_version_reports_ready(storage_engine: Engine, retra
     assert result.state is ReadinessState.READY
     assert result.can_predict
     assert result.active_model_version == "v1"
+
+
+def test_is_replay_reports_replay_state_regardless_of_underlying_data(
+    storage_engine: Engine, retraining_settings
+) -> None:
+    # No samples at all -- the underlying assessment would be NO_DATA --
+    # but is_replay must still win, per F9: the badge must be unmistakable
+    # whenever replayed data is being served, not just when it's READY.
+    result = assess_readiness(storage_engine, FEATURE_CONFIG, retraining_settings, is_replay=True)
+
+    assert result.state is ReadinessState.REPLAY
+    assert not result.can_predict
+    assert "REPLAY" in result.detail
+
+
+def test_is_replay_still_reports_can_predict_when_underlying_data_is_ready(
+    storage_engine: Engine, retraining_settings
+) -> None:
+    insert_system_metric_samples_batch(
+        storage_engine, _samples_spanning(FEATURE_CONFIG.min_history_seconds + 60)
+    )
+    write_active_version(retraining_settings.active_version_file, "v1")
+
+    result = assess_readiness(storage_engine, FEATURE_CONFIG, retraining_settings, is_replay=True)
+
+    assert result.state is ReadinessState.REPLAY
+    assert result.can_predict
+    assert result.active_model_version == "v1"

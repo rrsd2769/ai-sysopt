@@ -20,10 +20,14 @@ from aiperfopt.storage import create_all_tables, create_storage_engine, insert_s
 from aiperfopt.storage.records import SystemMetricSample
 
 
-def build_test_ctx(tmp_path: Path, live_inference_interval_seconds: float = 1.0) -> AppContext:
+def build_test_ctx(
+    tmp_path: Path, live_inference_interval_seconds: float = 1.0, is_replay: bool = False
+) -> AppContext:
     settings = load_settings()
     settings = settings.model_copy(update={
-        "storage": settings.storage.model_copy(update={"database_path": tmp_path / "test.db"}),
+        "storage": settings.storage.model_copy(
+            update={"database_path": tmp_path / "test.db", "is_replay": is_replay}
+        ),
         "forecasting": settings.forecasting.model_copy(update={
             "short_horizon_seconds": (10, 20), "medium_horizon_seconds": (30, 60),
             "walk_forward_splits": 2, "min_training_rows": 15, "models_dir": tmp_path / "models",
@@ -53,8 +57,10 @@ def rising_cpu_samples_now(n: int = 300, interval: float = 2.0) -> list[SystemMe
     ]
 
 
-def build_test_client(tmp_path: Path, with_history: bool = False, auto_start: bool = False) -> TestClient:
-    ctx = build_test_ctx(tmp_path)
+def build_test_client(
+    tmp_path: Path, with_history: bool = False, auto_start: bool = False, is_replay: bool = False
+) -> TestClient:
+    ctx = build_test_ctx(tmp_path, is_replay=is_replay)
     if with_history:
         insert_system_metric_samples_batch(ctx.storage_engine, rising_cpu_samples_now())
     app = create_app(ctx, auto_start=auto_start)

@@ -4,11 +4,13 @@ from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
 from aiperfopt.frontend.formatting import (
     confidence_tier,
     format_confidence,
+    format_duration_short,
     format_percent,
     format_probability,
     format_timestamp,
     humanize_bytes,
     humanize_category,
+    readiness_banner_text,
 )
 
 
@@ -56,3 +58,21 @@ def test_confidence_tier_thresholds():
     assert confidence_tier(0.1) == "low"
     assert confidence_tier(0.75) == "high"
     assert confidence_tier(0.5) == "medium"
+
+
+def test_format_duration_short():
+    assert format_duration_short(45.0) == "45s"
+    assert format_duration_short(135.0) == "2m15s"
+    assert format_duration_short(0.0) == "0s"
+
+
+def test_readiness_banner_text_for_each_state():
+    assert readiness_banner_text("no_data", "detail", 0.0, 300.0) == "No data yet"
+    assert readiness_banner_text("collecting", "detail", 30.0, 300.0) == "Collecting - 30s of 5m00s"
+    assert readiness_banner_text("needs_training", "detail", 300.0, 300.0) == "No model trained"
+    assert readiness_banner_text("ready", "detail", 300.0, 300.0) == "Live"
+    assert readiness_banner_text("replay", "detail", 300.0, 300.0) == "REPLAY"
+
+
+def test_readiness_banner_text_falls_back_to_detail_for_unknown_state():
+    assert readiness_banner_text("some_future_state", "a detail string", 0.0, 0.0) == "a detail string"

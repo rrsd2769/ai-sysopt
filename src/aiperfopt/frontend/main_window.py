@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 
 from aiperfopt.applog import get_logger
 from aiperfopt.frontend.api_client import ApiClient, ApiError
@@ -38,6 +38,12 @@ logger = get_logger(__name__)
 
 _MODE_GENERAL = "General Mode"
 _MODE_DEVELOPER = "Developer Mode"
+
+# Readiness (Phase 9 F9) is polled on its own cadence via REST, separate
+# from the WebSocket LiveStateOut stream -- it answers "can this system
+# predict right now, and why not" (aiperfopt.readiness), not part of any
+# single live-inference tick's payload.
+_READINESS_POLL_INTERVAL_MS = 3000
 
 
 class MainWindow(QMainWindow):
@@ -56,6 +62,10 @@ class MainWindow(QMainWindow):
         self.live_client = live_client or LiveWebSocketClient(settings=settings)
         self.live_client.state_received.connect(self._on_live_state)
         self.live_client.connection_changed.connect(self._on_connection_changed)
+
+        self._readiness_timer = QTimer(self)
+        self._readiness_timer.setInterval(_READINESS_POLL_INTERVAL_MS)
+        self._readiness_timer.timeout.connect(self._poll_readiness)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -166,6 +176,11 @@ class MainWindow(QMainWindow):
         detail = exc.detail if isinstance(exc, ApiError) else str(exc)
         logger.warning("main window control action failed", extra={"error": detail})
 
+    # --- readiness polling -------------------------------------------------------
+
+    def _poll_readiness(self) -> None:
+        run_in_background(self.api_client.get_readiness, on_success=self.dashboard.update_readiness)
+
     # --- lifecycle --------------------------------------------------------------
 
     def start(self) -> None:
@@ -174,8 +189,11 @@ class MainWindow(QMainWindow):
         run_in_background(self.api_client.monitoring_status, on_success=self._on_monitoring_toggled)
         run_in_background(self.api_client.live_status, on_success=self._on_live_inference_toggled)
         self.retraining_panel.refresh_active_version()
+        self._poll_readiness()
+        self._readiness_timer.start()
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt override signature
+        self._readiness_timer.stop()
         self.live_client.stop()
         self.api_client.close()
         super().closeEvent(event)

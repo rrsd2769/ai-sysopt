@@ -79,6 +79,40 @@ def format_timestamp(epoch_seconds: float | None) -> str:
     return datetime.datetime.fromtimestamp(epoch_seconds).strftime("%H:%M:%S")
 
 
+_READINESS_LABELS: dict[str, str] = {
+    "no_data": "No data yet",
+    "needs_training": "No model trained",
+    "ready": "Live",
+    "replay": "REPLAY",
+}
+
+
+def format_duration_short(seconds: float) -> str:
+    """E.g. ``135.0 -> "2m15s"``, ``45.0 -> "45s"``."""
+    total = max(0, int(seconds))
+    minutes, secs = divmod(total, 60)
+    return f"{minutes}m{secs:02d}s" if minutes else f"{secs}s"
+
+
+def readiness_banner_text(state: str, detail: str, history_seconds: float, history_seconds_required: float) -> str:
+    """Short banner text for a ``GET /readiness`` state (Phase 9 F9), the
+    replacement for the previously-hardcoded "Live" banner
+    (``DashboardWidget`` used to show green "Live" unconditionally,
+    identical whether or not anything was actually being predicted).
+
+    Deliberately short -- the banner is a one-line status strip, not a
+    place for a full sentence; ``detail`` remains available (e.g. as a
+    tooltip) for the full explanation. Falls back to ``detail`` itself for
+    any state not in the table above, so an unrecognized future state
+    degrades to something readable rather than a blank banner.
+    """
+    if state == "collecting":
+        collected = format_duration_short(history_seconds)
+        required = format_duration_short(history_seconds_required)
+        return f"Collecting - {collected} of {required}"
+    return _READINESS_LABELS.get(state, detail)
+
+
 def confidence_tier(value: float | None) -> str:
     """A coarse label for confidence, used to pick a status color.
 

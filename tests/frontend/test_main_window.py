@@ -61,6 +61,37 @@ def test_start_connects_live_client_and_reflects_control_state(qtbot, tmp_path: 
         window.close()
 
 
+def test_start_polls_readiness_and_updates_the_dashboard_banner(qtbot, tmp_path: Path):
+    ctx = build_test_ctx(tmp_path)
+    samples = rising_cpu_samples_now(n=300, interval=2.0)
+    insert_system_metric_samples_batch(ctx.storage_engine, samples)
+
+    with running_backend(tmp_path, ctx=ctx, auto_start=True) as (base_url, _ctx):
+        window = _build_window(base_url)
+        qtbot.addWidget(window)
+
+        window.start()
+
+        # Enough history but no deployed model version -- NEEDS_TRAINING.
+        qtbot.waitUntil(lambda: window.dashboard._status_banner.text() == "No model trained", timeout=5000)
+
+        window.close()
+
+
+def test_replay_backend_shows_the_replay_banner_end_to_end(qtbot, tmp_path: Path):
+    ctx = build_test_ctx(tmp_path, is_replay=True)
+
+    with running_backend(tmp_path, ctx=ctx, auto_start=True) as (base_url, _ctx):
+        window = _build_window(base_url)
+        qtbot.addWidget(window)
+
+        window.start()
+
+        qtbot.waitUntil(lambda: window.dashboard._status_banner.text() == "REPLAY", timeout=5000)
+
+        window.close()
+
+
 def test_live_broadcast_updates_both_general_and_developer_widgets(qtbot, tmp_path: Path):
     ctx = build_test_ctx(tmp_path, live_inference_interval_seconds=0.5)
     samples = rising_cpu_samples_now(n=300, interval=2.0)

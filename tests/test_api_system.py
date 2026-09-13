@@ -89,3 +89,11 @@ def test_readiness_reports_needs_training_once_history_exists(tmp_path: Path):
         assert body["can_predict"] is False
         assert body["history_seconds"] >= body["history_seconds_required"]
         assert "aiperfopt train" in body["detail"]
+
+
+def test_readiness_reports_replay_when_storage_is_replay(tmp_path: Path):
+    with build_test_client(tmp_path, is_replay=True) as client:
+        body = client.get("/readiness").json()
+
+        assert body["state"] == "replay"
+        assert "REPLAY" in body["detail"]

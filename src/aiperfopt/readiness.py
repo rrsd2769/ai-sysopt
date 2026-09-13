@@ -36,6 +36,7 @@ class ReadinessState(str, Enum):
     COLLECTING = "collecting"
     NEEDS_TRAINING = "needs_training"
     READY = "ready"
+    REPLAY = "replay"
 
 
 @dataclass(frozen=True)
@@ -45,20 +46,45 @@ class Readiness:
     history_seconds: float
     history_seconds_required: float
     active_model_version: str | None
-
-    @property
-    def can_predict(self) -> bool:
-        return self.state is ReadinessState.READY
+    can_predict: bool = False
 
 
 def assess_readiness(
     engine: Engine,
     feature_config: FeatureEngineeringConfig,
     retraining_settings: RetrainingSettings,
+    is_replay: bool = False,
 ) -> Readiness:
     """Report whether the live pipeline can produce a prediction right now.
 
-    The two checks mirror, in order, the two early returns in
+    ``is_replay`` (``StorageSettings.is_replay``) overrides the reported
+    state to :attr:`ReadinessState.REPLAY` unconditionally -- per F9's
+    plan, the UI must show an unmistakable REPLAY indicator whenever it is
+    serving replayed data, not just when replay happens to also be READY.
+    The underlying data assessment (below) still runs first and its
+    ``detail``/``can_predict`` are carried through, since replayed data
+    genuinely can be too sparse or too old to predict from, exactly like
+    real data.
+    """
+    result = _assess_data_readiness(engine, feature_config, retraining_settings)
+    if not is_replay:
+        return result
+    return Readiness(
+        state=ReadinessState.REPLAY,
+        detail=f"REPLAY - {result.detail}",
+        history_seconds=result.history_seconds,
+        history_seconds_required=result.history_seconds_required,
+        active_model_version=result.active_model_version,
+        can_predict=result.can_predict,
+    )
+
+
+def _assess_data_readiness(
+    engine: Engine,
+    feature_config: FeatureEngineeringConfig,
+    retraining_settings: RetrainingSettings,
+) -> Readiness:
+    """The two checks mirror, in order, the two early returns in
     :meth:`aiperfopt.api.live_state.LiveInferenceLoop._tick` -- not enough
     trailing history, then no deployed model. Keeping the order identical
     is what makes the reported reason the *actual* reason the loop would
@@ -123,4 +149,5 @@ def assess_readiness(
         history_seconds=span,
         history_seconds_required=required,
         active_model_version=active_version,
+        can_predict=True,
     )

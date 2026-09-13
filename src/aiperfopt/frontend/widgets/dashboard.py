@@ -28,7 +28,10 @@ from aiperfopt.frontend.formatting import (
     format_percent,
     format_probability,
     humanize_category,
+    readiness_banner_text,
 )
+from aiperfopt.frontend.widgets.contention_strip import ContentionStrip
+from aiperfopt.frontend.widgets.live_chart import LiveTrendChart
 
 _TIER_COLORS = {
     "high": "#2e7d32",
@@ -36,6 +39,19 @@ _TIER_COLORS = {
     "low": "#c62828",
     "unknown": "#616161",
 }
+
+# Background/text colors per `GET /readiness` state (Phase 9 F9), keyed by
+# ReadinessState's value. "replay" is deliberately its own distinct color
+# (not a variant of "ready"'s green) -- the plan requires an *unmistakable*
+# indicator that this is replayed, not live, data.
+_READINESS_STYLES = {
+    "no_data": ("#eeeeee", "#424242"),
+    "collecting": ("#fff3cd", "#664d03"),
+    "needs_training": ("#ffe0b2", "#7a4100"),
+    "ready": ("#e6f4ea", "#1e4620"),
+    "replay": ("#ede7f6", "#4527a0"),
+}
+_ERROR_STYLE = ("#fdecea", "#b71c1c")
 
 
 class _MetricTile(QFrame):
@@ -67,6 +83,9 @@ class DashboardWidget(QWidget):
 
         outer = QVBoxLayout(self)
 
+        self._last_error: str | None = None
+        self._last_readiness: dict[str, Any] | None = None
+
         self._status_banner = QLabel("Waiting for live data...")
         self._status_banner.setStyleSheet(
             "padding: 10px; border-radius: 6px; background: #eeeeee; font-weight: 600;"
@@ -80,6 +99,12 @@ class DashboardWidget(QWidget):
         for tile in (self._cpu_tile, self._mem_tile, self._contention_tile):
             tiles_row.addWidget(tile)
         outer.addLayout(tiles_row)
+
+        self._live_chart = LiveTrendChart()
+        outer.addWidget(self._live_chart)
+
+        self._contention_strip = ContentionStrip()
+        outer.addWidget(self._contention_strip)
 
         self._anomaly_banner = QLabel()
         self._anomaly_banner.setWordWrap(True)
@@ -123,16 +148,11 @@ class DashboardWidget(QWidget):
     # --- public API -----------------------------------------------------
 
     def update_state(self, state: dict[str, Any]) -> None:
-        if state.get("error"):
-            self._status_banner.setText(f"Something went wrong: {state['error']}")
-            self._status_banner.setStyleSheet(
-                "padding: 10px; border-radius: 6px; background: #fdecea; color: #b71c1c; font-weight: 600;"
-            )
-        else:
-            self._status_banner.setText("Live")
-            self._status_banner.setStyleSheet(
-                "padding: 10px; border-radius: 6px; background: #e6f4ea; color: #1e4620; font-weight: 600;"
-            )
+        self._last_error = state.get("error")
+        self._render_banner()
+
+        self._live_chart.update_state(state)
+        self._contention_strip.update_state(state)
 
         metrics = state.get("latest_metrics") or {}
         self._cpu_tile.set_value(format_percent(metrics.get("cpu_percent")))
@@ -156,7 +176,47 @@ class DashboardWidget(QWidget):
         self._update_diagnosis(state.get("diagnosis"))
         self._update_recommendation(state.get("recommendation"))
 
+    def update_readiness(self, readiness: dict[str, Any]) -> None:
+        """Feed one ``GET /readiness`` response (Phase 9 F9).
+
+        Polled separately from the WebSocket ``LiveStateOut`` stream (see
+        ``MainWindow``) since readiness -- can this system predict right
+        now, and if not, why -- is not itself part of that payload; it
+        answers a different question than any single live-inference tick
+        does.
+        """
+        self._last_readiness = readiness
+        self._render_banner()
+
     # --- internal ---------------------------------------------------------
+
+    def _render_banner(self) -> None:
+        if self._last_error:
+            bg, fg = _ERROR_STYLE
+            self._status_banner.setText(f"Something went wrong: {self._last_error}")
+            self._status_banner.setStyleSheet(
+                f"padding: 10px; border-radius: 6px; background: {bg}; color: {fg}; font-weight: 600;"
+            )
+            self._status_banner.setToolTip("")
+            return
+
+        if self._last_readiness is None:
+            return  # keep the initial "Waiting for live data..." text until the first /readiness response
+
+        readiness = self._last_readiness
+        state = readiness.get("state", "")
+        text = readiness_banner_text(
+            state,
+            readiness.get("detail", ""),
+            readiness.get("history_seconds", 0.0),
+            readiness.get("history_seconds_required", 0.0),
+        )
+        bg, fg = _READINESS_STYLES.get(state, _READINESS_STYLES["no_data"])
+        self._status_banner.setText(text)
+        self._status_banner.setStyleSheet(
+            f"padding: 10px; border-radius: 6px; background: {bg}; color: {fg}; font-weight: 600;"
+        )
+        self._status_banner.setToolTip(readiness.get("detail", ""))
 
     def _update_diagnosis(self, diagnosis: dict[str, Any] | None) -> None:
         if diagnosis is None:
