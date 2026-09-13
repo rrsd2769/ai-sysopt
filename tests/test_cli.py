@@ -35,6 +35,7 @@ def clean_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path / "home"
 
 
+@pytest.mark.plumbing
 @pytest.mark.parametrize(
     "argv",
     [
@@ -57,11 +58,13 @@ def test_every_subcommand_parses(argv: list[str]) -> None:
     assert callable(args.func)
 
 
+@pytest.mark.plumbing
 def test_a_subcommand_is_required() -> None:
     with pytest.raises(SystemExit):
         build_parser().parse_args([])
 
 
+@pytest.mark.behavioural
 def test_train_defaults_are_the_documented_ones() -> None:
     args = build_parser().parse_args(["train"])
     assert args.source == "synthetic"
@@ -70,6 +73,7 @@ def test_train_defaults_are_the_documented_ones() -> None:
     assert args.deploy is False
 
 
+@pytest.mark.behavioural
 def test_evaluate_defaults_are_the_documented_ones() -> None:
     args = build_parser().parse_args(["evaluate"])
     assert args.ablation is False
@@ -79,10 +83,12 @@ def test_evaluate_defaults_are_the_documented_ones() -> None:
     assert args.holdout_fraction == 0.2
 
 
+@pytest.mark.plumbing
 def test_evaluate_without_ablation_or_report_is_a_no_op_error(clean_home: Path) -> None:
     assert main(["evaluate"]) == 1
 
 
+@pytest.mark.behavioural
 def test_doctor_succeeds_on_a_completely_fresh_install(clean_home: Path, capsys) -> None:
     """A fresh install is 'not ready yet', which is a normal state, not a failure."""
     assert main(["doctor"]) == 0
@@ -93,12 +99,14 @@ def test_doctor_succeeds_on_a_completely_fresh_install(clean_home: Path, capsys)
     assert str(clean_home) in out
 
 
+@pytest.mark.plumbing
 def test_console_script_is_declared_in_packaging_metadata() -> None:
     with (_PROJECT_ROOT / "pyproject.toml").open("rb") as handle:
         pyproject = tomllib.load(handle)
     assert pyproject["project"]["scripts"]["aiperfopt"] == "aiperfopt.cli:main"
 
 
+@pytest.mark.behavioural
 def test_export_training_window_writes_system_metrics_and_process_summaries(
     clean_home: Path, tmp_path: Path
 ) -> None:
@@ -132,6 +140,7 @@ def test_export_training_window_writes_system_metrics_and_process_summaries(
     assert payload["process_feature_summaries"][0]["proc_cpu_sum"] == 5.0
 
 
+@pytest.mark.plumbing
 def test_collect_forever_stops_cleanly_on_sigterm(clean_home: Path) -> None:
     """The Phase 2 background-collection mode: SIGTERM must flush and exit 0,
     not be killed mid-write the way the default SIGTERM handler would."""
@@ -152,6 +161,7 @@ def test_collect_forever_stops_cleanly_on_sigterm(clean_home: Path) -> None:
             proc.wait()
 
 
+@pytest.mark.plumbing
 def test_python_dash_m_entrypoint_works(clean_home: Path) -> None:
     """``python -m aiperfopt`` must be equivalent to the installed script."""
     env = {**os.environ, HOME_ENV_VAR: str(clean_home)}

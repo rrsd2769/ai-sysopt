@@ -16,18 +16,21 @@ def _normal_data(n=100, seed=0) -> pd.DataFrame:
     })
 
 
+@pytest.mark.plumbing
 def test_fit_with_too_few_rows_raises():
     detector = AnomalyDetector(min_training_rows=50)
     with pytest.raises(AnomalyDetectionError):
         detector.fit(_normal_data(n=10))
 
 
+@pytest.mark.plumbing
 def test_score_before_fit_raises():
     detector = AnomalyDetector()
     with pytest.raises(AnomalyDetectionError):
         detector.score(pd.Series({"a": 1.0, "b": 2.0}))
 
 
+@pytest.mark.plumbing
 def test_score_returns_bounded_value():
     detector = AnomalyDetector(min_training_rows=20)
     detector.fit(_normal_data())
@@ -35,6 +38,7 @@ def test_score_returns_bounded_value():
     assert 0.0 <= score <= 1.0
 
 
+@pytest.mark.behavioural
 def test_typical_point_scores_lower_than_extreme_outlier():
     detector = AnomalyDetector(min_training_rows=20)
     detector.fit(_normal_data(n=200))
@@ -45,6 +49,7 @@ def test_typical_point_scores_lower_than_extreme_outlier():
     assert outlier > typical
 
 
+@pytest.mark.behavioural
 def test_score_batch_matches_individual_scores():
     detector = AnomalyDetector(min_training_rows=20)
     data = _normal_data(n=100)
@@ -57,6 +62,7 @@ def test_score_batch_matches_individual_scores():
         assert b == pytest.approx(i, abs=1e-6)
 
 
+@pytest.mark.plumbing
 def test_score_handles_missing_columns_via_fillna():
     detector = AnomalyDetector(min_training_rows=20)
     detector.fit(_normal_data())
@@ -65,6 +71,7 @@ def test_score_handles_missing_columns_via_fillna():
     assert 0.0 <= score <= 1.0
 
 
+@pytest.mark.plumbing
 def test_score_handles_nan_values():
     detector = AnomalyDetector(min_training_rows=20)
     detector.fit(_normal_data())
@@ -73,12 +80,14 @@ def test_score_handles_nan_values():
     assert 0.0 <= score <= 1.0
 
 
+@pytest.mark.behavioural
 def test_is_significant():
     detector = AnomalyDetector()
     assert detector.is_significant(0.8, threshold=0.7) is True
     assert detector.is_significant(0.5, threshold=0.7) is False
 
 
+@pytest.mark.plumbing
 def test_fit_sets_schema_version():
     detector = AnomalyDetector(min_training_rows=20)
     detector.fit(_normal_data())
@@ -87,6 +96,7 @@ def test_fit_sets_schema_version():
     assert detector.schema_version == ANOMALY_ARTIFACT_SCHEMA_VERSION
 
 
+@pytest.mark.behavioural
 def test_score_imputes_missing_column_from_training_mean_not_zero():
     """F1 regression: fit() and score() must use the same imputation.
 
@@ -110,6 +120,7 @@ def test_score_imputes_missing_column_from_training_mean_not_zero():
     assert score_missing != pytest.approx(score_zero, abs=1e-6)
 
 
+@pytest.mark.behavioural
 def test_scoring_training_matrix_has_low_mean_score():
     data = _normal_data(n=200)
     detector = AnomalyDetector(min_training_rows=20)

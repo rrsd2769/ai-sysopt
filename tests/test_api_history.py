@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from aiperfopt.storage import insert_evaluation, insert_model_deployment
 from aiperfopt.storage.records import EvaluationRecord, ModelDeploymentRecord
 from tests.api_conftest import build_test_client
+
+pytestmark = pytest.mark.plumbing
 
 
 def test_system_metrics_empty_database(tmp_path: Path):

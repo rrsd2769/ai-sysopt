@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
 from aiperfopt.frontend.formatting import (
     confidence_tier,
@@ -12,6 +14,8 @@ from aiperfopt.frontend.formatting import (
     humanize_category,
     readiness_banner_text,
 )
+
+pytestmark = pytest.mark.behavioural
 
 
 def test_humanize_category_covers_every_real_taxonomy_value():

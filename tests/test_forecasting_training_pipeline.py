@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.config.settings import ForecastingSettings
@@ -27,6 +28,7 @@ def _fast_feature_config() -> FeatureEngineeringConfig:
     return FeatureEngineeringConfig(lookback_windows_seconds=(10, 30), tolerance_seconds=3.0)
 
 
+@pytest.mark.plumbing
 def test_full_training_pipeline_one_metric_end_to_end(storage_engine: Engine, tmp_path: Path):
     fconfig = _fast_feature_config()
     fsettings = _fast_forecasting_settings(tmp_path / "models")
@@ -46,6 +48,7 @@ def test_full_training_pipeline_one_metric_end_to_end(storage_engine: Engine, tm
         assert "lightgbm" in outcome.walk_forward_summary
 
 
+@pytest.mark.plumbing
 def test_walk_forward_evaluation_rows_persisted_to_storage(storage_engine: Engine, tmp_path: Path):
     fconfig = _fast_feature_config()
     fsettings = _fast_forecasting_settings(tmp_path / "models")
@@ -66,6 +69,7 @@ def test_walk_forward_evaluation_rows_persisted_to_storage(storage_engine: Engin
     assert any(r.baseline_name is not None for r in walk_forward_rows)
 
 
+@pytest.mark.behavioural
 def test_lightgbm_artifact_saved_only_when_selected(storage_engine: Engine, tmp_path: Path):
     fconfig = _fast_feature_config()
     fsettings = _fast_forecasting_settings(tmp_path / "models")
@@ -85,6 +89,7 @@ def test_lightgbm_artifact_saved_only_when_selected(storage_engine: Engine, tmp_
             assert outcome.artifact_path is None
 
 
+@pytest.mark.behavioural
 def test_held_out_scenario_never_appears_in_walk_forward_training():
     """The held-out scenario generator uses a different time block than
     every training scenario — verifying this holds is what makes Section
@@ -99,6 +104,7 @@ def test_held_out_scenario_never_appears_in_walk_forward_training():
     assert training_timestamps.isdisjoint(holdout_timestamps)
 
 
+@pytest.mark.behavioural
 def test_process_summaries_threaded_through_without_error(storage_engine: Engine, tmp_path: Path):
     """Phase 5: an optional process summary can be merged into the feature
     matrix without breaking training -- the wiring the ablation's "v2" arm
@@ -144,6 +150,7 @@ def test_process_summaries_threaded_through_without_error(storage_engine: Engine
         assert any(name.startswith("proc_") for name in outcome.feature_importance)
 
 
+@pytest.mark.behavioural
 def test_feature_importance_absent_when_not_requested(storage_engine: Engine, tmp_path: Path):
     fconfig = _fast_feature_config()
     fsettings = _fast_forecasting_settings(tmp_path / "models")

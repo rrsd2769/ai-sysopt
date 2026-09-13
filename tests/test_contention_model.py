@@ -17,6 +17,7 @@ def _separable_training_data(n=100, seed=0):
     return pd.DataFrame({"feature_a": a, "feature_b": b}), pd.Series(label)
 
 
+@pytest.mark.behavioural
 def test_fit_and_predict_proba_separates_classes():
     X, y = _separable_training_data()
     classifier = ContentionClassifier(min_training_rows=20)
@@ -28,6 +29,7 @@ def test_fit_and_predict_proba_separates_classes():
     assert classifier.predict_proba(high_row) > classifier.predict_proba(low_row)
 
 
+@pytest.mark.plumbing
 def test_fit_with_too_few_rows_raises():
     X, y = _separable_training_data(n=10)
     classifier = ContentionClassifier(min_training_rows=50)
@@ -35,6 +37,7 @@ def test_fit_with_too_few_rows_raises():
         classifier.fit(X, y)
 
 
+@pytest.mark.plumbing
 def test_fit_with_single_class_raises():
     X = pd.DataFrame({"a": [1.0, 2.0, 3.0] * 10})
     y = pd.Series([0] * 30)  # only one class present
@@ -43,12 +46,14 @@ def test_fit_with_single_class_raises():
         classifier.fit(X, y)
 
 
+@pytest.mark.plumbing
 def test_predict_proba_before_fit_raises():
     classifier = ContentionClassifier()
     with pytest.raises(ContentionPredictionError):
         classifier.predict_proba(pd.Series({"a": 1.0}))
 
 
+@pytest.mark.behavioural
 def test_predict_proba_batch_matches_individual_predictions():
     X, y = _separable_training_data()
     classifier = ContentionClassifier(min_training_rows=20)
@@ -61,6 +66,7 @@ def test_predict_proba_batch_matches_individual_predictions():
         assert b == pytest.approx(i, abs=1e-6)
 
 
+@pytest.mark.behavioural
 def test_contributing_metrics_ranks_the_actually_informative_feature_first():
     """feature_a determines the label; feature_b is noise. For a clearly
     high-feature_a row, feature_a should dominate the attribution."""
@@ -74,12 +80,14 @@ def test_contributing_metrics_ranks_the_actually_informative_feature_first():
     assert contributions[0].metric_name == "feature_a"
 
 
+@pytest.mark.plumbing
 def test_contributing_metrics_before_fit_raises():
     classifier = ContentionClassifier()
     with pytest.raises(ContentionPredictionError):
         classifier.contributing_metrics(pd.Series({"a": 1.0}))
 
 
+@pytest.mark.plumbing
 def test_predict_proba_handles_missing_feature_gracefully():
     X, y = _separable_training_data()
     classifier = ContentionClassifier(min_training_rows=20)
@@ -90,6 +98,7 @@ def test_predict_proba_handles_missing_feature_gracefully():
     assert 0.0 <= proba <= 1.0
 
 
+@pytest.mark.plumbing
 def test_decision_threshold_defaults_to_none_and_is_settable():
     """Phase 5: unset means "never fitted" -- callers fall back to the
     configured constant in that case (see aiperfopt.api.live_state)."""

@@ -48,6 +48,7 @@ def _rising_cpu_samples(n: int, interval: float = 2.0) -> list[SystemMetricSampl
     ]
 
 
+@pytest.mark.plumbing
 def test_resolve_deployed_forecasters_reconstructs_from_persisted_evaluations(
     storage_engine: Engine, tmp_path: Path
 ):
@@ -66,6 +67,7 @@ def test_resolve_deployed_forecasters_reconstructs_from_persisted_evaluations(
     assert forecasters["cpu_percent"].model_version is not None
 
 
+@pytest.mark.behavioural
 def test_resolve_deployed_forecasters_skips_metric_with_no_holdout_evaluation(
     storage_engine: Engine, tmp_path: Path
 ):
@@ -85,6 +87,7 @@ def test_resolve_deployed_forecasters_skips_metric_with_no_holdout_evaluation(
     assert set(forecasters.keys()) == {"cpu_percent"}
 
 
+@pytest.mark.plumbing
 def test_resolve_deployed_forecasters_empty_for_unknown_version(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, _, _ = _fast_settings(tmp_path)
     forecasters = resolve_deployed_forecasters(
@@ -93,6 +96,7 @@ def test_resolve_deployed_forecasters_empty_for_unknown_version(storage_engine: 
     assert forecasters == {}
 
 
+@pytest.mark.plumbing
 def test_build_live_contention_input_row_feeds_a_real_prediction(storage_engine: Engine, tmp_path: Path):
     """End-to-end: real trained forecaster + classifier + anomaly detector,
     fed a live row built from real stored history, produces a real
@@ -141,6 +145,7 @@ def test_build_live_contention_input_row_feeds_a_real_prediction(storage_engine:
     assert isinstance(prediction.triggered, bool)
 
 
+@pytest.mark.plumbing
 def test_build_live_contention_input_row_returns_none_with_no_forecasters(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path)
     insert_system_metric_samples_batch(storage_engine, _rising_cpu_samples(300))
@@ -154,6 +159,7 @@ def test_build_live_contention_input_row_returns_none_with_no_forecasters(storag
     assert row is None
 
 
+@pytest.mark.behavioural
 def test_build_forecast_records_coerces_missing_confidence_and_uses_settings_horizon(tmp_path: Path):
     """A deployed *baseline* forecaster (Section 10.7's contingency plan) has
     no ``confidence``/``horizon_seconds`` attribute of its own -- Phase 7's

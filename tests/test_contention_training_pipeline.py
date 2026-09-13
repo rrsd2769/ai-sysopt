@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.config.settings import ContentionSettings, ForecastingSettings
@@ -40,6 +41,7 @@ def _fast_settings(models_dir: Path):
     return fconfig, fsettings, csettings, labeling_config
 
 
+@pytest.mark.plumbing
 def test_full_forecasting_then_contention_pipeline(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
@@ -59,6 +61,7 @@ def test_full_forecasting_then_contention_pipeline(storage_engine: Engine, tmp_p
     assert anomaly_artifact_exists(tmp_path / "models", "test-v1")
 
 
+@pytest.mark.plumbing
 def test_contention_evaluations_persisted_with_extra_metrics(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
@@ -85,6 +88,7 @@ def test_contention_evaluations_persisted_with_extra_metrics(storage_engine: Eng
         assert "precision" in row.extra or "selected_forecaster" in row.extra
 
 
+@pytest.mark.plumbing
 def test_classifier_artifact_saved_when_training_succeeds(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
@@ -103,9 +107,9 @@ def test_classifier_artifact_saved_when_training_succeeds(storage_engine: Engine
         assert contention_artifact_exists(tmp_path / "models", "test-v1")
 
 
+@pytest.mark.plumbing
 def test_no_deployed_forecasters_raises_value_error(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
-    import pytest
 
     with pytest.raises(ValueError):
         train_contention_and_anomaly_pipeline(
@@ -114,6 +118,7 @@ def test_no_deployed_forecasters_raises_value_error(storage_engine: Engine, tmp_
         )
 
 
+@pytest.mark.behavioural
 def test_interleave_scenario_chunks_preserves_all_rows():
     import pandas as pd
 
@@ -126,6 +131,7 @@ def test_interleave_scenario_chunks_preserves_all_rows():
     assert set(combined["timestamp"]) == set(ds_a["timestamp"]) | set(ds_b["timestamp"])
 
 
+@pytest.mark.behavioural
 def test_interleave_scenario_chunks_mixes_scenarios_in_early_rows():
     import pandas as pd
 
@@ -140,6 +146,7 @@ def test_interleave_scenario_chunks_mixes_scenarios_in_early_rows():
     assert first_quarter_sources == {"a", "b"}
 
 
+@pytest.mark.plumbing
 def test_interleave_scenario_chunks_empty_input():
     result = _interleave_scenario_chunks([], n_chunks=4)
     assert result.empty
@@ -148,6 +155,7 @@ def test_interleave_scenario_chunks_empty_input():
 # --- Phase 5: fitted decision threshold, base rate, threshold-rule baseline ---
 
 
+@pytest.mark.behavioural
 def test_fitted_decision_threshold_set_on_saved_classifier(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
@@ -176,6 +184,7 @@ def test_fitted_decision_threshold_set_on_saved_classifier(storage_engine: Engin
     assert classifier.decision_threshold == summary.decision_threshold
 
 
+@pytest.mark.plumbing
 def test_process_summaries_threaded_through_without_error(storage_engine: Engine, tmp_path: Path):
     """Phase 5: supplying a process summary must not break the pipeline --
     this is the wiring the ablation's "v2" arm depends on."""

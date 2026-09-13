@@ -10,6 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pytest
 from sklearn.metrics import f1_score
 from sqlalchemy import Engine
 
@@ -20,6 +21,8 @@ from aiperfopt.features import FeatureEngineeringConfig
 from aiperfopt.forecasting.training_pipeline import MetricHorizonOutcome, TrainingRunSummary
 from aiperfopt.retraining.comparison import evaluate_skill_gate
 from aiperfopt.retraining.pipeline import run_retraining_on_synthetic_data
+
+pytestmark = pytest.mark.behavioural
 
 _MAE_MARGIN = 0.05
 _DIRECTIONAL_MARGIN = 0.05

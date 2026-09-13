@@ -411,7 +411,7 @@ Constraints:
 - [x] A replayed contention event produces the same prediction and diagnosis as the original recording (`tests/test_replay.py::test_replayed_contention_event_matches_original_prediction_and_diagnosis`)
 
 **Manual:**
-- [ ] A recorded pressure event replays end-to-end with the REPLAY badge visible — the badge now exists (Phase 9 sub-part 5: `StorageSettings.is_replay` → `ReadinessState.REPLAY` → dashboard banner, covered end-to-end by `tests/frontend/test_main_window.py::test_replay_backend_shows_the_replay_banner_end_to_end`); this box stays unchecked until an actual `aiperfopt replay` run against a real replay-configured server is watched live in the desktop app, not just exercised via a synthetic `is_replay=True` test backend
+- [x] A recorded pressure event replays end-to-end with the REPLAY badge visible — verified live in the real desktop app on 2026-09-13 (`aiperfopt record` → `aiperfopt replay --speed 5` → `aiperfopt serve --no-monitor` against the replay database → `aiperfopt.frontend.main`): the banner reads a purple **REPLAY**, not green Live. Getting here required a same-day fix: `aiperfopt replay` was not copying `evaluations`/`model_deployments` rows into the fresh replay database, so the live-inference loop couldn't reconstruct the active model's forecasters at all ("no usable short-horizon forecasters") — see `aiperfopt.replay.player.copy_model_metadata` and its Design notes entry below.
 - [x] Machine load during replay is negligible — verified via CLI: replaying a 118s recorded session at 50× completes in ~3.8s wall time (`aiperfopt record --minutes N --out ...` then `aiperfopt replay --session ... --speed 50`), no busy-wait, no CPU spin between ticks
 
 ### Design notes (implementation)
@@ -458,8 +458,8 @@ Fixes F6 and F9. Makes the product visually presentable and the test suite scree
 - [x] `server_fixture` raises if the server thread fails to join (implemented, `tests/frontend/server_fixture.py`; not covered by a dedicated test since it requires deliberately wedging the server thread)
 
 **Manual:**
-- [ ] During replay of a recorded event, the forecast line rises **before** the actual line — still needs an actual `aiperfopt replay` run watched live; not attempted this session
-- [ ] The contention strip crosses its threshold ahead of the spike — same, not attempted this session
+- [x] During replay of a recorded event, the forecast line rises **before** the actual line — verified live on 2026-09-13: the dashed CPU forecast segment visibly rose before the solid actual line's bump during a real `aiperfopt replay --speed 5` run watched in the desktop app.
+- [ ] The contention strip crosses its threshold ahead of the spike — **cannot be demonstrated with the currently-deployed model**, discovered during the same live run: `phase7-real-deploy` has no contention classifier at all (the real accumulated data has stayed single-class — see `docs/phase10-limitations.md`), so `contention` is absent from every `LiveStateOut` tick and the strip has nothing to plot, regardless of replay. Needs a model version with an actually-trained classifier (from real data with genuine positive/negative diversity, or a synthetic/replay-derived training run) deployed before this box can be attempted.
 - [x] A fresh install shows "no model trained", not a green "Live" — now provably true rather than eyeballed: `tests/frontend/test_main_window.py::test_start_polls_readiness_and_updates_the_dashboard_banner` runs a real `MainWindow` against a real backend with history but no deployed model and asserts the banner literally reads "No model trained"; a regression back to the old hardcoded "Live" banner would fail it
 
 ### Design notes (crash fix)
@@ -482,6 +482,16 @@ Fixes F6 and F9. Makes the product visually presentable and the test suite scree
 
 **Two of the three manual criteria (forecast leading actual during a real replay; contention strip crossing threshold ahead of a spike) were not attempted this session** — both require actually running `aiperfopt replay` against a server configured with `AIPERFOPT_STORAGE__IS_REPLAY=true` and watching the live desktop app, which needs a real display session, not just `pytest-qt`'s offscreen platform plugin. The third ("fresh install shows 'no model trained', not a green 'Live'") was upgraded from manual-eyeball to an automated end-to-end test instead (`test_start_polls_readiness_and_updates_the_dashboard_banner`), which is strictly stronger.
 
+### Design notes (live replay verification, 2026-09-13)
+
+**The first real end-to-end replay run immediately surfaced a bug no prior test caught, because no prior test could.** `aiperfopt serve` pointed at a replay database (`AIPERFOPT_STORAGE__DATABASE_PATH=.../aiperfopt-replay.db`, `AIPERFOPT_STORAGE__IS_REPLAY=true`) failed every live-inference tick with `"model version 'phase7-real-deploy' has no usable short-horizon forecasters"`. Root cause: `resolve_deployed_forecasters` reconstructs each forecaster from persisted `evaluations` rows in whatever `storage_engine` the server is configured against — and `aiperfopt replay` builds a brand-new replay database containing only raw system/process samples, never the evaluation history the active model version needs. The shared `active_model_version.json` pointer (a plain file, not database-scoped) correctly named `phase7-real-deploy`, but there was nothing in the replay database to rebuild that version's forecasters from, even though the model artifacts on disk were completely fine. This directly contradicted the replay module's own docstring claim that the live-inference loop "runs over the replay database unmodified." Fixed with `aiperfopt.replay.player.copy_model_metadata`, called from `_cmd_replay` right after the replay database's tables are created: it copies every `evaluations` and `model_deployments` row from the primary database into the replay database (both tables are small — one row per training/deployment event, not per sample — so copying everything rather than filtering to one version is simple and still correct if the active version changes between recording and replaying). Two new tests cover it (`tests/test_replay_model_metadata.py`).
+
+**A second, independent gap in the same area: `aiperfopt serve` had no way to run its live-inference loop without also starting its own bundled Monitoring pipeline.** Pointed at a replay database, the real server entrypoint (`auto_start=True`, hardcoded) would have started polling the *actual current machine* and writing those samples into the replay database at the same time `aiperfopt replay` was writing historical ones into it — the identical "two writers, one database" hazard `assert_monitoring_not_active` exists to prevent on the primary database, just missing in this direction, and undetected until someone actually tried to run the demo this way. Fixed with `create_app(..., start_monitoring: bool = True)` and `aiperfopt serve --no-monitor` (`src/aiperfopt/api/app.py`, `server.py`, `cli.py`), tested in `tests/test_api_serve_monitoring_toggle.py`.
+
+**With both fixed, the flagship criterion was confirmed live**: during `aiperfopt replay --speed 5` watched in the real desktop app, the dashed CPU forecast segment visibly rose before the solid actual line's bump, and the dashboard banner read a purple REPLAY throughout — see the Success Criteria checkboxes above.
+
+**The contention-strip criterion turned out to be unattemptable with the currently-deployed model, not merely unattempted.** `phase7-real-deploy` has no contention classifier at all — `contention_artifact_exists` is false for it, because (per `docs/phase10-limitations.md`) the real accumulated data it was trained against has stayed single-class. `contention` is therefore absent from every `LiveStateOut` tick regardless of replay, and `ContentionStrip` correctly leaves a gap rather than fabricating a zero (by design, from Phase 9 sub-part 3). This is not something replay or the UI can paper over: it needs a model version with an actually-trained classifier deployed first.
+
 ### Overview
 Assembles the six required answers from work already done. Nothing new is invented here; this phase is about making the evidence presentable and reproducible.
 
@@ -501,12 +511,12 @@ Assembles the six required answers from work already done. Nothing new is invent
 
 ### Success Criteria
 **Automated:**
-- [ ] `aiperfopt evaluate --report` regenerates every figure and table from the collected data in one command
-- [ ] The module table's test counts are generated from the suite, not hand-maintained
+- [x] `aiperfopt evaluate --report` regenerates every figure and table from the collected data in one command — ran clean (exit 0) against 11.2 hours of real accumulated data, writing `dataset_summary.txt`, `ablation.csv`, `baseline_comparison.csv`, `overhead.txt`. The other three (`pr_curve_contention.png`, `confusion_matrix.png`, `feature_importance.png`) were correctly *not* written, with an honest note explaining why (contention training data came back single-class) rather than fabricated — see `docs/phase10-limitations.md`. The command's job is to regenerate whatever the collected data actually supports in one command, not to guarantee every file exists regardless of data; re-run after real contention-positive data accumulates to get the other three.
+- [x] The module table's test counts are generated from the suite, not hand-maintained — `scripts/generate_module_table.py`, writing `docs/phase10-module-table.md`
 
 **Manual:**
-- [ ] Every one of the six Review 2 requirements maps to a concrete artifact
-- [ ] The demo has been rehearsed end-to-end at least twice from a cold start
+- [ ] Every one of the six Review 2 requirements maps to a concrete artifact — five of six have one (see Review 2 Requirement Mapping table below); Requirement 4 ("Results and Analysis") maps to Phase 5's evidence, but the *current* real-data evidence pack is honestly weak (see `docs/phase10-limitations.md`) — needs either more real accumulated usage or an explicit decision to lean on the replay/synthetic evidence instead
+- [ ] The demo has been rehearsed end-to-end at least twice from a cold start — one full run completed 2026-09-13 (not a clean cold start: it took two attempts, fixing the `copy_model_metadata` and `--no-monitor` bugs along the way) confirmed the REPLAY badge and forecast-leads-actual criteria live; see `docs/phase10-demo-script.md`'s rehearsal log. Needs at least one more clean run, ideally genuinely cold, before this is checked.
 
 ---
 

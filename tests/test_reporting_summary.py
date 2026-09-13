@@ -39,16 +39,19 @@ def _make_sample(ts: float, cpu: float, mem: float = 50.0) -> SystemMetricSample
 # --- resolve_report_window ------------------------------------------------------------
 
 
+@pytest.mark.behavioural
 def test_explicit_start_end_always_wins():
     start, end = resolve_report_window(period="daily", start=100.0, end=200.0)
     assert (start, end) == (100.0, 200.0)
 
 
+@pytest.mark.behavioural
 def test_explicit_start_must_precede_end():
     with pytest.raises(ValueError):
         resolve_report_window(period=None, start=200.0, end=100.0)
 
 
+@pytest.mark.behavioural
 def test_daily_period_defaults_to_last_24h_ending_now():
     before = time.time()
     start, end = resolve_report_window(period="daily", start=None, end=None)
@@ -57,12 +60,14 @@ def test_daily_period_defaults_to_last_24h_ending_now():
     assert abs((end - start) - 24 * 3600.0) < 1.0
 
 
+@pytest.mark.behavioural
 def test_weekly_period():
     start, end = resolve_report_window(period="weekly", start=None, end=1_000_000.0)
     assert end == 1_000_000.0
     assert start == 1_000_000.0 - 7 * 24 * 3600.0
 
 
+@pytest.mark.behavioural
 def test_unknown_period_without_explicit_window_raises():
     with pytest.raises(ValueError):
         resolve_report_window(period="monthly", start=None, end=None)
@@ -71,6 +76,7 @@ def test_unknown_period_without_explicit_window_raises():
 # --- system metrics summary ------------------------------------------------------------
 
 
+@pytest.mark.behavioural
 def test_system_metrics_summary_computes_avg_min_max(storage_engine: Engine):
     samples = [_make_sample(1000.0 + i, cpu=float(i * 10)) for i in range(5)]  # 0,10,20,30,40
     insert_system_metric_samples_batch(storage_engine, samples)
@@ -85,12 +91,14 @@ def test_system_metrics_summary_computes_avg_min_max(storage_engine: Engine):
     assert s.sample_count == 5
 
 
+@pytest.mark.behavioural
 def test_system_metrics_summary_with_no_samples_is_all_none(storage_engine: Engine):
     summaries = build_system_metrics_summary(storage_engine, 0.0, 100.0, metric_names=("cpu_percent",))
     assert summaries[0].avg is None
     assert summaries[0].sample_count == 0
 
 
+@pytest.mark.behavioural
 def test_system_metrics_summary_skips_none_values(storage_engine: Engine):
     # swap_percent defaults to None on SystemMetricSample unless set.
     samples = [_make_sample(1000.0, cpu=10.0), _make_sample(1001.0, cpu=20.0)]
@@ -103,6 +111,7 @@ def test_system_metrics_summary_skips_none_values(storage_engine: Engine):
 # --- prediction accuracy summary ------------------------------------------------------------
 
 
+@pytest.mark.behavioural
 def test_prediction_accuracy_summary_computes_mae_and_directional(storage_engine: Engine):
     base = 1000.0
     samples = [_make_sample(base + i * 2, cpu=float(50 + i)) for i in range(20)]
@@ -138,11 +147,13 @@ def test_prediction_accuracy_summary_computes_mae_and_directional(storage_engine
     assert s.directional_accuracy == 1.0  # both predicted a rise, both actually rose
 
 
+@pytest.mark.behavioural
 def test_prediction_accuracy_summary_empty_when_no_predictions(storage_engine: Engine):
     summaries = build_prediction_accuracy_summary(storage_engine, 0.0, 1000.0)
     assert summaries == []
 
 
+@pytest.mark.behavioural
 def test_prediction_accuracy_summary_unmatched_predictions_have_none_metrics(storage_engine: Engine):
     # Target far in the future -- nothing observed nearby.
     insert_forecast_prediction(
@@ -160,6 +171,7 @@ def test_prediction_accuracy_summary_unmatched_predictions_have_none_metrics(sto
     assert summaries[0].prediction_count == 1
 
 
+@pytest.mark.behavioural
 def test_prediction_accuracy_summary_separates_by_horizon(storage_engine: Engine):
     samples = [_make_sample(1000.0 + i, cpu=50.0) for i in range(30)]
     insert_system_metric_samples_batch(storage_engine, samples)
@@ -180,6 +192,7 @@ def test_prediction_accuracy_summary_separates_by_horizon(storage_engine: Engine
 # --- contention summary ------------------------------------------------------------
 
 
+@pytest.mark.behavioural
 def test_contention_summary_counts_triggered_and_avg_probability(storage_engine: Engine):
     insert_contention_prediction(
         storage_engine,
@@ -199,6 +212,7 @@ def test_contention_summary_counts_triggered_and_avg_probability(storage_engine:
     assert summary.avg_probability == pytest.approx(0.5)
 
 
+@pytest.mark.behavioural
 def test_contention_summary_empty(storage_engine: Engine):
     summary = build_contention_summary(storage_engine, 0.0, 100.0)
     assert summary == ContentionSummary(0, 0, None)
@@ -207,6 +221,7 @@ def test_contention_summary_empty(storage_engine: Engine):
 # --- diagnosis summary ------------------------------------------------------------
 
 
+@pytest.mark.behavioural
 def test_diagnosis_summary_zero_fills_every_taxonomy_category(storage_engine: Engine):
     summary = build_diagnosis_summary(storage_engine, 0.0, 100.0)
     assert summary.total_count == 0
@@ -214,6 +229,7 @@ def test_diagnosis_summary_zero_fills_every_taxonomy_category(storage_engine: En
     assert all(v == 0 for v in summary.counts_by_category.values())
 
 
+@pytest.mark.behavioural
 def test_diagnosis_summary_counts_and_actionable(storage_engine: Engine):
     insert_diagnosis(
         storage_engine,
@@ -244,6 +260,7 @@ def test_diagnosis_summary_counts_and_actionable(storage_engine: Engine):
 # --- recommendation summary ------------------------------------------------------------
 
 
+@pytest.mark.behavioural
 def test_recommendation_summary_counts_and_actions(storage_engine: Engine):
     insert_recommendation(
         storage_engine,
@@ -259,6 +276,7 @@ def test_recommendation_summary_counts_and_actions(storage_engine: Engine):
     assert summary.counts_by_diagnosis_category == {"cpu_bound_single_process": 1}
 
 
+@pytest.mark.behavioural
 def test_recommendation_summary_empty(storage_engine: Engine):
     summary = build_recommendation_summary(storage_engine, 0.0, 100.0)
     assert summary.total_count == 0
@@ -269,6 +287,7 @@ def test_recommendation_summary_empty(storage_engine: Engine):
 # --- build_report (top-level) ------------------------------------------------------------
 
 
+@pytest.mark.behavioural
 def test_build_report_combines_all_sub_summaries(storage_engine: Engine):
     samples = [_make_sample(1000.0 + i, cpu=50.0) for i in range(10)]
     insert_system_metric_samples_batch(storage_engine, samples)
@@ -293,6 +312,7 @@ def test_build_report_combines_all_sub_summaries(storage_engine: Engine):
     assert report.recommendation.total_count == 0
 
 
+@pytest.mark.plumbing
 def test_build_report_requires_period_or_explicit_window(storage_engine: Engine):
     with pytest.raises(ValueError):
         build_report(storage_engine)

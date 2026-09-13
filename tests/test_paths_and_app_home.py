@@ -18,6 +18,8 @@ import pytest
 from aiperfopt.config import load_settings
 from aiperfopt.paths import HOME_ENV_VAR, app_home, default_app_home, resolve_under_home
 
+pytestmark = pytest.mark.behavioural
+
 
 @pytest.fixture
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:

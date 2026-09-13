@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.contention.processes import get_contributing_processes
 from aiperfopt.storage import ProcessMetricSample, insert_process_metric_samples_batch
+
+pytestmark = pytest.mark.behavioural
 
 
 def test_ranks_top_processes_by_cpu_for_cpu_dominant_metric(storage_engine: Engine):

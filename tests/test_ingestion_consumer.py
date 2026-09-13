@@ -35,6 +35,7 @@ def _sample(ts: float) -> SystemMetricSample:
     return SystemMetricSample(timestamp=ts, cpu_percent=10.0, mem_percent=20.0)
 
 
+@pytest.mark.plumbing
 def test_consumer_flushes_on_batch_size(storage_engine: Engine):
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
@@ -57,6 +58,7 @@ def test_consumer_flushes_on_batch_size(storage_engine: Engine):
         consumer.stop(timeout=2.0)
 
 
+@pytest.mark.plumbing
 def test_consumer_flushes_on_interval_with_partial_batch(storage_engine: Engine):
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
@@ -80,6 +82,7 @@ def test_consumer_flushes_on_interval_with_partial_batch(storage_engine: Engine)
         consumer.stop(timeout=2.0)
 
 
+@pytest.mark.behavioural
 def test_consumer_preserves_chronological_order(storage_engine: Engine):
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
@@ -104,6 +107,7 @@ def test_consumer_preserves_chronological_order(storage_engine: Engine):
         consumer.stop(timeout=2.0)
 
 
+@pytest.mark.plumbing
 def test_consumer_routes_all_three_record_types(storage_engine: Engine):
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
@@ -137,6 +141,7 @@ def test_consumer_routes_all_three_record_types(storage_engine: Engine):
         consumer.stop(timeout=2.0)
 
 
+@pytest.mark.plumbing
 def test_consumer_flushes_remaining_items_on_stop(storage_engine: Engine):
     q: "queue.Queue[QueueItem]" = queue.Queue()
     consumer = IngestionConsumer(
@@ -153,6 +158,7 @@ def test_consumer_flushes_remaining_items_on_stop(storage_engine: Engine):
     assert len(rows) == 7
 
 
+@pytest.mark.plumbing
 def test_consumer_survives_storage_failure_and_keeps_running(storage_engine: Engine, monkeypatch):
     import aiperfopt.ingestion.consumer as consumer_module
     from aiperfopt.common.exceptions import StorageError
@@ -179,6 +185,7 @@ def test_consumer_survives_storage_failure_and_keeps_running(storage_engine: Eng
         consumer.stop(timeout=2.0)
 
 
+@pytest.mark.plumbing
 def test_consumer_runs_retention_check_on_schedule(storage_engine: Engine, monkeypatch):
     import aiperfopt.ingestion.consumer as consumer_module
 

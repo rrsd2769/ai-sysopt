@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import pytest
+
 from aiperfopt.diagnosis.explainer import ForecastExplanation, FeatureAttribution
 from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
 from aiperfopt.diagnosis.text import build_plain_language_explanation, build_technical_explanation
 from aiperfopt.storage.records import ContentionPredictionRecord
+
+pytestmark = pytest.mark.behavioural
 
 
 def _record(**overrides) -> ContentionPredictionRecord:

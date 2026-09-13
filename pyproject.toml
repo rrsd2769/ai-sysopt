@@ -81,3 +81,8 @@ pythonpath = ["src"]
 # A single hung test must not stall the whole suite (the Qt suite is the
 # usual offender). Generous enough not to fire on real ML fitting.
 timeout = 300
+addopts = "--strict-markers"
+markers = [
+    "behavioural: asserts a computed value, decision, or output is correct (fails when logic degrades, not just when code errors)",
+    "plumbing: asserts only that code executed, wiring/DI/config is correct, or a record/thread/call happened (no correctness claim about the value)",
+]

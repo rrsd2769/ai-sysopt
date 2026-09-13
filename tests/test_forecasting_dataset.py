@@ -14,6 +14,7 @@ def _samples(n: int, interval: float = 2.0, start: float = 0.0):
     ]
 
 
+@pytest.mark.plumbing
 def test_whole_second_timestamps_do_not_raise_merge_error():
     """Regression test: pandas 3.0's datetime resolution inference upcasts
     ``index - Timedelta`` to a different resolution than a fresh
@@ -29,6 +30,7 @@ def test_whole_second_timestamps_do_not_raise_merge_error():
     assert not dataset.empty
 
 
+@pytest.mark.behavioural
 def test_target_matches_actual_future_value():
     samples = _samples(100, interval=2.0)  # cpu_percent == sample index
     config = FeatureEngineeringConfig(lookback_windows_seconds=(10, 30), tolerance_seconds=2.0)
@@ -40,6 +42,7 @@ def test_target_matches_actual_future_value():
     assert row["target"] == pytest.approx(row["current_value"] + 5)
 
 
+@pytest.mark.behavioural
 def test_tail_rows_without_a_future_value_are_dropped():
     samples = _samples(50, interval=2.0)
     config = FeatureEngineeringConfig(lookback_windows_seconds=(10,), tolerance_seconds=2.0)
@@ -52,6 +55,7 @@ def test_tail_rows_without_a_future_value_are_dropped():
     assert last_kept_ts <= samples[-1].timestamp - 20 + 2.0  # within tolerance
 
 
+@pytest.mark.behavioural
 def test_current_value_is_exact_match_to_raw_sample():
     samples = _samples(30, interval=2.0)
     config = FeatureEngineeringConfig(lookback_windows_seconds=(10,), tolerance_seconds=2.0)
@@ -63,6 +67,7 @@ def test_current_value_is_exact_match_to_raw_sample():
         assert row["current_value"] == pytest.approx(matching_sample.cpu_percent)
 
 
+@pytest.mark.plumbing
 def test_unknown_metric_name_raises_key_error():
     samples = _samples(30)
     config = FeatureEngineeringConfig()
@@ -71,12 +76,14 @@ def test_unknown_metric_name_raises_key_error():
         build_supervised_dataset(samples, fm, "not_a_real_metric", horizon_seconds=10, tolerance_seconds=2.0)
 
 
+@pytest.mark.plumbing
 def test_empty_feature_matrix_returns_empty_dataset():
     config = FeatureEngineeringConfig()
     result = build_supervised_dataset([], compute_feature_matrix([], config), "cpu_percent", 10, 2.0)
     assert result.empty
 
 
+@pytest.mark.behavioural
 def test_counter_metric_without_is_counter_flag_has_astronomically_large_target():
     """Regression test for a real Phase 4 bug: a counter metric's raw
     cumulative value grows unboundedly, while the features available to
@@ -101,6 +108,7 @@ def test_counter_metric_without_is_counter_flag_has_astronomically_large_target(
     assert with_flag["target"].iloc[10] == pytest.approx(500.0, rel=0.05)
 
 
+@pytest.mark.behavioural
 def test_counter_metric_current_value_is_also_rate_not_raw(
 ):
     samples = [

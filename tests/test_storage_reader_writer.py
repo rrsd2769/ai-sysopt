@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.storage import (
@@ -49,6 +50,7 @@ def _sample(ts: float, cpu: float = 10.0) -> SystemMetricSample:
     return SystemMetricSample(timestamp=ts, cpu_percent=cpu, mem_percent=42.0)
 
 
+@pytest.mark.plumbing
 def test_system_metric_round_trip(storage_engine: Engine):
     row_id = insert_system_metric_sample(storage_engine, _sample(1000.0, cpu=55.5))
     assert row_id is not None
@@ -60,6 +62,7 @@ def test_system_metric_round_trip(storage_engine: Engine):
     assert rows[0].id == row_id
 
 
+@pytest.mark.behavioural
 def test_system_metrics_range_is_chronologically_ordered(storage_engine: Engine):
     # Insert out of order deliberately.
     insert_system_metric_samples_batch(
@@ -71,6 +74,7 @@ def test_system_metrics_range_is_chronologically_ordered(storage_engine: Engine)
     assert [r.timestamp for r in rows] == [100.0, 200.0, 300.0]
 
 
+@pytest.mark.behavioural
 def test_get_recent_system_metrics_windowing(storage_engine: Engine):
     insert_system_metric_samples_batch(
         storage_engine, [_sample(t) for t in (0.0, 50.0, 100.0, 150.0, 200.0)]
@@ -81,6 +85,7 @@ def test_get_recent_system_metrics_windowing(storage_engine: Engine):
     assert [r.timestamp for r in recent] == [150.0, 200.0]
 
 
+@pytest.mark.behavioural
 def test_process_metric_round_trip_and_pid_filter(storage_engine: Engine):
     insert_process_metric_samples_batch(
         storage_engine,
@@ -99,6 +104,7 @@ def test_process_metric_round_trip_and_pid_filter(storage_engine: Engine):
     assert all(r.pid == 111 for r in pid_rows)
 
 
+@pytest.mark.plumbing
 def test_process_event_round_trip(storage_engine: Engine):
     insert_process_event(
         storage_engine, ProcessEvent(timestamp=5.0, pid=999, name="stress_test", event_type="launch")
@@ -110,6 +116,7 @@ def test_process_event_round_trip(storage_engine: Engine):
     assert rows[0].pid == 999
 
 
+@pytest.mark.behavioural
 def test_feature_vector_round_trip_and_latest(storage_engine: Engine):
     insert_feature_vector(
         storage_engine,
@@ -135,6 +142,7 @@ def test_feature_vector_round_trip_and_latest(storage_engine: Engine):
     assert latest.timestamp == 20.0
 
 
+@pytest.mark.behavioural
 def test_forecast_prediction_round_trip_and_metric_filter(storage_engine: Engine):
     insert_forecast_prediction(
         storage_engine,
@@ -158,6 +166,7 @@ def test_forecast_prediction_round_trip_and_metric_filter(storage_engine: Engine
     assert cpu_rows[0].predicted_value == 72.5
 
 
+@pytest.mark.plumbing
 def test_contention_prediction_round_trip_with_json_fields(storage_engine: Engine):
     insert_contention_prediction(
         storage_engine,
@@ -176,6 +185,7 @@ def test_contention_prediction_round_trip_with_json_fields(storage_engine: Engin
     assert rows[0].contributing_processes[0]["pid"] == 42
 
 
+@pytest.mark.plumbing
 def test_diagnosis_round_trip_with_json_fields(storage_engine: Engine):
     insert_diagnosis(
         storage_engine,
@@ -207,6 +217,7 @@ def test_diagnosis_round_trip_with_json_fields(storage_engine: Engine):
     assert rows[0].contributing_processes[0]["name"] == "chrome"
 
 
+@pytest.mark.plumbing
 def test_recommendation_round_trip(storage_engine: Engine):
     diag_id = insert_diagnosis(
         storage_engine,
@@ -234,6 +245,7 @@ def test_recommendation_round_trip(storage_engine: Engine):
     assert rows[0].actions[0]["title"] == "t"
 
 
+@pytest.mark.plumbing
 def test_evaluation_round_trip(storage_engine: Engine):
     insert_evaluation(
         storage_engine,
@@ -261,6 +273,7 @@ def test_evaluation_round_trip(storage_engine: Engine):
     assert baseline_rows[0].mae == 3.5
 
 
+@pytest.mark.behavioural
 def test_evaluations_by_version_filters_correctly(storage_engine: Engine):
     insert_evaluation(
         storage_engine,
@@ -290,6 +303,7 @@ def test_evaluations_by_version_filters_correctly(storage_engine: Engine):
     assert get_evaluations_by_version(storage_engine, "v3") == []
 
 
+@pytest.mark.behavioural
 def test_model_deployment_round_trip(storage_engine: Engine):
     insert_model_deployment(
         storage_engine,
@@ -320,6 +334,7 @@ def test_model_deployment_round_trip(storage_engine: Engine):
     assert latest.comparison_summary["reasons"] == ["mae regressed beyond tolerance"]
 
 
+@pytest.mark.plumbing
 def test_log_event_round_trip(storage_engine: Engine):
     insert_log_event(
         storage_engine,
@@ -336,6 +351,7 @@ def test_log_event_round_trip(storage_engine: Engine):
     assert rows[0].context["model_version"] == "v3"
 
 
+@pytest.mark.plumbing
 def test_range_query_limit_is_respected(storage_engine: Engine):
     insert_system_metric_samples_batch(
         storage_engine, [_sample(float(t)) for t in range(10)]

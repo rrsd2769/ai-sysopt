@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import pytest
+
 from tests.api_conftest import build_test_client, rising_cpu_samples_now
 
 from aiperfopt.storage import insert_forecast_prediction
@@ -25,12 +27,14 @@ def _insert_forecast(ctx, *, target_timestamp: float, predicted_value: float, ho
     )
 
 
+@pytest.mark.plumbing
 def test_rejects_unknown_metric_name(tmp_path: Path):
     with build_test_client(tmp_path, with_history=False) as client:
         r = client.get("/reporting/predicted-vs-actual", params={"metric_name": "not_a_real_metric"})
         assert r.status_code == 400
 
 
+@pytest.mark.plumbing
 def test_empty_when_no_predictions_exist(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.get("/reporting/predicted-vs-actual", params={"metric_name": "cpu_percent"})
@@ -38,6 +42,7 @@ def test_empty_when_no_predictions_exist(tmp_path: Path):
         assert r.json() == []
 
 
+@pytest.mark.behavioural
 def test_joins_prediction_with_nearest_actual_sample(tmp_path: Path):
     from tests.api_conftest import build_test_ctx
 
@@ -65,6 +70,7 @@ def test_joins_prediction_with_nearest_actual_sample(tmp_path: Path):
         assert abs(point["error"] - 5.0) < 1e-9
 
 
+@pytest.mark.behavioural
 def test_prediction_with_no_nearby_actual_gets_none(tmp_path: Path):
     from tests.api_conftest import build_test_ctx
 
@@ -84,6 +90,7 @@ def test_prediction_with_no_nearby_actual_gets_none(tmp_path: Path):
         assert points[0]["error"] is None
 
 
+@pytest.mark.behavioural
 def test_horizon_label_filter(tmp_path: Path):
     from tests.api_conftest import build_test_ctx
 
@@ -105,6 +112,7 @@ def test_horizon_label_filter(tmp_path: Path):
         assert points[0]["horizon_label"] == "medium"
 
 
+@pytest.mark.plumbing
 def test_valid_metric_names_endpoint(tmp_path: Path):
     with build_test_client(tmp_path, with_history=False) as client:
         r = client.get("/reporting/metrics")
@@ -114,12 +122,14 @@ def test_valid_metric_names_endpoint(tmp_path: Path):
         assert names == sorted(names)
 
 
+@pytest.mark.plumbing
 def test_summary_requires_period_or_explicit_window(tmp_path: Path):
     with build_test_client(tmp_path, with_history=False) as client:
         r = client.get("/reporting/summary")
         assert r.status_code == 400
 
 
+@pytest.mark.plumbing
 def test_summary_with_explicit_window_returns_all_sections(tmp_path: Path):
     from tests.api_conftest import build_test_ctx
 
@@ -149,6 +159,7 @@ def test_summary_with_explicit_window_returns_all_sections(tmp_path: Path):
         assert body["recommendation"]["total_count"] == 0
 
 
+@pytest.mark.behavioural
 def test_summary_with_period(tmp_path: Path):
     with build_test_client(tmp_path, with_history=False) as client:
         r = client.get("/reporting/summary", params={"period": "daily"})
@@ -157,6 +168,7 @@ def test_summary_with_period(tmp_path: Path):
         assert abs((body["end"] - body["start"]) - 24 * 3600.0) < 5.0
 
 
+@pytest.mark.plumbing
 def test_summary_download_sets_content_disposition(tmp_path: Path):
     with build_test_client(tmp_path, with_history=False) as client:
         r = client.get("/reporting/summary", params={"period": "daily", "download": True})

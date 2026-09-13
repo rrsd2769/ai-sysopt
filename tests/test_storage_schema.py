@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from sqlalchemy import inspect
 
 from aiperfopt.storage import create_all_tables, create_storage_engine, verify_schema
 from aiperfopt.storage.schema import metadata
+
+pytestmark = pytest.mark.plumbing
 
 
 def test_create_all_tables_creates_every_expected_table(tmp_path: Path):

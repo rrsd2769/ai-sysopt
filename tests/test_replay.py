@@ -77,11 +77,13 @@ def _fast_settings(tmp_path: Path):
 # --- record_session / save_session / load_session --------------------------------
 
 
+@pytest.mark.plumbing
 def test_record_session_raises_when_no_data(storage_engine: Engine):
     with pytest.raises(ReplayError):
         record_session(storage_engine, minutes=5.0, end=1000.0)
 
 
+@pytest.mark.behavioural
 def test_record_session_captures_actual_data_span(storage_engine: Engine):
     insert_system_metric_samples_batch(storage_engine, _flat_samples(10, interval=2.0, start=100.0))
 
@@ -93,6 +95,7 @@ def test_record_session_captures_actual_data_span(storage_engine: Engine):
     assert session.duration_seconds == pytest.approx(18.0)
 
 
+@pytest.mark.behavioural
 def test_save_and_load_session_round_trips(storage_engine: Engine, tmp_path: Path):
     insert_system_metric_samples_batch(storage_engine, _flat_samples(5, interval=1.0, start=0.0))
     from aiperfopt.storage.writer import insert_process_metric_samples_batch
@@ -118,6 +121,7 @@ def test_save_and_load_session_round_trips(storage_engine: Engine, tmp_path: Pat
 # --- guard: refuse while monitoring active ----------------------------------------
 
 
+@pytest.mark.behavioural
 def test_is_monitoring_active_true_for_fresh_sample(storage_engine: Engine):
     insert_system_metric_samples_batch(storage_engine, [SystemMetricSample(
         timestamp=time.time(), cpu_percent=10.0, mem_percent=10.0,
@@ -125,6 +129,7 @@ def test_is_monitoring_active_true_for_fresh_sample(storage_engine: Engine):
     assert is_monitoring_active(storage_engine) is True
 
 
+@pytest.mark.behavioural
 def test_is_monitoring_active_false_for_stale_or_missing_data(storage_engine: Engine):
     assert is_monitoring_active(storage_engine) is False
 
@@ -134,6 +139,7 @@ def test_is_monitoring_active_false_for_stale_or_missing_data(storage_engine: En
     assert is_monitoring_active(storage_engine) is False
 
 
+@pytest.mark.behavioural
 def test_replay_refuses_while_primary_engine_looks_active(storage_engine: Engine, tmp_path: Path):
     primary = storage_engine
     insert_system_metric_samples_batch(primary, [SystemMetricSample(
@@ -153,6 +159,7 @@ def test_replay_refuses_while_primary_engine_looks_active(storage_engine: Engine
     assert get_system_metrics_range(replay_engine) == []
 
 
+@pytest.mark.behavioural
 def test_replay_proceeds_when_primary_engine_is_stale(storage_engine: Engine, tmp_path: Path):
     primary = storage_engine
     insert_system_metric_samples_batch(primary, [SystemMetricSample(
@@ -174,6 +181,7 @@ def test_replay_proceeds_when_primary_engine_is_stale(storage_engine: Engine, tm
 # --- replay writes only to the replay database ------------------------------------
 
 
+@pytest.mark.behavioural
 def test_replay_writes_nothing_to_primary_database(tmp_path: Path):
     primary = create_storage_engine(tmp_path / "primary.db")
     create_all_tables(primary)
@@ -194,6 +202,7 @@ def test_replay_writes_nothing_to_primary_database(tmp_path: Path):
 # --- identical feature vectors regardless of speed --------------------------------
 
 
+@pytest.mark.behavioural
 def test_replay_produces_identical_feature_vectors_at_different_speeds(tmp_path: Path):
     fconfig, *_ = _fast_settings(tmp_path)
 
@@ -222,6 +231,7 @@ def test_replay_produces_identical_feature_vectors_at_different_speeds(tmp_path:
 # --- replayed contention event reproduces the original prediction/diagnosis ------
 
 
+@pytest.mark.behavioural
 def test_replayed_contention_event_matches_original_prediction_and_diagnosis(tmp_path: Path):
     fconfig, fsettings, csettings, dsettings, labeling_config = _fast_settings(tmp_path)
 

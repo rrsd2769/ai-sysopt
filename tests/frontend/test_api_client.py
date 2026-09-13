@@ -11,6 +11,8 @@ from aiperfopt.storage import insert_system_metric_samples_batch
 from tests.api_conftest import build_test_ctx, rising_cpu_samples_now
 from tests.frontend.server_fixture import running_backend
 
+pytestmark = pytest.mark.plumbing
+
 
 def _client_for(base_url: str) -> ApiClient:
     host, port = base_url.replace("http://", "").split(":")

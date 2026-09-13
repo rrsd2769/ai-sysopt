@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 
 import pandas as pd
+import pytest
 
 from aiperfopt.features.process_features import (
     PROCESS_SUMMARY_COLUMNS,
@@ -27,6 +28,7 @@ def _aggregates_df(rows: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+@pytest.mark.plumbing
 def test_empty_process_metrics_yields_empty_frame_with_expected_columns():
     result = compute_process_summary_series(
         _metrics_df([]), _events_df([]), _aggregates_df([])
@@ -35,6 +37,7 @@ def test_empty_process_metrics_yields_empty_frame_with_expected_columns():
     assert list(result.columns) == ["timestamp", *PROCESS_SUMMARY_COLUMNS]
 
 
+@pytest.mark.behavioural
 def test_one_row_per_distinct_poll_timestamp():
     metrics = _metrics_df(
         [
@@ -46,6 +49,7 @@ def test_one_row_per_distinct_poll_timestamp():
     assert sorted(result["timestamp"].tolist()) == [100.0, 103.0]
 
 
+@pytest.mark.behavioural
 def test_causality_a_later_row_never_changes_an_earlier_summary():
     """Adding a future sample (t=200) must not change the summary computed at t=100."""
     base_metrics = _metrics_df(
@@ -75,6 +79,7 @@ def test_causality_a_later_row_never_changes_an_earlier_summary():
     assert row_before["proc_launch_count_30s"] == 0
 
 
+@pytest.mark.behavioural
 def test_launch_counts_are_backward_looking_from_each_timestamp():
     metrics = _metrics_df(
         [{"timestamp": 200.0, "pid": 1, "cpu_percent": 5.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0}]
@@ -93,6 +98,7 @@ def test_launch_counts_are_backward_looking_from_each_timestamp():
     assert result["proc_terminate_count_30s"] == 1
 
 
+@pytest.mark.behavioural
 def test_launch_burst_10s_finds_the_densest_10s_subwindow():
     metrics = _metrics_df(
         [{"timestamp": 100.0, "pid": 1, "cpu_percent": 5.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0}]
@@ -110,6 +116,7 @@ def test_launch_burst_10s_finds_the_densest_10s_subwindow():
     assert result["proc_launch_burst_10s"] == 3
 
 
+@pytest.mark.behavioural
 def test_young_process_features_reflect_only_recently_created_processes():
     metrics = _metrics_df(
         [
@@ -122,6 +129,7 @@ def test_young_process_features_reflect_only_recently_created_processes():
     assert result["proc_young_cpu_sum"] == 20.0
 
 
+@pytest.mark.behavioural
 def test_young_process_features_are_zero_with_no_recent_launches():
     metrics = _metrics_df(
         [{"timestamp": 100.0, "pid": 1, "cpu_percent": 20.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0}]
@@ -131,6 +139,7 @@ def test_young_process_features_are_zero_with_no_recent_launches():
     assert result["proc_young_cpu_sum"] == 0.0
 
 
+@pytest.mark.behavioural
 def test_aggregate_row_corrects_whole_population_sums_but_not_top_k():
     """proc_cpu_sum/proc_mem_rss_sum/proc_count_active must include the
     'everything else' aggregate; proc_cpu_top1 must not (top-K is exact
@@ -152,6 +161,7 @@ def test_aggregate_row_corrects_whole_population_sums_but_not_top_k():
     assert result["proc_cpu_top1_share"] == 50.0 / 75.0
 
 
+@pytest.mark.behavioural
 def test_align_uses_the_most_recent_poll_at_or_before_each_eval_timestamp():
     metrics = _metrics_df(
         [
@@ -169,6 +179,7 @@ def test_align_uses_the_most_recent_poll_at_or_before_each_eval_timestamp():
     assert row_112["proc_cpu_sum"] == 40.0  # nearest poll <= 112 is t=110
 
 
+@pytest.mark.behavioural
 def test_align_never_uses_a_future_poll():
     """A poll strictly after the eval timestamp must never be used (causality)."""
     metrics = _metrics_df(
@@ -182,6 +193,7 @@ def test_align_never_uses_a_future_poll():
     assert all(pd.isna(row[col]) for col in PROCESS_SUMMARY_COLUMNS)
 
 
+@pytest.mark.behavioural
 def test_align_yields_nan_not_a_stale_value_beyond_tolerance():
     metrics = _metrics_df(
         [{"timestamp": 100.0, "pid": 1, "cpu_percent": 10.0, "memory_rss": 0, "num_threads": 1, "create_time": 0.0}]
@@ -196,6 +208,7 @@ def test_align_yields_nan_not_a_stale_value_beyond_tolerance():
     assert all(pd.isna(row_200[col]) for col in PROCESS_SUMMARY_COLUMNS)
 
 
+@pytest.mark.behavioural
 def test_align_with_empty_summary_yields_all_nan_rows():
     empty_summary = pd.DataFrame(columns=["timestamp", *PROCESS_SUMMARY_COLUMNS])
     aligned = align_process_summary_to_timestamps(empty_summary, [1.0, 2.0], tolerance_seconds=5.0)
@@ -204,6 +217,7 @@ def test_align_with_empty_summary_yields_all_nan_rows():
         assert aligned[col].isna().all()
 
 
+@pytest.mark.behavioural
 def test_align_is_identical_whether_called_for_training_or_live():
     """The same (summary, eval_timestamps, tolerance) must produce the
     same output regardless of which caller invokes it -- the property
@@ -225,6 +239,7 @@ def test_align_is_identical_whether_called_for_training_or_live():
     pd.testing.assert_frame_equal(result_a, result_b)
 
 
+@pytest.mark.behavioural
 def test_gap_between_polls_does_not_interpolate_a_missing_timestamp():
     """No row is fabricated for a timestamp process_metrics never sampled --
     this module produces one row per *observed* poll, no reindexing/ffill."""

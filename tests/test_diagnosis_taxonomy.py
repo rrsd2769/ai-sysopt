@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import pytest
+
 from aiperfopt.config.settings import DiagnosisSettings
 from aiperfopt.diagnosis.taxonomy import DiagnosisCategory, is_actionable, resolve_diagnosis_category
 from aiperfopt.storage.records import ContentionPredictionRecord
+
+pytestmark = pytest.mark.behavioural
 
 _CONFIG = DiagnosisSettings(
     cross_resource_dominance_ratio=0.6,

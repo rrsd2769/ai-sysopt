@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 import shap
 
 from aiperfopt.contention.model import ContentionClassifier
@@ -18,6 +19,8 @@ from aiperfopt.diagnosis.explainer import (
 )
 from aiperfopt.forecasting.baselines import NaivePersistenceForecaster
 from aiperfopt.forecasting.model import MetricForecaster
+
+pytestmark = pytest.mark.behavioural
 
 
 def _trained_forecaster(rng: np.random.Generator, n: int = 150) -> tuple[MetricForecaster, pd.Series]:

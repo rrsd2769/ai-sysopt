@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tests.api_conftest import build_test_client
 
 
+@pytest.mark.plumbing
 def test_active_version_none_initially(tmp_path: Path):
     with build_test_client(tmp_path) as client:
         r = client.get("/retraining/active-version")
@@ -12,6 +15,7 @@ def test_active_version_none_initially(tmp_path: Path):
         assert r.json() == {"active_model_version": None}
 
 
+@pytest.mark.plumbing
 def test_run_retraining_real_usage_requires_data(tmp_path: Path):
     with build_test_client(tmp_path, with_history=False) as client:
         r = client.post("/retraining/run", json={
@@ -20,6 +24,7 @@ def test_run_retraining_real_usage_requires_data(tmp_path: Path):
         assert r.status_code == 422  # RetrainingError -> not enough data
 
 
+@pytest.mark.plumbing
 def test_run_retraining_real_usage_success(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
@@ -32,6 +37,7 @@ def test_run_retraining_real_usage_success(tmp_path: Path):
         assert body["comparison"]["recommendation"] == "no_active_baseline"
 
 
+@pytest.mark.plumbing
 def test_run_retraining_synthetic_success(tmp_path: Path):
     with build_test_client(tmp_path, with_history=False) as client:
         r = client.post("/retraining/run", json={
@@ -42,6 +48,7 @@ def test_run_retraining_synthetic_success(tmp_path: Path):
         assert r.json()["data_source"] == "synthetic"
 
 
+@pytest.mark.plumbing
 def test_confirm_deployment_activates_version(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
@@ -61,6 +68,7 @@ def test_confirm_deployment_activates_version(tmp_path: Path):
         assert r.json() == {"active_model_version": "v1"}
 
 
+@pytest.mark.behavioural
 def test_confirm_deployment_on_a_failing_gate_returns_422_with_reasons(tmp_path: Path):
     """The router maps a gate failure to 422 listing the failed criteria
     (Phase 6, point 2) -- the confirm endpoint is stateless and trusts
@@ -91,6 +99,7 @@ def test_confirm_deployment_on_a_failing_gate_returns_422_with_reasons(tmp_path:
         assert r.json() == {"active_model_version": None}
 
 
+@pytest.mark.behavioural
 def test_confirm_deployment_rejected_does_not_activate(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
@@ -110,6 +119,7 @@ def test_confirm_deployment_rejected_does_not_activate(tmp_path: Path):
         assert r.json() == {"active_model_version": None}
 
 
+@pytest.mark.plumbing
 def test_rollback_with_no_prior_version_returns_409(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
@@ -126,6 +136,7 @@ def test_rollback_with_no_prior_version_returns_409(tmp_path: Path):
         assert r.status_code == 409
 
 
+@pytest.mark.behavioural
 def test_rollback_restores_previous_version(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={

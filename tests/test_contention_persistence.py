@@ -25,6 +25,7 @@ def _trained_classifier() -> ContentionClassifier:
     return classifier
 
 
+@pytest.mark.behavioural
 def test_save_and_load_round_trip(tmp_path: Path):
     classifier = _trained_classifier()
     save_contention_classifier(classifier, tmp_path, "v1")
@@ -35,11 +36,13 @@ def test_save_and_load_round_trip(tmp_path: Path):
     assert loaded.predict_proba(row) == pytest.approx(classifier.predict_proba(row))
 
 
+@pytest.mark.plumbing
 def test_save_untrained_raises(tmp_path: Path):
     with pytest.raises(ContentionPredictionError):
         save_contention_classifier(ContentionClassifier(), tmp_path, "v1")
 
 
+@pytest.mark.plumbing
 def test_load_missing_raises(tmp_path: Path):
     with pytest.raises(ContentionPredictionError):
         load_contention_classifier(tmp_path, "does_not_exist")

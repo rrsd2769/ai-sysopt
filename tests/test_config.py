@@ -8,6 +8,7 @@ from aiperfopt.common.exceptions import ConfigError
 from aiperfopt.config import InterfaceMode, load_settings
 
 
+@pytest.mark.behavioural
 def test_defaults_load_with_no_overrides(minimal_env):
     settings = load_settings()
 
@@ -19,6 +20,7 @@ def test_defaults_load_with_no_overrides(minimal_env):
     assert settings.privacy.excluded_processes == []
 
 
+@pytest.mark.behavioural
 def test_user_override_file_beats_defaults(minimal_env, tmp_path: Path):
     override = tmp_path / "override.yaml"
     override.write_text(
@@ -34,6 +36,7 @@ def test_user_override_file_beats_defaults(minimal_env, tmp_path: Path):
     assert settings.contention.decision_threshold == 0.75
 
 
+@pytest.mark.behavioural
 def test_env_var_beats_user_override_file(minimal_env, tmp_path: Path, monkeypatch):
     override = tmp_path / "override.yaml"
     override.write_text("contention:\n  decision_threshold: 0.9\n")
@@ -44,6 +47,7 @@ def test_env_var_beats_user_override_file(minimal_env, tmp_path: Path, monkeypat
     assert settings.contention.decision_threshold == 0.42
 
 
+@pytest.mark.behavioural
 def test_missing_user_override_file_falls_back_to_defaults(minimal_env, tmp_path: Path):
     nonexistent = tmp_path / "does_not_exist.yaml"
 
@@ -52,6 +56,7 @@ def test_missing_user_override_file_falls_back_to_defaults(minimal_env, tmp_path
     assert settings.monitoring.polling_interval_seconds == 1.5
 
 
+@pytest.mark.plumbing
 def test_invalid_horizon_range_rejected(minimal_env, tmp_path: Path):
     override = tmp_path / "bad.yaml"
     override.write_text("forecasting:\n  short_horizon_seconds: [60, 30]\n")
@@ -60,6 +65,7 @@ def test_invalid_horizon_range_rejected(minimal_env, tmp_path: Path):
         load_settings(override)
 
 
+@pytest.mark.plumbing
 def test_invalid_decision_threshold_rejected(minimal_env, tmp_path: Path):
     override = tmp_path / "bad.yaml"
     override.write_text("contention:\n  decision_threshold: 1.5\n")
@@ -68,6 +74,7 @@ def test_invalid_decision_threshold_rejected(minimal_env, tmp_path: Path):
         load_settings(override)
 
 
+@pytest.mark.plumbing
 def test_malformed_yaml_raises_config_error(minimal_env, tmp_path: Path):
     override = tmp_path / "malformed.yaml"
     override.write_text("mode: [unclosed\n")
@@ -76,6 +83,7 @@ def test_malformed_yaml_raises_config_error(minimal_env, tmp_path: Path):
         load_settings(override)
 
 
+@pytest.mark.plumbing
 def test_non_mapping_yaml_top_level_rejected(minimal_env, tmp_path: Path):
     override = tmp_path / "list_top_level.yaml"
     override.write_text("- just\n- a\n- list\n")
@@ -84,12 +92,14 @@ def test_non_mapping_yaml_top_level_rejected(minimal_env, tmp_path: Path):
         load_settings(override)
 
 
+@pytest.mark.behavioural
 def test_no_exclusions_by_default(minimal_env):
     """Section 13 / NFR-7.4: no process exclusions unless explicitly configured."""
     settings = load_settings()
     assert settings.privacy.excluded_processes == []
 
 
+@pytest.mark.behavioural
 def test_developer_mode_selectable_via_env(minimal_env, monkeypatch):
     monkeypatch.setenv("AIPERFOPT_MODE__ACTIVE_MODE", "developer")
     settings = load_settings()

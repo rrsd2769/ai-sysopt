@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 
+import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.features import FeatureEngineeringConfig
@@ -40,6 +41,7 @@ def _seed_regular_history(engine: Engine, count: int, interval: float, end_ts: f
     insert_system_metric_samples_batch(engine, samples)
 
 
+@pytest.mark.plumbing
 def test_compute_live_feature_vector_reads_correct_window(storage_engine: Engine):
     now = time.time()
     _seed_regular_history(storage_engine, count=100, interval=2.0, end_ts=now)
@@ -52,12 +54,14 @@ def test_compute_live_feature_vector_reads_correct_window(storage_engine: Engine
     assert "cpu_percent_roll_mean_30s" in vector.feature_values
 
 
+@pytest.mark.plumbing
 def test_compute_live_feature_vector_none_when_no_data(storage_engine: Engine):
     config = FeatureEngineeringConfig()
     vector = compute_live_feature_vector(storage_engine, config)
     assert vector is None
 
 
+@pytest.mark.behavioural
 def test_summarize_and_persist_process_features_writes_durable_rows(storage_engine: Engine):
     old_ts = 100.0  # older than the cutoff -> about to be pruned
     insert_process_metric_sample(
@@ -82,6 +86,7 @@ def test_summarize_and_persist_process_features_writes_durable_rows(storage_engi
     assert summaries[0].summary_values["proc_launch_count_30s"] == 1
 
 
+@pytest.mark.behavioural
 def test_summarize_and_persist_process_features_ignores_rows_at_or_after_cutoff(storage_engine: Engine):
     insert_process_metric_sample(
         storage_engine,
@@ -94,12 +99,14 @@ def test_summarize_and_persist_process_features_ignores_rows_at_or_after_cutoff(
     assert get_process_feature_summaries_range(storage_engine) == []
 
 
+@pytest.mark.plumbing
 def test_summarize_and_persist_process_features_is_a_noop_with_no_process_data(storage_engine: Engine):
     written = summarize_and_persist_process_features(storage_engine, cutoff=200.0)
     assert written == 0
     assert get_process_feature_summaries_range(storage_engine) == []
 
 
+@pytest.mark.plumbing
 def test_compute_and_store_live_feature_vector_persists_to_storage(storage_engine: Engine):
     now = time.time()
     _seed_regular_history(storage_engine, count=100, interval=2.0, end_ts=now)
@@ -115,6 +122,7 @@ def test_compute_and_store_live_feature_vector_persists_to_storage(storage_engin
     assert stored[0].feature_set_version == "v2"
 
 
+@pytest.mark.plumbing
 def test_compute_and_store_live_feature_vector_no_op_when_no_data(storage_engine: Engine):
     config = FeatureEngineeringConfig()
     record = compute_and_store_live_feature_vector(storage_engine, config)
@@ -122,6 +130,7 @@ def test_compute_and_store_live_feature_vector_no_op_when_no_data(storage_engine
     assert get_features_range(storage_engine) == []
 
 
+@pytest.mark.plumbing
 def test_backfill_feature_matrix_persists_all_rows(storage_engine: Engine):
     now = time.time()
     _seed_regular_history(storage_engine, count=100, interval=2.0, end_ts=now)
@@ -134,6 +143,7 @@ def test_backfill_feature_matrix_persists_all_rows(storage_engine: Engine):
     assert len(stored) == 100
 
 
+@pytest.mark.plumbing
 def test_backfill_feature_matrix_dry_run_does_not_persist(storage_engine: Engine):
     now = time.time()
     _seed_regular_history(storage_engine, count=50, interval=2.0, end_ts=now)
@@ -145,6 +155,7 @@ def test_backfill_feature_matrix_dry_run_does_not_persist(storage_engine: Engine
     assert get_features_range(storage_engine) == []
 
 
+@pytest.mark.plumbing
 def test_backfill_feature_matrix_empty_range_returns_zero(storage_engine: Engine):
     config = FeatureEngineeringConfig()
     count = backfill_feature_matrix(storage_engine, config, start=0.0, end=1.0)
@@ -160,6 +171,7 @@ def _seed_process_history(engine: Engine, base: float, poll_interval: float, cou
         )
 
 
+@pytest.mark.behavioural
 def test_read_process_summary_series_combines_persisted_and_raw(storage_engine: Engine):
     """Phase 2's retention split means old data survives only as a
     persisted ProcessFeatureSummaryRecord while recent data is still raw
@@ -187,6 +199,7 @@ def test_read_process_summary_series_combines_persisted_and_raw(storage_engine: 
     assert recent_row["proc_cpu_sum"] == 55.0
 
 
+@pytest.mark.behavioural
 def test_live_and_backfill_produce_identical_process_columns_for_same_window(storage_engine: Engine):
     """The success criterion this phase is built around: process summary
     columns must be identical whether computed via the live path or the
@@ -212,6 +225,7 @@ def test_live_and_backfill_produce_identical_process_columns_for_same_window(sto
         assert live_vector.feature_values[col] == backfilled_row.feature_values[col], col
 
 
+@pytest.mark.plumbing
 def test_compute_live_feature_vector_includes_process_columns_when_available(storage_engine: Engine):
     now = time.time()
     _seed_regular_history(storage_engine, count=60, interval=2.0, end_ts=now)
@@ -224,6 +238,7 @@ def test_compute_live_feature_vector_includes_process_columns_when_available(sto
     assert "proc_cpu_sum_roll_mean_30s" in vector.feature_values
 
 
+@pytest.mark.behavioural
 def test_compute_live_feature_vector_has_no_process_columns_without_process_data(storage_engine: Engine):
     now = time.time()
     _seed_regular_history(storage_engine, count=60, interval=2.0, end_ts=now)

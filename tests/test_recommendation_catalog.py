@@ -7,6 +7,7 @@ from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
 from aiperfopt.recommendation.catalog import load_recommendation_catalog
 
 
+@pytest.mark.behavioural
 def test_packaged_catalog_loads_and_covers_every_actionable_category():
     catalog = load_recommendation_catalog()
     assert catalog.catalog_version
@@ -14,11 +15,13 @@ def test_packaged_catalog_loads_and_covers_every_actionable_category():
     assert set(catalog.actions_by_category.keys()) == expected
 
 
+@pytest.mark.behavioural
 def test_packaged_catalog_has_no_anomaly_entry():
     catalog = load_recommendation_catalog()
     assert DiagnosisCategory.UNUSUAL_PATTERN_ANOMALY.value not in catalog.actions_by_category
 
 
+@pytest.mark.behavioural
 def test_every_category_has_at_least_two_ranked_actions():
     catalog = load_recommendation_catalog()
     for category, actions in catalog.actions_by_category.items():
@@ -27,29 +30,34 @@ def test_every_category_has_at_least_two_ranked_actions():
             assert action.title and action.description and action.rationale
 
 
+@pytest.mark.behavioural
 def test_actions_for_returns_actions_in_file_order():
     catalog = load_recommendation_catalog()
     actions = catalog.actions_for(DiagnosisCategory.CPU_SINGLE_PROCESS.value)
     assert actions[0].title == "Quit or pause the dominant process"
 
 
+@pytest.mark.plumbing
 def test_actions_for_refuses_anomaly_category_even_if_asked():
     catalog = load_recommendation_catalog()
     with pytest.raises(RecommendationError):
         catalog.actions_for(DiagnosisCategory.UNUSUAL_PATTERN_ANOMALY.value)
 
 
+@pytest.mark.plumbing
 def test_actions_for_unknown_category_raises():
     catalog = load_recommendation_catalog()
     with pytest.raises(RecommendationError):
         catalog.actions_for("not_a_real_category")
 
 
+@pytest.mark.plumbing
 def test_missing_file_raises_recommendation_error(tmp_path):
     with pytest.raises(RecommendationError):
         load_recommendation_catalog(tmp_path / "does_not_exist.yaml")
 
 
+@pytest.mark.plumbing
 def test_catalog_missing_a_required_category_raises(tmp_path):
     bad = tmp_path / "bad.yaml"
     bad.write_text(
@@ -64,6 +72,7 @@ def test_catalog_missing_a_required_category_raises(tmp_path):
         load_recommendation_catalog(bad)
 
 
+@pytest.mark.plumbing
 def test_catalog_with_anomaly_entry_raises(tmp_path):
     bad = tmp_path / "bad.yaml"
     categories = "\n".join(
@@ -75,6 +84,7 @@ def test_catalog_with_anomaly_entry_raises(tmp_path):
         load_recommendation_catalog(bad)
 
 
+@pytest.mark.plumbing
 def test_catalog_with_malformed_action_raises(tmp_path):
     bad = tmp_path / "bad.yaml"
     categories = "\n".join(

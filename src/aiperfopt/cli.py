@@ -246,7 +246,7 @@ def _cmd_replay(args: argparse.Namespace) -> int:
     a live collector must never write to the same database concurrently.
     """
     from aiperfopt.common.exceptions import ReplayError
-    from aiperfopt.replay.player import replay_session
+    from aiperfopt.replay.player import copy_model_metadata, replay_session
     from aiperfopt.replay.session import load_session
     from aiperfopt.storage import create_all_tables, create_storage_engine
 
@@ -257,6 +257,11 @@ def _cmd_replay(args: argparse.Namespace) -> int:
     replay_db_path = args.replay_db or primary_path.with_name(f"{primary_path.stem}-replay{primary_path.suffix}")
     replay_engine = create_storage_engine(replay_db_path)
     create_all_tables(replay_engine)
+    # So a server pointed at the replay database can reconstruct the
+    # active model's forecasters (resolve_deployed_forecasters reads
+    # `evaluations`, keyed by model version) without needing the primary
+    # database at all -- see copy_model_metadata's docstring.
+    copy_model_metadata(ctx.storage_engine, replay_engine)
 
     print(
         f"Replaying {len(session.system_metrics)} system sample(s) "
@@ -430,7 +435,7 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
 def _cmd_serve(args: argparse.Namespace) -> int:
     from aiperfopt.api.server import main as serve_main
 
-    serve_main()
+    serve_main(start_monitoring=not args.no_monitor)
     return 0
 
 
@@ -580,6 +585,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_evaluate.set_defaults(func=_cmd_evaluate, default_log_level="WARNING")
 
     p_serve = sub.add_parser("serve", help="Run the API server with monitoring and live inference.")
+    p_serve.add_argument(
+        "--no-monitor", action="store_true",
+        help="Don't start the bundled Monitoring pipeline; only the live-inference loop. "
+             "Use this when pointing the server at a replay database (AIPERFOPT_STORAGE__IS_REPLAY=true) "
+             "so this process doesn't also write real, current-machine samples into it "
+             "while `aiperfopt replay` is writing historical ones.",
+    )
     p_serve.set_defaults(func=_cmd_serve)
 
     p_ui = sub.add_parser("ui", help="Open the desktop UI against a running backend.")

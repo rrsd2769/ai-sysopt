@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from aiperfopt.frontend.api_client import ApiClient
 from aiperfopt.frontend.config import FrontendSettings
 from aiperfopt.frontend.live_client import LiveWebSocketClient
@@ -25,6 +27,7 @@ def _build_window(base_url: str) -> MainWindow:
     )
 
 
+@pytest.mark.plumbing
 def test_mode_toggle_shows_and_hides_developer_widgets(qtbot, tmp_path: Path):
     with running_backend(tmp_path) as (base_url, _ctx):
         window = _build_window(base_url)
@@ -43,6 +46,7 @@ def test_mode_toggle_shows_and_hides_developer_widgets(qtbot, tmp_path: Path):
         window.close()
 
 
+@pytest.mark.plumbing
 def test_start_connects_live_client_and_reflects_control_state(qtbot, tmp_path: Path):
     ctx = build_test_ctx(tmp_path)
     samples = rising_cpu_samples_now(n=300, interval=2.0)
@@ -61,6 +65,7 @@ def test_start_connects_live_client_and_reflects_control_state(qtbot, tmp_path: 
         window.close()
 
 
+@pytest.mark.behavioural
 def test_start_polls_readiness_and_updates_the_dashboard_banner(qtbot, tmp_path: Path):
     ctx = build_test_ctx(tmp_path)
     samples = rising_cpu_samples_now(n=300, interval=2.0)
@@ -78,6 +83,7 @@ def test_start_polls_readiness_and_updates_the_dashboard_banner(qtbot, tmp_path:
         window.close()
 
 
+@pytest.mark.behavioural
 def test_replay_backend_shows_the_replay_banner_end_to_end(qtbot, tmp_path: Path):
     ctx = build_test_ctx(tmp_path, is_replay=True)
 
@@ -92,6 +98,7 @@ def test_replay_backend_shows_the_replay_banner_end_to_end(qtbot, tmp_path: Path
         window.close()
 
 
+@pytest.mark.plumbing
 def test_live_broadcast_updates_both_general_and_developer_widgets(qtbot, tmp_path: Path):
     ctx = build_test_ctx(tmp_path, live_inference_interval_seconds=0.5)
     samples = rising_cpu_samples_now(n=300, interval=2.0)

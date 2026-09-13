@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
 from aiperfopt.frontend.widgets.live_chart import LiveTrendChart
+
+pytestmark = pytest.mark.behavioural
 
 _STATE = {
     "timestamp": 1000.0,

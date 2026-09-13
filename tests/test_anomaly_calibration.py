@@ -35,6 +35,7 @@ def _idle_like_samples(n: int, interval: float = 3.0, start: float = 0.0, seed: 
     ]
 
 
+@pytest.mark.plumbing
 def test_calibration_raises_with_insufficient_real_rows(storage_engine: Engine):
     insert_system_metric_samples_batch(storage_engine, _idle_like_samples(n=5))
     config = FeatureEngineeringConfig()
@@ -43,6 +44,7 @@ def test_calibration_raises_with_insufficient_real_rows(storage_engine: Engine):
         calibrate_anomaly_detector(storage_engine, config, min_real_rows=DEFAULT_MIN_REAL_ROWS)
 
 
+@pytest.mark.plumbing
 def test_calibration_raises_when_no_real_data_at_all(storage_engine: Engine):
     config = FeatureEngineeringConfig()
 
@@ -50,6 +52,7 @@ def test_calibration_raises_when_no_real_data_at_all(storage_engine: Engine):
         build_calibration_matrix(storage_engine, config, min_real_rows=DEFAULT_MIN_REAL_ROWS)
 
 
+@pytest.mark.behavioural
 def test_calibration_fits_on_real_data_and_generalizes_to_holdout(storage_engine: Engine):
     """The two 'real normal data' success criteria from the Phase 3 plan.
 
@@ -87,6 +90,7 @@ def test_calibration_fits_on_real_data_and_generalizes_to_holdout(storage_engine
     assert exceed_fraction < 0.10
 
 
+@pytest.mark.behavioural
 def test_calibration_blends_synthetic_only_after_real_floor_met(storage_engine: Engine):
     """Synthetic rows may add capacity but can't substitute for the real floor."""
     config = FeatureEngineeringConfig()

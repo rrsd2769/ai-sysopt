@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from aiperfopt.synthetic import (
     HELD_OUT_SCENARIO_GENERATOR,
     HELD_OUT_SCENARIO_NAME,
@@ -7,6 +9,8 @@ from aiperfopt.synthetic import (
     generate_cpu_stress_scenario,
     generate_idle_scenario,
 )
+
+pytestmark = pytest.mark.behavioural
 
 
 def test_generators_are_deterministic_given_seed():

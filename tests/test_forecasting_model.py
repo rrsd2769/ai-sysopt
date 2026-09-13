@@ -25,6 +25,7 @@ def _synthetic_training_frame(n: int = 60):
     return X, pd.Series(y)
 
 
+@pytest.mark.behavioural
 def test_fit_and_predict_learns_a_simple_relationship():
     X, y = _synthetic_training_frame()
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1", min_training_rows=10)
@@ -36,6 +37,7 @@ def test_fit_and_predict_learns_a_simple_relationship():
     assert abs(result.predicted_value - 15.0) < 3.0
 
 
+@pytest.mark.behavioural
 def test_predict_reconstructs_absolute_value_from_a_delta_target():
     """fit() is given a delta (target - current_value); predict() must add
     current_value back so callers always see an absolute value (Phase 5)."""
@@ -57,12 +59,14 @@ def test_predict_reconstructs_absolute_value_from_a_delta_target():
     assert abs(result.predicted_value - 50.0) < 5.0
 
 
+@pytest.mark.plumbing
 def test_predict_before_fit_raises():
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1")
     with pytest.raises(ForecastingError):
         model.predict(pd.Series({"feature_a": 1.0}))
 
 
+@pytest.mark.plumbing
 def test_fit_with_too_few_rows_raises():
     X = pd.DataFrame({"feature_a": [1.0, 2.0, 3.0]})
     y = pd.Series([1.0, 2.0, 3.0])
@@ -71,6 +75,7 @@ def test_fit_with_too_few_rows_raises():
         model.fit(X, y)
 
 
+@pytest.mark.plumbing
 def test_predict_handles_missing_feature_columns_gracefully():
     """A row missing a column the model was trained on (e.g. a metric
     source that degraded that cycle) should not crash prediction —
@@ -84,6 +89,7 @@ def test_predict_handles_missing_feature_columns_gracefully():
     assert isinstance(result.predicted_value, float)
 
 
+@pytest.mark.behavioural
 def test_predict_batch_matches_single_row_predict():
     X, y = _synthetic_training_frame()
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1", min_training_rows=10)
@@ -96,6 +102,7 @@ def test_predict_batch_matches_single_row_predict():
         assert batch_val == pytest.approx(single_val)
 
 
+@pytest.mark.behavioural
 def test_set_confidence_from_validation_bounded_zero_to_one():
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1")
 
@@ -109,12 +116,14 @@ def test_set_confidence_from_validation_bounded_zero_to_one():
     assert 0.0 < model.confidence < 1.0
 
 
+@pytest.mark.behavioural
 def test_set_confidence_handles_zero_target_std():
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1")
     model.set_confidence_from_validation(rmse=1.0, target_std=0.0)
     assert model.confidence == 0.5  # documented degenerate-case fallback
 
 
+@pytest.mark.plumbing
 def test_predict_confidence_matches_model_scalar():
     X, y = _synthetic_training_frame()
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1", min_training_rows=10)

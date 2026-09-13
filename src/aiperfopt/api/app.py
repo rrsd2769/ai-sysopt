@@ -45,6 +45,7 @@ def create_app(
     ctx: AppContext | None = None,
     user_config_path: Path | str | None = None,
     auto_start: bool = False,
+    start_monitoring: bool = True,
 ) -> FastAPI:
     """Build a ready-to-serve FastAPI app.
 
@@ -55,11 +56,23 @@ def create_app(
         fixture built against a temporary database). If omitted, this
         calls :func:`aiperfopt.bootstrap.bootstrap` itself.
     auto_start:
-        If True, starts the Monitoring pipeline and live-inference loop
-        immediately on FastAPI startup rather than waiting for an
-        explicit ``/monitoring/start``/``/live/start`` call. The real
-        server entrypoint wants this; a test client building an app just
-        to exercise REST endpoints usually does not.
+        If True, starts the live-inference loop immediately on FastAPI
+        startup rather than waiting for an explicit ``/live/start`` call.
+        The real server entrypoint wants this; a test client building an
+        app just to exercise REST endpoints usually does not.
+    start_monitoring:
+        Whether ``auto_start`` also starts the Monitoring pipeline (the
+        real collector polling this machine and writing to
+        ``ctx.settings.storage.database_path``). Ignored unless
+        ``auto_start`` is True. Set False when the configured database is
+        a replay database (``StorageSettings.is_replay``) -- otherwise
+        this bundled collector would write real, current-machine samples
+        into the same file ``aiperfopt replay`` is writing historical
+        ones into, exactly the concurrent-write hazard
+        ``aiperfopt.replay.player.assert_monitoring_not_active`` exists to
+        catch on the *primary* database. There is no equivalent guard for
+        a server started this way, so the caller (``aiperfopt serve
+        --no-monitor``) must opt out explicitly.
     """
     ctx = ctx or bootstrap(user_config_path)
     feature_config = FeatureEngineeringConfig()
@@ -97,7 +110,8 @@ def create_app(
         live_loop.on_update = _broadcast
 
         if auto_start:
-            monitoring_pipeline.start()
+            if start_monitoring:
+                monitoring_pipeline.start()
             live_loop.start()
 
         try:

@@ -7,6 +7,8 @@ import pytest
 from aiperfopt.common.exceptions import RetrainingError
 from aiperfopt.retraining.active_version import read_active_version, write_active_version
 
+pytestmark = pytest.mark.plumbing
+
 
 def test_read_active_version_returns_none_when_file_absent(tmp_path: Path):
     assert read_active_version(tmp_path / "active_model_version.json") is None

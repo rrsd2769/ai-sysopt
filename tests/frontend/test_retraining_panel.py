@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from aiperfopt.frontend.api_client import ApiClient
 from aiperfopt.frontend.config import FrontendSettings
 from aiperfopt.frontend.widgets.retraining_panel import RetrainingPanel
@@ -15,6 +17,7 @@ def _settings_for(base_url: str) -> FrontendSettings:
     return FrontendSettings(api_host=host, api_port=int(port))
 
 
+@pytest.mark.behavioural
 def test_run_and_confirm_full_round_trip(qtbot, tmp_path: Path):
     ctx = build_test_ctx(tmp_path)
     samples = rising_cpu_samples_now(n=300, interval=2.0)
@@ -55,6 +58,7 @@ def test_run_and_confirm_full_round_trip(qtbot, tmp_path: Path):
         client.close()
 
 
+@pytest.mark.plumbing
 def test_run_without_a_version_name_shows_a_hint(qtbot, tmp_path: Path):
     with running_backend(tmp_path) as (base_url, _ctx):
         client = ApiClient(settings=_settings_for(base_url))

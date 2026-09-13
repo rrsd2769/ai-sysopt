@@ -15,12 +15,16 @@ import tomllib
 from importlib import resources
 from pathlib import Path
 
+import pytest
+
 from aiperfopt.recommendation.catalog import load_recommendation_catalog
 from aiperfopt.resources import (
     DEFAULT_CONFIG_FILENAME,
     RECOMMENDATION_CATALOG_FILENAME,
     resource_path,
 )
+
+pytestmark = pytest.mark.plumbing
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 

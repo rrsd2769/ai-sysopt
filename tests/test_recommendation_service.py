@@ -27,6 +27,7 @@ def _persisted_diagnosis(engine: Engine, **overrides) -> DiagnosisRecord:
     return record
 
 
+@pytest.mark.behavioural
 def test_actionable_diagnosis_produces_and_persists_a_recommendation(storage_engine: Engine):
     diagnosis = _persisted_diagnosis(storage_engine)
     result = generate_recommendations(storage_engine, diagnosis, _CATALOG)
@@ -42,6 +43,7 @@ def test_actionable_diagnosis_produces_and_persists_a_recommendation(storage_eng
     assert persisted[0].diagnosis_id == diagnosis.id
 
 
+@pytest.mark.behavioural
 def test_non_actionable_diagnosis_returns_none_and_persists_nothing(storage_engine: Engine):
     diagnosis = _persisted_diagnosis(
         storage_engine,
@@ -55,6 +57,7 @@ def test_non_actionable_diagnosis_returns_none_and_persists_nothing(storage_engi
     assert get_recommendations_range(storage_engine) == []
 
 
+@pytest.mark.behavioural
 def test_every_actionable_category_round_trips_through_the_real_catalog(storage_engine: Engine):
     """Not just the catalog's own validation (test_recommendation_catalog.py) —
     this exercises the actual service path for every category the way a
@@ -66,6 +69,7 @@ def test_every_actionable_category_round_trips_through_the_real_catalog(storage_
         assert result.diagnosis_category == category
 
 
+@pytest.mark.plumbing
 def test_unpersisted_diagnosis_without_id_raises(storage_engine: Engine):
     diagnosis = DiagnosisRecord(
         generated_at=100.0, category="cpu_bound_single_process", is_actionable=True,

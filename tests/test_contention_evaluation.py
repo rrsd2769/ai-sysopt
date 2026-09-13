@@ -16,6 +16,8 @@ from aiperfopt.contention.evaluation import (
     run_contention_walk_forward_evaluation,
 )
 
+pytestmark = pytest.mark.behavioural
+
 
 def test_feature_columns_of_excludes_timestamp_and_label():
     df = pd.DataFrame({"timestamp": [1.0], "label": [0], "forecast_a": [2.0]})

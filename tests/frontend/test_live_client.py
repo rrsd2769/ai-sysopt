@@ -3,11 +3,16 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import pytest
+
 from aiperfopt.frontend.config import FrontendSettings
 from aiperfopt.frontend.live_client import LiveWebSocketClient
 from aiperfopt.storage import insert_system_metric_samples_batch
 from tests.api_conftest import build_test_ctx, rising_cpu_samples_now
 from tests.frontend.server_fixture import running_backend
+
+
+pytestmark = pytest.mark.plumbing
 
 
 def _settings_for(base_url: str) -> FrontendSettings:

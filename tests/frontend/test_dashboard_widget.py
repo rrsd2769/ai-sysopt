@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from aiperfopt.frontend.widgets.dashboard import DashboardWidget
 
 _BASE_STATE = {
@@ -15,6 +17,7 @@ _BASE_STATE = {
 }
 
 
+@pytest.mark.behavioural
 def test_renders_current_metrics(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -23,6 +26,7 @@ def test_renders_current_metrics(qtbot):
     assert widget._mem_tile._value_label.text() == "61.2%"
 
 
+@pytest.mark.behavioural
 def test_anomaly_banner_toggles(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -36,6 +40,7 @@ def test_anomaly_banner_toggles(qtbot):
     assert "Unusual" in widget._anomaly_banner.text()
 
 
+@pytest.mark.behavioural
 def test_diagnosis_renders_plain_language_text(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -55,6 +60,7 @@ def test_diagnosis_renders_plain_language_text(qtbot):
     assert "82%" in widget._diagnosis_confidence.text()
 
 
+@pytest.mark.plumbing
 def test_no_diagnosis_shows_default_text(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -62,6 +68,7 @@ def test_no_diagnosis_shows_default_text(qtbot):
     assert widget._diagnosis_title.text() == "No issue detected right now"
 
 
+@pytest.mark.plumbing
 def test_recommendation_actions_render_as_cards(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -83,6 +90,7 @@ def test_recommendation_actions_render_as_cards(qtbot):
     assert widget._recs_empty_label.isHidden()
 
 
+@pytest.mark.plumbing
 def test_no_recommendation_shows_empty_state(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -90,6 +98,7 @@ def test_no_recommendation_shows_empty_state(qtbot):
     assert not widget._recs_empty_label.isHidden()
 
 
+@pytest.mark.behavioural
 def test_error_state_shows_error_banner(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -98,6 +107,7 @@ def test_error_state_shows_error_banner(qtbot):
     assert "storage unavailable" in widget._status_banner.text()
 
 
+@pytest.mark.behavioural
 def test_readiness_drives_the_banner_text_and_color(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -115,6 +125,7 @@ def test_readiness_drives_the_banner_text_and_color(qtbot):
     assert widget._status_banner.text() == "Live"
 
 
+@pytest.mark.behavioural
 def test_replay_readiness_state_shows_unmistakable_replay_banner(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -126,6 +137,7 @@ def test_replay_readiness_state_shows_unmistakable_replay_banner(qtbot):
     assert widget._status_banner.text() == "REPLAY"
 
 
+@pytest.mark.behavioural
 def test_live_state_error_overrides_readiness_banner(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)
@@ -142,6 +154,7 @@ def test_live_state_error_overrides_readiness_banner(qtbot):
     assert widget._status_banner.text() == "Live"
 
 
+@pytest.mark.plumbing
 def test_recommendation_cards_are_cleared_between_updates(qtbot):
     widget = DashboardWidget()
     qtbot.addWidget(widget)

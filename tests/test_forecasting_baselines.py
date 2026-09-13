@@ -12,6 +12,8 @@ from aiperfopt.forecasting.baselines import (
     NaivePersistenceForecaster,
 )
 
+pytestmark = pytest.mark.behavioural
+
 
 def test_naive_persistence_predicts_current_value():
     row = pd.Series({"current_value": 42.5, "timestamp": 100.0})

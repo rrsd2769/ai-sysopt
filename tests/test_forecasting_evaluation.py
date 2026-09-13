@@ -14,6 +14,8 @@ from aiperfopt.forecasting.evaluation import (
     select_best_forecaster_name,
 )
 
+pytestmark = pytest.mark.behavioural
+
 
 def test_compute_mae_rmse_known_values():
     y_true = np.array([10.0, 20.0, 30.0])

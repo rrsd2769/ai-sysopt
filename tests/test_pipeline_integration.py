@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import pytest
+
 from aiperfopt.bootstrap import AppContext
 from aiperfopt.config.settings import (
     AppSettings,
@@ -54,6 +56,9 @@ def _fast_context(tmp_path: Path) -> AppContext:
     engine = create_storage_engine(settings.storage.database_path)
     create_all_tables(engine)
     return AppContext(settings=settings, storage_engine=engine)
+
+
+pytestmark = pytest.mark.plumbing
 
 
 def test_full_pipeline_produces_and_persists_real_data(tmp_path: Path):

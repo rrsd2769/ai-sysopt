@@ -4,11 +4,14 @@ import json
 import logging
 from pathlib import Path
 
+import pytest
+
 from aiperfopt.applog import configure_logging, get_logger
 from aiperfopt.applog.formatting import JsonFormatter
 from aiperfopt.config.settings import LoggingSettings
 
 
+@pytest.mark.behavioural
 def test_json_formatter_produces_valid_json():
     formatter = JsonFormatter()
     record = logging.LogRecord(
@@ -24,6 +27,7 @@ def test_json_formatter_produces_valid_json():
     assert "timestamp" in parsed
 
 
+@pytest.mark.behavioural
 def test_json_formatter_includes_extra_fields():
     formatter = JsonFormatter()
     record = logging.LogRecord(
@@ -39,6 +43,7 @@ def test_json_formatter_includes_extra_fields():
     assert parsed["latency_ms"] == 812
 
 
+@pytest.mark.behavioural
 def test_json_formatter_includes_exception_info():
     formatter = JsonFormatter()
     try:
@@ -57,6 +62,7 @@ def test_json_formatter_includes_exception_info():
     assert "traceback" in parsed["exception"]
 
 
+@pytest.mark.behavioural
 def test_configure_logging_writes_json_lines_to_file(tmp_path: Path):
     settings = LoggingSettings(level="INFO", log_dir=tmp_path, json_format=True)
     configure_logging(settings, force=True)
@@ -76,6 +82,7 @@ def test_configure_logging_writes_json_lines_to_file(tmp_path: Path):
     assert parsed["stage"] == "test"
 
 
+@pytest.mark.plumbing
 def test_configure_logging_is_idempotent_without_force(tmp_path: Path):
     settings = LoggingSettings(level="INFO", log_dir=tmp_path, json_format=True)
     configure_logging(settings, force=True)
@@ -87,6 +94,7 @@ def test_configure_logging_is_idempotent_without_force(tmp_path: Path):
     assert handler_count_after_first == handler_count_after_second
 
 
+@pytest.mark.behavioural
 def test_configure_logging_respects_level(tmp_path: Path):
     settings = LoggingSettings(level="ERROR", log_dir=tmp_path, json_format=True)
     configure_logging(settings, force=True)

@@ -21,6 +21,7 @@ def _fast_settings(**overrides) -> MonitoringSettings:
     return MonitoringSettings(**base)
 
 
+@pytest.mark.plumbing
 def test_engine_start_stop_lifecycle():
     q: "queue.Queue[QueueItem]" = queue.Queue()
     engine = MonitoringEngine(_fast_settings(), q)
@@ -32,6 +33,7 @@ def test_engine_start_stop_lifecycle():
     assert engine.is_running is False
 
 
+@pytest.mark.plumbing
 def test_engine_produces_system_metric_items():
     q: "queue.Queue[QueueItem]" = queue.Queue()
     engine = MonitoringEngine(_fast_settings(), q)
@@ -43,6 +45,7 @@ def test_engine_produces_system_metric_items():
         engine.stop(timeout=2.0)
 
 
+@pytest.mark.plumbing
 def test_engine_produces_process_metric_items():
     q: "queue.Queue[QueueItem]" = queue.Queue()
     engine = MonitoringEngine(_fast_settings(), q)
@@ -63,6 +66,7 @@ def test_engine_produces_process_metric_items():
         engine.stop(timeout=2.0)
 
 
+@pytest.mark.plumbing
 def test_engine_survives_repeated_system_metric_failures(monkeypatch):
     """FR-1.4 / NFR-5.1: a broken mandatory source must not kill the engine
     thread — it should log and keep retrying next cycle."""
@@ -102,6 +106,7 @@ def test_engine_survives_repeated_system_metric_failures(monkeypatch):
         engine.stop(timeout=2.0)
 
 
+@pytest.mark.plumbing
 def test_engine_drops_samples_without_blocking_when_queue_full():
     tiny_queue: "queue.Queue[QueueItem]" = queue.Queue(maxsize=1)
     engine = MonitoringEngine(_fast_settings(), tiny_queue)
@@ -116,6 +121,7 @@ def test_engine_drops_samples_without_blocking_when_queue_full():
         engine.stop(timeout=2.0)
 
 
+@pytest.mark.plumbing
 def test_engine_start_is_idempotent():
     q: "queue.Queue[QueueItem]" = queue.Queue()
     engine = MonitoringEngine(_fast_settings(), q)
@@ -127,6 +133,7 @@ def test_engine_start_is_idempotent():
     engine.stop(timeout=2.0)
 
 
+@pytest.mark.behavioural
 def test_engine_respects_process_exclusions_end_to_end():
     import subprocess
 

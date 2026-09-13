@@ -12,15 +12,18 @@ def _sample(ts: float, cpu: float) -> SystemMetricSample:
     return SystemMetricSample(timestamp=ts, cpu_percent=cpu, mem_percent=50.0)
 
 
+@pytest.mark.plumbing
 def test_rejects_unknown_metric_name(storage_engine: Engine):
     with pytest.raises(ValueError):
         join_predicted_vs_actual(storage_engine, "not_a_real_metric")
 
 
+@pytest.mark.plumbing
 def test_empty_when_no_predictions(storage_engine: Engine):
     assert join_predicted_vs_actual(storage_engine, "cpu_percent") == []
 
 
+@pytest.mark.behavioural
 def test_matches_nearest_actual_for_target_and_current_value(storage_engine: Engine):
     samples = [_sample(1000.0 + i, cpu=float(50 + i)) for i in range(20)]
     insert_system_metric_samples_batch(storage_engine, samples)
@@ -41,6 +44,7 @@ def test_matches_nearest_actual_for_target_and_current_value(storage_engine: Eng
     assert p.error == pytest.approx(5.0)
 
 
+@pytest.mark.behavioural
 def test_no_nearby_actual_leaves_fields_none(storage_engine: Engine):
     insert_forecast_prediction(
         storage_engine,
@@ -56,6 +60,7 @@ def test_no_nearby_actual_leaves_fields_none(storage_engine: Engine):
     assert points[0].error is None
 
 
+@pytest.mark.behavioural
 def test_horizon_label_filter(storage_engine: Engine):
     for horizon in ("short", "medium"):
         insert_forecast_prediction(
@@ -71,6 +76,7 @@ def test_horizon_label_filter(storage_engine: Engine):
     assert points[0].horizon_label == "medium"
 
 
+@pytest.mark.behavioural
 def test_results_sorted_by_target_timestamp(storage_engine: Engine):
     for target in (1050.0, 1010.0, 1030.0):
         insert_forecast_prediction(

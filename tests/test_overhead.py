@@ -22,6 +22,8 @@ from aiperfopt.monitoring.overhead import (
     measure_pipeline_overhead,
 )
 
+pytestmark = pytest.mark.behavioural
+
 
 @pytest.mark.timeout(60)
 def test_pipeline_self_cpu_stays_within_budget(tmp_path: Path):

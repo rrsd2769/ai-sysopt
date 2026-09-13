@@ -36,12 +36,14 @@ def _regular_samples(count: int, interval: float = 2.0, start: float | None = No
     return samples
 
 
+@pytest.mark.plumbing
 def test_empty_input_returns_empty_matrix():
     config = FeatureEngineeringConfig()
     matrix = compute_feature_matrix([], config)
     assert matrix.empty
 
 
+@pytest.mark.plumbing
 def test_matrix_has_one_row_per_input_sample():
     config = FeatureEngineeringConfig()
     samples = _regular_samples(50)
@@ -49,6 +51,7 @@ def test_matrix_has_one_row_per_input_sample():
     assert len(matrix) == 50
 
 
+@pytest.mark.behavioural
 def test_gauge_lag_feature_matches_actual_value_n_seconds_ago():
     config = FeatureEngineeringConfig(lookback_windows_seconds=(30, 120), tolerance_seconds=2.0)
     # cpu_percent increases by 1.0 every 2s sample -> value at t-30s should
@@ -64,6 +67,7 @@ def test_gauge_lag_feature_matches_actual_value_n_seconds_ago():
     assert last_row["cpu_percent_lag_30s"] == pytest.approx(134.0)
 
 
+@pytest.mark.behavioural
 def test_rolling_mean_matches_manual_calculation():
     config = FeatureEngineeringConfig(lookback_windows_seconds=(30,), tolerance_seconds=2.0)
     base = time.time() - 100
@@ -76,6 +80,7 @@ def test_rolling_mean_matches_manual_calculation():
     assert (matrix["cpu_percent_roll_mean_30s"] == 42.0).all()
 
 
+@pytest.mark.behavioural
 def test_counter_metric_rate_is_computed_not_raw_value():
     config = FeatureEngineeringConfig(lookback_windows_seconds=(30,), tolerance_seconds=2.0)
     base = time.time() - 100
@@ -92,6 +97,7 @@ def test_counter_metric_rate_is_computed_not_raw_value():
     assert last_row["disk_read_bytes_rate_roll_mean_30s"] == pytest.approx(500.0)
 
 
+@pytest.mark.behavioural
 def test_counter_reset_produces_nan_rate_not_negative_value():
     config = FeatureEngineeringConfig(lookback_windows_seconds=(30,), tolerance_seconds=2.0)
     base = time.time() - 20
@@ -107,6 +113,7 @@ def test_counter_reset_produces_nan_rate_not_negative_value():
     assert math.isnan(second_row["disk_read_bytes_rate_roll_max_30s"])
 
 
+@pytest.mark.behavioural
 def test_lag_beyond_tolerance_after_gap_is_none():
     """FR-4.3: a lag lookup with no sample nearby must be None, not a stale value."""
     config = FeatureEngineeringConfig(lookback_windows_seconds=(30, 120), tolerance_seconds=3.0)
@@ -124,6 +131,7 @@ def test_lag_beyond_tolerance_after_gap_is_none():
     assert math.isnan(first_row_after_gap["cpu_percent_lag_30s"])
 
 
+@pytest.mark.plumbing
 def test_rolling_stats_survive_gaps_without_crashing():
     config = FeatureEngineeringConfig(lookback_windows_seconds=(30,), tolerance_seconds=3.0)
     base = time.time() - 300
@@ -138,6 +146,7 @@ def test_rolling_stats_survive_gaps_without_crashing():
     assert not matrix.empty
 
 
+@pytest.mark.behavioural
 def test_duplicate_timestamps_are_deduplicated():
     config = FeatureEngineeringConfig()
     base = time.time() - 10
@@ -150,11 +159,13 @@ def test_duplicate_timestamps_are_deduplicated():
     assert len(matrix) == 2  # duplicate collapsed to one row
 
 
+@pytest.mark.plumbing
 def test_compute_latest_feature_vector_returns_none_for_empty_input():
     config = FeatureEngineeringConfig()
     assert compute_latest_feature_vector([], config) is None
 
 
+@pytest.mark.behavioural
 def test_compute_latest_feature_vector_matches_last_row_of_batch_matrix():
     """FR-4.2: identical live/train computation, not just similar."""
     config = FeatureEngineeringConfig()
@@ -179,6 +190,7 @@ def test_compute_latest_feature_vector_matches_last_row_of_batch_matrix():
             assert value == pytest.approx(full_value), f"mismatch on {key}"
 
 
+@pytest.mark.behavioural
 def test_process_summary_columns_get_the_same_gauge_treatment():
     """Phase 4: an aligned process_summary frame's columns must be
     treated exactly like any other configured gauge metric — lag/
@@ -199,6 +211,7 @@ def test_process_summary_columns_get_the_same_gauge_treatment():
     assert (matrix["proc_cpu_sum_roll_mean_30s"] == 42.0).all()
 
 
+@pytest.mark.behavioural
 def test_process_summary_none_leaves_process_columns_absent():
     """No process data available (e.g. a synthetic training scenario) must
     not fabricate process feature columns."""
@@ -208,6 +221,7 @@ def test_process_summary_none_leaves_process_columns_absent():
     assert not any(c.startswith("proc_cpu_sum") for c in matrix.columns)
 
 
+@pytest.mark.behavioural
 def test_process_summary_columns_are_causal_like_any_other_gauge():
     """A future process value must not change a past row's engineered
     feature -- the same causality guarantee _feature_bundle already gives
@@ -232,6 +246,7 @@ def test_process_summary_columns_are_causal_like_any_other_gauge():
     pd.testing.assert_frame_equal(matrix_before.iloc[:-1], matrix_after.iloc[:-1])
 
 
+@pytest.mark.plumbing
 def test_feature_matrix_to_records_round_trips_shape():
     config = FeatureEngineeringConfig()
     samples = _regular_samples(20)
@@ -244,12 +259,14 @@ def test_feature_matrix_to_records_round_trips_shape():
     assert all(isinstance(r.feature_values, dict) for r in records)
 
 
+@pytest.mark.plumbing
 def test_feature_matrix_to_records_empty_matrix_returns_empty_list():
     config = FeatureEngineeringConfig()
     matrix = compute_feature_matrix([], config)
     assert feature_matrix_to_records(matrix) == []
 
 
+@pytest.mark.behavioural
 def test_all_nan_metric_column_is_handled_without_erroring():
     """A gauge/counter metric with no real data (e.g. no battery on this
     machine, so battery_percent is None on every sample) must not crash

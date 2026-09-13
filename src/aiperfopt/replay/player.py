@@ -40,12 +40,13 @@ import time
 from dataclasses import dataclass
 from typing import Callable, Sequence
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 
 from aiperfopt.applog import get_logger
 from aiperfopt.common.exceptions import ReplayError
 from aiperfopt.readiness import STALE_AFTER_SECONDS
 from aiperfopt.replay.session import RecordedSession
+from aiperfopt.storage import schema
 from aiperfopt.storage.reader import get_recent_system_metrics
 from aiperfopt.storage.writer import (
     insert_process_events_batch,
@@ -55,6 +56,34 @@ from aiperfopt.storage.writer import (
 )
 
 logger = get_logger(__name__)
+
+
+def copy_model_metadata(primary_engine: Engine, replay_engine: Engine) -> None:
+    """Copy every ``evaluations`` and ``model_deployments`` row from
+    ``primary_engine`` into ``replay_engine``.
+
+    Raw system/process samples are the only thing the insertion loop
+    below writes into a fresh replay database. But the live-inference
+    loop reconstructs each deployed forecaster from persisted evaluation
+    history (``resolve_deployed_forecasters``, keyed by model version),
+    not from the model artifact files alone -- without this, a server
+    pointed at the replay database finds the shared
+    ``active_model_version.json`` pointer (a plain file, not
+    database-scoped) but no evaluation rows to rebuild that version's
+    forecasters from, and every live-inference tick fails with "no usable
+    short-horizon forecasters" even though the model artifacts on disk
+    are perfectly fine. ``model_deployments`` is copied too so the
+    Retraining tab's deployment history isn't misleadingly empty during a
+    replay demo. Both tables are small (one row per training/deployment
+    event, not per sample), so copying every row rather than filtering to
+    one model version keeps this simple and still correct if the active
+    version changes between recording and replaying.
+    """
+    with primary_engine.connect() as src, replay_engine.begin() as dst:
+        for table in (schema.evaluations, schema.model_deployments):
+            rows = [dict(row._mapping) for row in src.execute(select(table))]
+            if rows:
+                dst.execute(table.insert(), rows)
 
 
 def is_monitoring_active(engine: Engine) -> bool:

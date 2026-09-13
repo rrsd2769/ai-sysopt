@@ -26,6 +26,7 @@ def _fitted_anomaly_detector(samples, feature_config):
     return detector
 
 
+@pytest.mark.behavioural
 def test_dataset_has_expected_columns():
     feature_config = FeatureEngineeringConfig(lookback_windows_seconds=(10, 30), tolerance_seconds=3.0)
     samples = _samples(100)
@@ -46,6 +47,7 @@ def test_dataset_has_expected_columns():
     assert "cpu_percent_roll_mean_10s" not in ds.columns
 
 
+@pytest.mark.behavioural
 def test_label_is_one_when_metric_crosses_threshold():
     feature_config = FeatureEngineeringConfig(lookback_windows_seconds=(10, 30), tolerance_seconds=3.0)
     # cpu_percent ramps well past the threshold partway through.
@@ -62,6 +64,7 @@ def test_label_is_one_when_metric_crosses_threshold():
     assert set(ds["label"].unique()).issubset({0, 1})
 
 
+@pytest.mark.behavioural
 def test_label_is_always_zero_when_never_crossing_threshold():
     feature_config = FeatureEngineeringConfig(lookback_windows_seconds=(10, 30), tolerance_seconds=3.0)
     samples = _samples(100, cpu_fn=lambda i: 15.0)  # always well below threshold
@@ -76,6 +79,7 @@ def test_label_is_always_zero_when_never_crossing_threshold():
     assert ds["label"].sum() == 0
 
 
+@pytest.mark.behavioural
 def test_multiple_target_metrics_produce_columns_for_each():
     feature_config = FeatureEngineeringConfig(lookback_windows_seconds=(10, 30), tolerance_seconds=3.0)
     samples = _samples(100)
@@ -94,6 +98,7 @@ def test_multiple_target_metrics_produce_columns_for_each():
     assert "forecast_mem_percent" in ds.columns
 
 
+@pytest.mark.plumbing
 def test_empty_samples_returns_empty_dataset():
     feature_config = FeatureEngineeringConfig()
     labeling = ContentionLabelingConfig()
@@ -105,6 +110,7 @@ def test_empty_samples_returns_empty_dataset():
     assert ds.empty
 
 
+@pytest.mark.plumbing
 def test_no_deployed_forecasters_returns_empty_dataset():
     feature_config = FeatureEngineeringConfig()
     labeling = ContentionLabelingConfig()

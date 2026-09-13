@@ -26,6 +26,7 @@ def _trained_detector() -> AnomalyDetector:
     return detector
 
 
+@pytest.mark.behavioural
 def test_save_and_load_round_trip(tmp_path: Path):
     detector = _trained_detector()
     save_anomaly_detector(detector, tmp_path, "v1")
@@ -36,16 +37,19 @@ def test_save_and_load_round_trip(tmp_path: Path):
     assert loaded.score(row) == pytest.approx(detector.score(row))
 
 
+@pytest.mark.plumbing
 def test_save_untrained_raises(tmp_path: Path):
     with pytest.raises(AnomalyDetectionError):
         save_anomaly_detector(AnomalyDetector(), tmp_path, "v1")
 
 
+@pytest.mark.plumbing
 def test_load_missing_artifact_raises(tmp_path: Path):
     with pytest.raises(AnomalyDetectionError):
         load_anomaly_detector(tmp_path, "does_not_exist")
 
 
+@pytest.mark.plumbing
 def test_load_pre_phase4_artifact_raises(tmp_path: Path):
     """A pre-Phase-4 artifact lacks ``feature_set_version`` entirely (same
     unpickling-absence trap as schema_version, above) -- loading it must
@@ -59,6 +63,7 @@ def test_load_pre_phase4_artifact_raises(tmp_path: Path):
         load_anomaly_detector(tmp_path, "v1")
 
 
+@pytest.mark.plumbing
 def test_load_pre_phase3_artifact_raises(tmp_path: Path):
     """A pre-Phase-3 artifact lacks ``schema_version``/``_train_means`` entirely.
 
@@ -77,6 +82,7 @@ def test_load_pre_phase3_artifact_raises(tmp_path: Path):
         load_anomaly_detector(tmp_path, "v1")
 
 
+@pytest.mark.behavioural
 def test_notification_emitted_when_score_meets_threshold(storage_engine: Engine):
     emitted = emit_anomaly_notification_if_significant(
         storage_engine, anomaly_score=0.9, threshold=0.7, timestamp=100.0
@@ -90,6 +96,7 @@ def test_notification_emitted_when_score_meets_threshold(storage_engine: Engine)
     assert events[0].context["anomaly_score"] == 0.9
 
 
+@pytest.mark.behavioural
 def test_no_notification_when_score_below_threshold(storage_engine: Engine):
     emitted = emit_anomaly_notification_if_significant(
         storage_engine, anomaly_score=0.3, threshold=0.7, timestamp=100.0
@@ -98,6 +105,7 @@ def test_no_notification_when_score_below_threshold(storage_engine: Engine):
     assert get_log_events_range(storage_engine) == []
 
 
+@pytest.mark.behavioural
 def test_notification_at_exact_threshold_is_emitted(storage_engine: Engine):
     emitted = emit_anomaly_notification_if_significant(
         storage_engine, anomaly_score=0.7, threshold=0.7, timestamp=100.0

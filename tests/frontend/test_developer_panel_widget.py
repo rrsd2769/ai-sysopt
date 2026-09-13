@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
 from aiperfopt.frontend.widgets.developer_panel import DeveloperPanel
+
+pytestmark = pytest.mark.plumbing
 
 _BASE_STATE = {
     "timestamp": 1000.0,

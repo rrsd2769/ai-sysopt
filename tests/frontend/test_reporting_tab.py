@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from aiperfopt.frontend.api_client import ApiClient
 from aiperfopt.frontend.config import FrontendSettings
 from aiperfopt.frontend.widgets.reporting_tab import ReportingTab
@@ -9,6 +11,9 @@ from aiperfopt.storage import insert_diagnosis, insert_system_metric_samples_bat
 from aiperfopt.storage.records import DiagnosisRecord
 from tests.api_conftest import build_test_ctx, rising_cpu_samples_now
 from tests.frontend.server_fixture import running_backend
+
+
+pytestmark = pytest.mark.plumbing
 
 
 def _settings_for(base_url: str) -> FrontendSettings:

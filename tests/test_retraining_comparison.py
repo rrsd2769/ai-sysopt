@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.contention.training_pipeline import ContentionTrainingSummary
@@ -17,6 +18,7 @@ def _outcome(metric_name="cpu_percent", horizon_label="short", mae=1.0, rmse=2.0
     )
 
 
+@pytest.mark.behavioural
 def test_no_active_version_recommends_no_active_baseline(storage_engine: Engine):
     forecast_summary = TrainingRunSummary(model_version="v1", outcomes=[_outcome()])
 
@@ -29,6 +31,7 @@ def test_no_active_version_recommends_no_active_baseline(storage_engine: Engine)
     assert len(comparison.reasons) == 1
 
 
+@pytest.mark.behavioural
 def test_improved_candidate_recommends_deploy(storage_engine: Engine):
     insert_evaluation(
         storage_engine,
@@ -51,6 +54,7 @@ def test_improved_candidate_recommends_deploy(storage_engine: Engine):
     assert comparison.metric_comparisons[0].baseline_mae == 2.0
 
 
+@pytest.mark.behavioural
 def test_regressed_mae_recommends_reject(storage_engine: Engine):
     insert_evaluation(
         storage_engine,
@@ -74,6 +78,7 @@ def test_regressed_mae_recommends_reject(storage_engine: Engine):
     assert len(comparison.reasons) == 1
 
 
+@pytest.mark.behavioural
 def test_regressed_directional_accuracy_recommends_reject(storage_engine: Engine):
     insert_evaluation(
         storage_engine,
@@ -96,6 +101,7 @@ def test_regressed_directional_accuracy_recommends_reject(storage_engine: Engine
     assert comparison.metric_comparisons[0].regressed is True
 
 
+@pytest.mark.behavioural
 def test_no_baseline_for_metric_does_not_block_deployment(storage_engine: Engine):
     # active-v1 never trained "mem_percent" -- nothing to compare against for it.
     insert_evaluation(
@@ -124,6 +130,7 @@ def test_no_baseline_for_metric_does_not_block_deployment(storage_engine: Engine
     assert mem_comparison.regressed is False
 
 
+@pytest.mark.behavioural
 def test_contention_f1_regression_blocks_deployment(storage_engine: Engine):
     insert_evaluation(
         storage_engine,
@@ -148,6 +155,7 @@ def test_contention_f1_regression_blocks_deployment(storage_engine: Engine):
     assert comparison.contention_comparison.baseline_f1 == 0.8
 
 
+@pytest.mark.plumbing
 def test_as_dict_is_json_serializable(storage_engine: Engine):
     import json
 

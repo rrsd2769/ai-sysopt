@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from aiperfopt.contention.training_pipeline import ContentionTrainingSummary
 from aiperfopt.forecasting.training_pipeline import MetricHorizonOutcome, TrainingRunSummary
 from aiperfopt.evaluation.ablation import AblationReport, ArmResult
@@ -60,6 +62,9 @@ def _fake_report() -> AblationReport:
         },
         arms={"v1": v1, "v2": v2},
     )
+
+
+pytestmark = pytest.mark.plumbing
 
 
 def test_write_ablation_report_produces_every_artifact(tmp_path: Path):

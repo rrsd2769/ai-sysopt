@@ -52,6 +52,7 @@ def _rising_cpu_samples(n: int, start: float = 0.0, interval: float = 2.0) -> li
     return samples
 
 
+@pytest.mark.behavioural
 def test_run_retraining_on_real_usage_data_produces_candidate(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config, rsettings = _fast_settings(tmp_path)
     insert_system_metric_samples_batch(storage_engine, _rising_cpu_samples(300))
@@ -76,6 +77,7 @@ def test_run_retraining_on_real_usage_data_produces_candidate(storage_engine: En
     assert holdout_tags == {"holdout_real_usage"}
 
 
+@pytest.mark.behavioural
 def test_run_retraining_on_synthetic_data_produces_candidate(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config, rsettings = _fast_settings(tmp_path)
 
@@ -92,6 +94,7 @@ def test_run_retraining_on_synthetic_data_produces_candidate(storage_engine: Eng
     assert holdout_tags == {"holdout_cpu_stress"}  # unchanged default for the synthetic path
 
 
+@pytest.mark.behavioural
 def test_second_candidate_compares_against_first_deployed_version(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config, rsettings = _fast_settings(tmp_path)
     insert_system_metric_samples_batch(storage_engine, _rising_cpu_samples(300))
@@ -119,6 +122,7 @@ def test_second_candidate_compares_against_first_deployed_version(storage_engine
         assert c.baseline_mae is not None  # rt-v1's holdout evaluations were found
 
 
+@pytest.mark.plumbing
 def test_full_confirm_and_active_version_persists_across_calls(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config, rsettings = _fast_settings(tmp_path)
     insert_system_metric_samples_batch(storage_engine, _rising_cpu_samples(300))

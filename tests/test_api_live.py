@@ -15,6 +15,7 @@ from aiperfopt.storage.records import SystemMetricSample
 from tests.api_conftest import build_test_client, build_test_ctx
 
 
+@pytest.mark.plumbing
 def test_live_state_is_none_before_loop_starts(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.get("/live/state")
@@ -22,6 +23,7 @@ def test_live_state_is_none_before_loop_starts(tmp_path: Path):
         assert r.json() is None
 
 
+@pytest.mark.plumbing
 def test_live_state_degrades_gracefully_with_no_history(tmp_path: Path):
     """No history at all -> the loop should tick without error and report nothing yet."""
     with build_test_client(tmp_path, with_history=False, auto_start=False) as client:
@@ -36,6 +38,7 @@ def test_live_state_degrades_gracefully_with_no_history(tmp_path: Path):
         client.post("/live/stop")
 
 
+@pytest.mark.plumbing
 def test_live_state_degrades_gracefully_with_no_deployed_model(tmp_path: Path):
     """History exists (features computable) but nothing was ever deployed."""
     with build_test_client(tmp_path, with_history=True, auto_start=False) as client:
@@ -50,6 +53,7 @@ def test_live_state_degrades_gracefully_with_no_deployed_model(tmp_path: Path):
         client.post("/live/stop")
 
 
+@pytest.mark.plumbing
 def test_live_loop_produces_real_prediction_after_deployment(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True, auto_start=False) as client:
         r = client.post("/retraining/run", json={
@@ -73,6 +77,7 @@ def test_live_loop_produces_real_prediction_after_deployment(tmp_path: Path):
         client.post("/live/stop")
 
 
+@pytest.mark.plumbing
 def test_websocket_receives_broadcast_state(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True, auto_start=False) as client:
         r = client.post("/retraining/run", json={
@@ -95,6 +100,7 @@ def test_websocket_receives_broadcast_state(tmp_path: Path):
         client.post("/live/stop")
 
 
+@pytest.mark.plumbing
 def test_websocket_connects_before_any_state_exists(tmp_path: Path):
     """Connecting before the loop has ever ticked must not hang or error --
     there's simply nothing to send yet."""
@@ -103,6 +109,7 @@ def test_websocket_connects_before_any_state_exists(tmp_path: Path):
             pass  # connecting and disconnecting cleanly is the assertion
 
 
+@pytest.mark.plumbing
 def test_live_tick_persists_one_forecast_row_per_deployed_metric(tmp_path: Path):
     """Phase 7 / F5: a live tick with a deployed forecaster must write a
     ForecastPredictionRecord, not just compute one and discard it."""
@@ -135,6 +142,7 @@ def test_live_tick_persists_one_forecast_row_per_deployed_metric(tmp_path: Path)
         assert rows[0].target_timestamp == pytest.approx(rows[0].generated_at + rows[0].horizon_seconds)
 
 
+@pytest.mark.plumbing
 def test_persisted_forecasts_feed_predicted_vs_actual_and_summary(tmp_path: Path):
     """After ticks plus a later real sample landing near the forecast's
     target, /reporting/predicted-vs-actual pairs it up and
@@ -190,6 +198,7 @@ def _flat_low_cpu_samples_now(n: int = 300, interval: float = 2.0) -> list[Syste
     ]
 
 
+@pytest.mark.behavioural
 def test_live_tick_persists_forecasts_when_no_contention_classifier_trained(tmp_path: Path):
     """Real, expected scenario per Phase 5/6: accumulated data can be
     single-class for contention, so no classifier is ever trained/saved

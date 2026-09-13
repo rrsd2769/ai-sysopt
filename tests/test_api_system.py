@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tests.api_conftest import build_test_client
 
 
+@pytest.mark.plumbing
 def test_health(tmp_path: Path):
     with build_test_client(tmp_path) as client:
         r = client.get("/health")
@@ -12,6 +15,7 @@ def test_health(tmp_path: Path):
         assert r.json() == {"status": "ok"}
 
 
+@pytest.mark.plumbing
 def test_config_returns_active_settings(tmp_path: Path):
     with build_test_client(tmp_path) as client:
         r = client.get("/config")
@@ -22,6 +26,7 @@ def test_config_returns_active_settings(tmp_path: Path):
         assert "api" in body
 
 
+@pytest.mark.plumbing
 def test_monitoring_never_running_by_default(tmp_path: Path):
     with build_test_client(tmp_path, auto_start=False) as client:
         r = client.get("/monitoring/status")
@@ -29,6 +34,7 @@ def test_monitoring_never_running_by_default(tmp_path: Path):
         assert r.json() == {"running": False}
 
 
+@pytest.mark.plumbing
 def test_monitoring_start_and_stop(tmp_path: Path):
     with build_test_client(tmp_path, auto_start=False) as client:
         r = client.post("/monitoring/start")
@@ -43,6 +49,7 @@ def test_monitoring_start_and_stop(tmp_path: Path):
         assert r.json() == {"running": False}
 
 
+@pytest.mark.plumbing
 def test_live_never_running_by_default(tmp_path: Path):
     with build_test_client(tmp_path, auto_start=False) as client:
         r = client.get("/live/status")
@@ -50,6 +57,7 @@ def test_live_never_running_by_default(tmp_path: Path):
         assert r.json() == {"running": False}
 
 
+@pytest.mark.plumbing
 def test_live_start_and_stop(tmp_path: Path):
     with build_test_client(tmp_path, auto_start=False) as client:
         r = client.post("/live/start")
@@ -68,6 +76,7 @@ def test_live_start_and_stop(tmp_path: Path):
 # endpoint the UI uses instead of that hardcoded banner.
 
 
+@pytest.mark.behavioural
 def test_readiness_reports_no_data_on_a_fresh_database(tmp_path: Path):
     with build_test_client(tmp_path) as client:
         r = client.get("/readiness")
@@ -81,6 +90,7 @@ def test_readiness_reports_no_data_on_a_fresh_database(tmp_path: Path):
         assert body["history_seconds_required"] > 0
 
 
+@pytest.mark.behavioural
 def test_readiness_reports_needs_training_once_history_exists(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         body = client.get("/readiness").json()
@@ -91,6 +101,7 @@ def test_readiness_reports_needs_training_once_history_exists(tmp_path: Path):
         assert "aiperfopt train" in body["detail"]
 
 
+@pytest.mark.behavioural
 def test_readiness_reports_replay_when_storage_is_replay(tmp_path: Path):
     with build_test_client(tmp_path, is_replay=True) as client:
         body = client.get("/readiness").json()

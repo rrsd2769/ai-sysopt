@@ -17,6 +17,8 @@ from aiperfopt.storage import (
     insert_process_metric_samples_batch,
 )
 
+pytestmark = pytest.mark.behavioural
+
 _CONTENTION_SETTINGS = ContentionSettings(
     decision_threshold=0.5,
     anomaly_dampening_factor=0.3,

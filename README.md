@@ -7,12 +7,19 @@ suggests what to do about it.
 
 > **Repair in progress.** This project is being brought back to a working
 > state against a measured diagnosis. See
-> [`docs/plans/2026-08-24-make-it-actually-predict.md`](docs/plans/2026-08-24-make-it-actually-predict.md)
-> for what is broken, what is being fixed, and in what order. Phase 0
-> (foundations) is complete; the model quality work is not. **Do not yet
-> trust the predictions this produces** — the forecasters currently lose
-> to naive baselines and the anomaly detector saturates. That is Phases
-> 3–6.
+> [`docs/plans/2026-09-12-presentable-predictive-monitor.md`](docs/plans/2026-09-12-presentable-predictive-monitor.md)
+> for what was broken, what has been fixed, and in what order — Phases
+> 1–9 are complete (data storage through a presentable live UI); Phase 10
+> (final assembly of the Review 2 evidence pack) is in progress. **Read
+> [`docs/phase10-limitations.md`](docs/phase10-limitations.md) before
+> trusting any specific number** — in particular, the contention
+> classifier has not yet trained on real accumulated data (it needs a
+> real pressure event to have occurred during passive collection), and
+> the process-feature ablation has not yet shown its claimed gain outside
+> of synthetic/replay data. See
+> [`docs/architecture.md`](docs/architecture.md) for the pipeline diagram
+> and [`docs/phase10-module-table.md`](docs/phase10-module-table.md) for
+> per-module test counts and behavioural/plumbing split.
 
 ## Quickstart
 
@@ -67,12 +74,17 @@ command also works as `python -m aiperfopt <command>`.
 | `aiperfopt doctor` | Environment, resolved paths, readiness, and the next step |
 | `aiperfopt collect --minutes N` | Collect metrics for a fixed period, no server |
 | `aiperfopt train [--source synthetic\|real] [--deploy]` | Train a candidate model; `--deploy` activates it |
-| `aiperfopt serve` | API server with monitoring and live inference |
+| `aiperfopt serve [--no-monitor]` | API server with live inference; `--no-monitor` skips the bundled collector (for replay demos) |
 | `aiperfopt ui` | Desktop UI against an already-running backend |
 | `aiperfopt run` | Backend + UI together |
+| `aiperfopt record --minutes N --out FILE` | Capture a window of already-collected history into a portable session file |
+| `aiperfopt replay --session FILE [--replay-db PATH] [--speed N]` | Replay a recorded session into a separate database, standing in for the collector (Phase 8) |
+| `aiperfopt evaluate [--ablation] [--report]` | Run the system-only vs. system+process ablation against real accumulated data; `--report` writes the `results/` evidence pack |
 
 Add `--log-level DEBUG` to any command for verbose output, or
-`--config path/to/override.yaml` to layer in your own settings.
+`--config path/to/override.yaml` to layer in your own settings. See
+[`docs/phase10-demo-script.md`](docs/phase10-demo-script.md) for the full
+record/replay/serve sequence used for a live demo.
 
 ## Where your data lives
 
@@ -108,29 +120,42 @@ against `AIPERFOPT_HOME`, never the working directory.
 ## Running tests
 
 ```bash
+QT_QPA_PLATFORM=offscreen pytest -q
+```
+
+**555 tests, all passing** (the Qt frontend suite's segfault from earlier
+phases is fixed — see the Phase 9 "Design notes (crash fix)" in the
+repair plan). Every test carries a `behavioural` or `plumbing` pytest
+marker (`--strict-markers` enforced; unmarked or misspelled markers fail
+collection) — **337 behavioural, 218 plumbing**. Behavioural means the
+test asserts a computed value, decision, or output is *correct*; plumbing
+means it only asserts that code ran, an object was constructed, or a
+record was written, without checking the value is right. This split is
+generated, not hand-maintained:
+
+```bash
+python scripts/generate_module_table.py   # writes docs/phase10-module-table.md
+```
+
+Backend-only, if you don't want to build the Qt suite's dependencies:
+
+```bash
 pytest --ignore=tests/frontend -q
 ```
 
-The backend suite is currently **384 passing**. The Qt frontend suite
-segfaults (`exit 139`) on a current environment — a known defect
-scheduled for Phase 8 of the repair plan, tracked in CI as a
-non-blocking job rather than hidden behind a skip:
-
-```bash
-QT_QPA_PLATFORM=offscreen pytest tests/frontend -q
-```
-
-Be aware that a green backend suite does **not** currently imply the
-models work: the suite tests plumbing, not answer quality. Phase 2 of the
-repair plan labels every test accordingly.
+A green suite does not by itself imply every model has real predictive
+skill on real data yet — see
+[`docs/phase10-limitations.md`](docs/phase10-limitations.md) for exactly
+which claims are and are not currently backed by real-data evidence.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs the backend suite on **both
-`windows-latest` and `macos-latest`**, plus a job asserting that a built
-wheel actually contains its YAML configuration. Windows is a first-class
-target: several defects are Windows-only and silent, so the suite has to
-really run there.
+`.github/workflows/ci.yml` runs the full suite on **`macos-latest`**,
+plus a job asserting that a built wheel actually contains its YAML
+configuration. Windows CI was deliberately dropped
+(`docs/plans/2026-09-12-presentable-predictive-monitor.md`'s "Decisions
+Taken": macOS only for this phase of the repair) — the code stays
+portable by construction, but nothing claims or tests it on Windows.
 
 ## Project layout
 
@@ -194,6 +219,12 @@ src/aiperfopt/
 │   ├── comparison.py                # Candidate-vs-active regression detection (FR-10.2)
 │   ├── deployment.py                 # confirm_deployment() / rollback_to_last_known_good() (FR-11.2/11.3)
 │   └── pipeline.py                    # Orchestrator: run_retraining_on_real_usage_data()
+├── replay/    # Deterministic replay of a recorded session (repair plan Phase 8)
+│   ├── session.py                  # RecordedSession — capture/load/shift a portable session file
+│   └── player.py                    # replay_session() into a separate database; copy_model_metadata()
+├── evaluation/    # Ablation harness + Review 2 evidence pack (repair plan Phase 5/10)
+│   ├── ablation.py                 # run_ablation() — system-only vs. system+process, real data only
+│   └── report.py                    # write_ablation_report() — ablation.csv, PR curve, SHAP, overhead.txt, ...
 ├── api/    # API Layer (Phase 9)
 │   ├── app.py                    # create_app() factory; lifespan wires shutdown, never auto-starts
 │   ├── server.py                  # python -m aiperfopt.api.server — the real uvicorn entrypoint
@@ -395,7 +426,13 @@ python3 -m aiperfopt.api.server
 
 This auto-starts Monitoring and the live-inference loop on startup
 (feature → forecast → contention → diagnosis → recommendation, ticking
-every `api.live_inference_interval_seconds`). Then:
+every `api.live_inference_interval_seconds`). Pass `--no-monitor`
+(`aiperfopt serve --no-monitor`, or `start_monitoring=False` to
+`create_app`) to start only the live-inference loop, not the bundled
+collector — required when pointing this server at a replay database
+(`AIPERFOPT_STORAGE__IS_REPLAY=true`), otherwise it would poll this real,
+current machine and write those samples into the replay database at the
+same time `aiperfopt replay` is writing historical ones into it. Then:
 
 - `http://127.0.0.1:8000/docs` — auto-generated OpenAPI docs (FR-12.3)
 - `ws://127.0.0.1:8000/ws/live` — live pipeline state, pushed every cycle (FR-12.1)

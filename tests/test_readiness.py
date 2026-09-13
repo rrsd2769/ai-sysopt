@@ -22,6 +22,8 @@ from aiperfopt.retraining.active_version import write_active_version
 from aiperfopt.storage import insert_system_metric_samples_batch
 from aiperfopt.storage.records import SystemMetricSample
 
+pytestmark = pytest.mark.behavioural
+
 FEATURE_CONFIG = FeatureEngineeringConfig()
 
 

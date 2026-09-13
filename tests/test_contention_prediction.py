@@ -9,6 +9,8 @@ from aiperfopt.contention.model import ContentionClassifier
 from aiperfopt.contention.prediction import _strip_feature_prefix, predict_contention
 from aiperfopt.storage import ProcessMetricSample, insert_process_metric_samples_batch
 
+pytestmark = pytest.mark.behavioural
+
 
 def _classifier_always_predicting(probability: float) -> ContentionClassifier:
     """A classifier trained so predict_proba is close to a fixed value for our test row."""

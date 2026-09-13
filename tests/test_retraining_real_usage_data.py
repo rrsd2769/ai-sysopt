@@ -19,6 +19,7 @@ def _make_samples(n: int, start: float = 0.0, interval: float = 2.0) -> list[Sys
     ]
 
 
+@pytest.mark.behavioural
 def test_build_real_usage_training_data_splits_chronologically(storage_engine: Engine):
     samples = _make_samples(100)
     insert_system_metric_samples_batch(storage_engine, samples)
@@ -38,6 +39,7 @@ def test_build_real_usage_training_data_splits_chronologically(storage_engine: E
     assert [s.timestamp for s in holdout_samples] == sorted(s.timestamp for s in holdout_samples)
 
 
+@pytest.mark.plumbing
 def test_build_real_usage_training_data_raises_below_min_rows(storage_engine: Engine):
     insert_system_metric_samples_batch(storage_engine, _make_samples(5))
 
@@ -45,6 +47,7 @@ def test_build_real_usage_training_data_raises_below_min_rows(storage_engine: En
         build_real_usage_training_data(storage_engine, min_total_rows=50)
 
 
+@pytest.mark.plumbing
 def test_build_real_usage_training_data_raises_on_empty_split(storage_engine: Engine):
     # A single row can't be split into a non-empty training set and a
     # non-empty holdout set at any fraction.
@@ -54,6 +57,7 @@ def test_build_real_usage_training_data_raises_on_empty_split(storage_engine: En
         build_real_usage_training_data(storage_engine, holdout_fraction=0.2, min_total_rows=1)
 
 
+@pytest.mark.behavioural
 def test_build_real_usage_training_data_respects_start_end_bounds(storage_engine: Engine):
     insert_system_metric_samples_batch(storage_engine, _make_samples(100, start=0.0, interval=1.0))
 

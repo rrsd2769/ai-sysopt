@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
 from aiperfopt.frontend.widgets.contention_strip import ContentionStrip
+
+pytestmark = pytest.mark.behavioural
 
 
 def test_appends_a_point_when_contention_present(qtbot):

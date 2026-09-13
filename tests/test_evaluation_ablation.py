@@ -54,6 +54,7 @@ def _seed_real_usage_data(engine: Engine, count: int = 150, interval: float = 2.
         )
 
 
+@pytest.mark.behavioural
 def test_feature_config_for_arm_v1_excludes_process_columns():
     base = FeatureEngineeringConfig()
     v1 = feature_config_for_arm("v1", base)
@@ -63,11 +64,13 @@ def test_feature_config_for_arm_v1_excludes_process_columns():
     assert v2 is base
 
 
+@pytest.mark.plumbing
 def test_feature_config_for_arm_rejects_unknown_arm():
     with pytest.raises(ValueError):
         feature_config_for_arm("v3", FeatureEngineeringConfig())
 
 
+@pytest.mark.plumbing
 def test_run_ablation_raises_when_not_enough_real_data(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
     with pytest.raises(RetrainingError):
@@ -78,6 +81,7 @@ def test_run_ablation_raises_when_not_enough_real_data(storage_engine: Engine, t
         )
 
 
+@pytest.mark.behavioural
 def test_run_ablation_produces_both_arms_with_distinct_features(storage_engine: Engine, tmp_path: Path):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
     _seed_real_usage_data(storage_engine)

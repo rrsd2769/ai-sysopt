@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.storage import (
@@ -27,6 +28,7 @@ def _sample(ts: float, cpu: float, mem: float = 40.0, disk_read: int = 100) -> S
     )
 
 
+@pytest.mark.behavioural
 def test_rollup_aggregates_old_rows_into_buckets(storage_engine: Engine):
     # All within the same 3600s bucket starting at 0.
     insert_system_metric_samples_batch(
@@ -54,6 +56,7 @@ def test_rollup_aggregates_old_rows_into_buckets(storage_engine: Engine):
     assert remaining == []
 
 
+@pytest.mark.behavioural
 def test_rollup_splits_across_bucket_boundaries(storage_engine: Engine):
     insert_system_metric_samples_batch(
         storage_engine,
@@ -70,6 +73,7 @@ def test_rollup_splits_across_bucket_boundaries(storage_engine: Engine):
     assert buckets[1].sample_count == 1
 
 
+@pytest.mark.behavioural
 def test_rollup_leaves_recent_rows_untouched(storage_engine: Engine):
     insert_system_metric_samples_batch(
         storage_engine, [_sample(0.0, cpu=10.0), _sample(9000.0, cpu=99.0)]
@@ -84,6 +88,7 @@ def test_rollup_leaves_recent_rows_untouched(storage_engine: Engine):
     assert remaining[0].timestamp == 9000.0
 
 
+@pytest.mark.plumbing
 def test_rollup_with_no_old_rows_is_a_no_op(storage_engine: Engine):
     insert_system_metric_samples_batch(storage_engine, [_sample(9000.0, cpu=10.0)])
 
@@ -94,6 +99,7 @@ def test_rollup_with_no_old_rows_is_a_no_op(storage_engine: Engine):
     assert len(get_system_metrics_range(storage_engine)) == 1
 
 
+@pytest.mark.behavioural
 def test_prune_process_level_data_removes_only_old_rows(storage_engine: Engine):
     insert_process_metric_sample(
         storage_engine, ProcessMetricSample(timestamp=0.0, pid=1, name="old", cpu_percent=5.0)
@@ -119,6 +125,7 @@ def test_prune_process_level_data_removes_only_old_rows(storage_engine: Engine):
     assert [r.pid for r in remaining_events] == [2]
 
 
+@pytest.mark.behavioural
 def test_apply_retention_policy_end_to_end(storage_engine: Engine):
     now = 100_000.0
     old_ts = now - (80 * 3600)  # 80 hours old
@@ -149,6 +156,7 @@ def test_apply_retention_policy_end_to_end(storage_engine: Engine):
     assert len(rollup_buckets) == 1
 
 
+@pytest.mark.behavioural
 def test_process_retention_is_independent_of_system_retention(storage_engine: Engine):
     """A row too old for the (short) process window but well within the
     (long) system window: system metrics at that timestamp survive while
@@ -180,6 +188,7 @@ def test_process_retention_is_independent_of_system_retention(storage_engine: En
     assert get_process_metric_aggregates_range(storage_engine) == []
 
 
+@pytest.mark.behavioural
 def test_rollup_result_is_idempotent_on_reduced_source_data(storage_engine: Engine):
     """Re-running rollup after rows are already removed does nothing (no duplicate buckets)."""
     insert_system_metric_samples_batch(storage_engine, [_sample(0.0, cpu=10.0)])

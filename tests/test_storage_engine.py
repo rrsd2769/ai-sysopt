@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from sqlalchemy import text
 
 from aiperfopt.storage import build_sqlite_url, check_connectivity, create_storage_engine
 from aiperfopt.storage.engine import engine_connection
+
+pytestmark = pytest.mark.plumbing
 
 
 def test_build_sqlite_url_creates_parent_directory(tmp_path: Path):

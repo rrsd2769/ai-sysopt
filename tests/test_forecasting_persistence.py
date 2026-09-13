@@ -24,6 +24,7 @@ def _trained_model(min_rows: int = 10) -> MetricForecaster:
     return model
 
 
+@pytest.mark.plumbing
 def test_save_creates_expected_files(tmp_path: Path):
     model = _trained_model()
     target_dir = save_forecaster(model, tmp_path)
@@ -31,12 +32,14 @@ def test_save_creates_expected_files(tmp_path: Path):
     assert (target_dir / "metadata.json").exists()
 
 
+@pytest.mark.plumbing
 def test_artifact_exists_true_after_save_false_before(tmp_path: Path):
     assert artifact_exists(tmp_path, "cpu_percent", "short", "test-v1") is False
     save_forecaster(_trained_model(), tmp_path)
     assert artifact_exists(tmp_path, "cpu_percent", "short", "test-v1") is True
 
 
+@pytest.mark.behavioural
 def test_load_round_trip_predicts_identically(tmp_path: Path):
     model = _trained_model()
     save_forecaster(model, tmp_path)
@@ -51,17 +54,20 @@ def test_load_round_trip_predicts_identically(tmp_path: Path):
     assert loaded.feature_columns == model.feature_columns
 
 
+@pytest.mark.plumbing
 def test_save_untrained_model_raises(tmp_path: Path):
     model = MetricForecaster("cpu_percent", "short", 45, "test-v1")
     with pytest.raises(ForecastingError):
         save_forecaster(model, tmp_path)
 
 
+@pytest.mark.plumbing
 def test_load_missing_artifact_raises(tmp_path: Path):
     with pytest.raises(ForecastingError):
         load_forecaster(tmp_path, "cpu_percent", "short", "does_not_exist")
 
 
+@pytest.mark.plumbing
 def test_load_v1_feature_set_artifact_against_v2_raises(tmp_path: Path):
     """A forecaster whose metadata.json predates FEATURE_SET_VERSION="v2"
     (Phase 4's process columns) must be rejected -- loading it silently
@@ -81,6 +87,7 @@ def test_load_v1_feature_set_artifact_against_v2_raises(tmp_path: Path):
         load_forecaster(tmp_path, "cpu_percent", "short", "test-v1")
 
 
+@pytest.mark.plumbing
 def test_different_horizons_and_metrics_do_not_collide(tmp_path: Path):
     short_model = _trained_model()
     short_model.horizon_label = "short"

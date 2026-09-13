@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import pytest
+
 from aiperfopt.frontend.widgets.predicted_vs_actual import PredictedVsActualChart
 
 
+@pytest.mark.plumbing
 def test_constructs_with_metric_name(qtbot):
     chart = PredictedVsActualChart("cpu_percent")
     qtbot.addWidget(chart)
     assert chart.metric_name == "cpu_percent"
 
 
+@pytest.mark.behavioural
 def test_update_points_populates_both_series(qtbot):
     chart = PredictedVsActualChart("cpu_percent")
     qtbot.addWidget(chart)
@@ -23,6 +27,7 @@ def test_update_points_populates_both_series(qtbot):
     assert chart._actual_series.count() == 2
 
 
+@pytest.mark.plumbing
 def test_update_points_with_empty_list_clears_series(qtbot):
     chart = PredictedVsActualChart("cpu_percent")
     qtbot.addWidget(chart)
@@ -33,6 +38,7 @@ def test_update_points_with_empty_list_clears_series(qtbot):
     assert chart._actual_series.count() == 0
 
 
+@pytest.mark.plumbing
 def test_set_metric_name_updates_title(qtbot):
     chart = PredictedVsActualChart()
     qtbot.addWidget(chart)
