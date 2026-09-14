@@ -69,3 +69,37 @@ def test_confidence_band_widens_when_confidence_is_none(qtbot):
     cpu_half_width = chart._band_upper["cpu_percent"].at(1).y() - 55.0
     mem_half_width = chart._band_upper["mem_percent"].at(1).y() - 61.0
     assert mem_half_width > cpu_half_width
+
+
+def test_y_axis_zooms_to_a_narrow_band_instead_of_staying_fixed_at_full_range(qtbot):
+    """A metric sitting in a tight band (e.g. memory idling around 60%) used to
+    render as a visually flat line on a fixed 0-100 axis. The axis should
+    zoom to the data instead, so real variation stays visible regardless of
+    the absolute level it's happening at."""
+    chart = LiveTrendChart()
+    qtbot.addWidget(chart)
+
+    narrow_state = {
+        "timestamp": 1000.0,
+        "latest_metrics": {"cpu_percent": 61.0, "mem_percent": 62.0},
+        "forecasts": None,
+    }
+    chart.update_state(narrow_state)
+    chart.update_state(dict(narrow_state, timestamp=1002.0, latest_metrics={"cpu_percent": 63.0, "mem_percent": 64.0}))
+
+    lo, hi = chart._axis_y.min(), chart._axis_y.max()
+    assert hi - lo < 100.0
+    assert lo < 61.0
+    assert hi > 64.0
+
+
+def test_y_axis_has_a_floor_span_when_the_machine_is_genuinely_idle(qtbot):
+    """A completely flat metric shouldn't zoom the axis down to pixel noise."""
+    chart = LiveTrendChart()
+    qtbot.addWidget(chart)
+
+    flat_state = {"timestamp": 1000.0, "latest_metrics": {"cpu_percent": 5.0, "mem_percent": 5.0}, "forecasts": None}
+    chart.update_state(flat_state)
+    chart.update_state(dict(flat_state, timestamp=1002.0))
+
+    assert chart._axis_y.max() - chart._axis_y.min() >= 10.0

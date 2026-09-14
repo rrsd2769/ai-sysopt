@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -32,6 +33,18 @@ from aiperfopt.frontend.formatting import format_confidence, format_percent, for
 from aiperfopt.frontend.workers import run_in_background
 
 logger = get_logger(__name__)
+
+# The backend's system-metrics summary includes cumulative counters
+# (disk_read_bytes, disk_write_bytes, net_bytes_sent/recv) and secondary
+# figures (load_avg_1, thread_count_total) alongside the three percentage
+# metrics everything else in this app (the live chart, contention
+# thresholds, the dashboard tiles) is built around. Averaging/min/maxing
+# a monotonically-increasing byte counter over a day produces large,
+# unitless-looking numbers that don't mean anything on their own -- not
+# useful "highlighted" information, just noise. Restricting this table to
+# the three metrics with a real, self-explanatory unit keeps it readable;
+# the raw data is still available via the API for anyone who needs it.
+_HIGHLIGHTED_METRICS = ("cpu_percent", "mem_percent", "swap_percent")
 
 
 class ReportingTab(QWidget):
@@ -58,7 +71,7 @@ class ReportingTab(QWidget):
         content = QWidget()
         content_layout = QVBoxLayout(content)
 
-        self._system_metrics_tree = _section("System metrics", ["Metric", "Avg", "Min", "Max", "Samples"], content_layout)
+        self._system_metrics_tree = _section("System metrics", ["Metric", "Avg", "Min", "Max"], content_layout)
         self._prediction_accuracy_tree = _section(
             "Prediction accuracy", ["Metric", "Horizon", "MAE", "RMSE", "Directional accuracy", "Matched / total"],
             content_layout,
@@ -103,21 +116,27 @@ class ReportingTab(QWidget):
 
     def _on_report_ready(self, report: dict[str, Any]) -> None:
         self._refresh_button.setEnabled(True)
+        highlighted = [m for m in report["system_metrics"] if m["metric_name"] in _HIGHLIGHTED_METRICS]
+        reading_count = max((m["sample_count"] for m in highlighted), default=0)
         self._status_label.setText(
             f"Report window: {_fmt(report['start'])} -- {_fmt(report['end'])}"
+            f"  ({reading_count:,} readings)"
         )
 
         self._system_metrics_tree.clear()
-        for m in report["system_metrics"]:
-            QTreeWidgetItem(
+        bold = QFont()
+        bold.setBold(True)
+        for m in highlighted:
+            item = QTreeWidgetItem(
                 self._system_metrics_tree,
                 [
-                    m["metric_name"], format_percent(m["avg"]) if m["avg"] is not None else "--",
-                    "--" if m["minimum"] is None else f"{m['minimum']:.2f}",
-                    "--" if m["maximum"] is None else f"{m['maximum']:.2f}",
-                    str(m["sample_count"]),
+                    m["metric_name"],
+                    format_percent(m["avg"]) if m["avg"] is not None else "--",
+                    format_percent(m["minimum"]) if m["minimum"] is not None else "--",
+                    format_percent(m["maximum"]) if m["maximum"] is not None else "--",
                 ],
             )
+            item.setFont(1, bold)  # "Avg" is the headline figure; Min/Max are supporting context
 
         self._prediction_accuracy_tree.clear()
         for p in report["prediction_accuracy"]:

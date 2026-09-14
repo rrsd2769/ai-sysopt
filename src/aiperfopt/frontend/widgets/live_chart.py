@@ -36,6 +36,17 @@ _MAX_POINTS = 300
 # heuristic rather than a statistical interval).
 _MAX_BAND_HALF_WIDTH = 15.0
 
+# A fixed 0-100 y-axis makes real variation invisible whenever a metric
+# spends most of its time in a narrow band (e.g. memory sitting at
+# 60-70%, or CPU idling under 10% with only occasional spikes) -- both
+# lines end up compressed into a thin, visually "flat" strip even though
+# the underlying data is moving. Auto-scaling to the currently-visible
+# range fixes that, at the cost of the axis itself changing over time;
+# a minimum span keeps it from over-zooming into pure sensor noise when
+# the machine is genuinely idle and flat.
+_MIN_Y_SPAN = 10.0
+_Y_PADDING_FRACTION = 0.15
+
 _METRIC_LABELS: dict[str, str] = {"cpu_percent": "CPU", "mem_percent": "Memory"}
 _METRIC_COLORS: dict[str, QColor] = {"cpu_percent": QColor("#1976d2"), "mem_percent": QColor("#6a1b9a")}
 
@@ -56,6 +67,12 @@ class LiveTrendChart(QWidget):
         self._actual_history: dict[str, deque[tuple[int, float]]] = {
             metric: deque(maxlen=_MAX_POINTS) for metric in _METRIC_LABELS
         }
+        # The current tick's forecast/band extent per metric, so the y-axis
+        # rescale below can include "where the dashed line and its band
+        # currently reach" -- not just observed history -- without the
+        # axis clipping the forecast off-screen the moment it exceeds the
+        # actual data's own range.
+        self._latest_forecast_range: dict[str, tuple[float, float] | None] = dict.fromkeys(_METRIC_LABELS)
 
         self._chart = QChart()
         self._chart.setTitle("Live trend: actual vs. forecast")
@@ -103,7 +120,7 @@ class LiveTrendChart(QWidget):
 
         self._axis_y = QValueAxis()
         self._axis_y.setTitleText("Percent")
-        self._axis_y.setRange(0.0, 100.0)
+        self._axis_y.setRange(0.0, _MIN_Y_SPAN)
         self._chart.addAxis(self._axis_y, Qt.AlignmentFlag.AlignLeft)
 
         for series in all_series:
@@ -136,6 +153,7 @@ class LiveTrendChart(QWidget):
                 max_ms = max(max_ms, int(forecast["target_timestamp"] * 1000))
 
         self._rescale_x_axis(max_ms)
+        self._rescale_y_axis()
 
     def _redraw_actual(self, metric_name: str) -> None:
         series = self._actual_series[metric_name]
@@ -154,6 +172,7 @@ class LiveTrendChart(QWidget):
         lower.clear()
 
         if forecast is None or current_value is None:
+            self._latest_forecast_range[metric_name] = None
             return
 
         target_ms = int(forecast["target_timestamp"] * 1000)
@@ -169,10 +188,40 @@ class LiveTrendChart(QWidget):
         # statistical interval.
         confidence = forecast.get("confidence")
         half_width = (1.0 - confidence if confidence is not None else 0.5) * _MAX_BAND_HALF_WIDTH
+        band_upper = min(100.0, predicted + half_width)
+        band_lower = max(0.0, predicted - half_width)
         upper.append(now_ms, float(current_value))
-        upper.append(target_ms, min(100.0, predicted + half_width))
+        upper.append(target_ms, band_upper)
         lower.append(now_ms, float(current_value))
-        lower.append(target_ms, max(0.0, predicted - half_width))
+        lower.append(target_ms, band_lower)
+        self._latest_forecast_range[metric_name] = (band_lower, band_upper)
+
+    def _rescale_y_axis(self) -> None:
+        """Zoom the shared y-axis to what's actually on screen right now.
+
+        A fixed 0-100 range is honest but makes a metric that spends most
+        of its time in a narrow band (memory idling at 60-70%, CPU mostly
+        under 10%) look like a flat line regardless of real movement.
+        Rescaling to the current window's actual+forecast extent (with a
+        floor so a genuinely idle machine doesn't zoom into pixel noise)
+        keeps the same variation visible whatever level it's happening at.
+        """
+        values: list[float] = [v for history in self._actual_history.values() for _, v in history]
+        for bounds in self._latest_forecast_range.values():
+            if bounds is not None:
+                values.extend(bounds)
+        if not values:
+            return
+
+        lo, hi = min(values), max(values)
+        span = hi - lo
+        if span < _MIN_Y_SPAN:
+            pad = (_MIN_Y_SPAN - span) / 2.0
+            lo, hi = lo - pad, hi + pad
+        else:
+            padding = span * _Y_PADDING_FRACTION
+            lo, hi = lo - padding, hi + padding
+        self._axis_y.setRange(max(0.0, lo), min(100.0, hi))
 
     def _rescale_x_axis(self, max_ms: int) -> None:
         all_ts = [ts for history in self._actual_history.values() for ts, _ in history]

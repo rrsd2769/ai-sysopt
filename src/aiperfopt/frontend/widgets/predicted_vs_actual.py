@@ -28,12 +28,13 @@ class PredictedVsActualChart(QWidget):
     rather than plotted as zero.
     """
 
-    def __init__(self, metric_name: str = "", parent: QWidget | None = None) -> None:
+    def __init__(self, metric_name: str = "", horizon_label: str = "", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.metric_name = metric_name
+        self.horizon_label = horizon_label
 
         self._chart = QChart()
-        self._chart.setTitle(f"Predicted vs. actual: {metric_name}" if metric_name else "Predicted vs. actual")
+        self._chart.setTitle(self._title())
         self._chart.legend().setVisible(True)
 
         self._predicted_series = QLineSeries()
@@ -62,9 +63,17 @@ class PredictedVsActualChart(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(view)
 
-    def set_metric_name(self, metric_name: str) -> None:
+    def set_metric_name(self, metric_name: str, horizon_label: str = "") -> None:
         self.metric_name = metric_name
-        self._chart.setTitle(f"Predicted vs. actual: {metric_name}")
+        self.horizon_label = horizon_label
+        self._chart.setTitle(self._title())
+
+    def _title(self) -> str:
+        if not self.metric_name:
+            return "Predicted vs. actual"
+        if self.horizon_label:
+            return f"Predicted vs. actual: {self.metric_name} ({self.horizon_label}-horizon)"
+        return f"Predicted vs. actual: {self.metric_name}"
 
     def update_points(self, points: list[dict[str, Any]]) -> None:
         self._predicted_series.clear()
