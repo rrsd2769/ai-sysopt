@@ -65,10 +65,36 @@ running continuously since Phase 2 and keeps accumulating; re-running
 `aiperfopt evaluate --report` after more real, varied usage (a build, a
 video call, several heavy applications opening) has occurred should start
 producing positive contention labels and a real ablation delta. Until
-then, the **deployed** model (`phase7-real-deploy`, currently serving
-`/live/state` per `aiperfopt doctor`) and the **replay of a recorded real
-pressure event** (Phase 8; see `docs/phase10-demo-script.md`) are the
-actual evidence for "the model works," not this particular ablation run.
+then, the **deployed** model (`phase10-real-contention-v3` as of
+2026-09-13, see below — previously `phase7-real-deploy`) and the
+**replay of a recorded real pressure event** (Phase 8; see
+`docs/phase10-demo-script.md`) are the actual evidence for "the model
+works," not this particular ablation run.
+
+**Update, 2026-09-13, later the same day: a real contention classifier
+exists and is deployed, but its accuracy is still unverified.** The
+background collector recorded a genuine pressure event (`swap_percent`
+up to 91.8%, `cpu_percent` up to 78.7%, both past
+`ContentionLabelingConfig`'s thresholds) between 12:13:48 and 12:23:51
+UTC. `aiperfopt train --source real` still reported "Combined contention
+training data has only one class" immediately afterward — not because
+the event didn't count, but because `build_real_usage_training_data`
+always reserves the most recent 20% of chronological rows as holdout
+(ADL-10), and the spike was still inside that trailing slice. After
+~4 hours of further collection pushed it into a training fold,
+`aiperfopt train --source real --version phase10-real-contention-v3
+--deploy` produced and deployed a real classifier —
+`contention_artifact_exists` is `True` for the active version for the
+first time on real data, confirmed via `aiperfopt doctor`. Its reported
+F1 is **0.0**, but this is the flip side of the same mechanic, not a bad
+result: `precision=0.0, recall=0.0, f1=0.0, pr_auc=nan,
+base_rate=0.00008` — the same aging-out that let the spike train the
+classifier also moved it out of the *holdout* slice used to score it, so
+there's nothing positive left in that holdout to grade against. The
+contention strip should now have data to plot during a live demo; whether
+the classifier is actually any good is a separate, still-open question
+that needs a second independent real pressure event landing in a future
+holdout window to answer honestly.
 
 ## Other known, deliberate boundaries
 
