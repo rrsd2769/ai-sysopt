@@ -20,12 +20,12 @@ execution only.
 | 7 | Recommendation Engine | Category -> curated actions catalog and lookup | `src/aiperfopt/recommendation/` | 14 | 7 | 7 |
 | 8 | Model Retraining | Real-usage retraining, candidate-vs-active comparison, confirm/rollback deployment | `src/aiperfopt/retraining/` | 28 | 18 | 10 |
 | 9 | API Layer | FastAPI app, live-inference loop, WebSocket fan-out, REST history/retraining/reporting routers | `src/aiperfopt/api/` | 50 | 13 | 37 |
-| 10 | Frontend | PySide6 desktop UI: dashboard, live chart/contention strip, Predicted vs. Actual, Reporting, Retraining panels | `src/aiperfopt/frontend/` | 63 | 29 | 34 |
+| 10 | Frontend | PySide6 desktop UI: dashboard, live chart/contention strip, Predicted vs. Actual, Reporting, Retraining panels | `src/aiperfopt/frontend/` | 67 | 31 | 36 |
 | 11 | Reporting / Analytics | Predicted-vs-actual join, period/window report assembly (accuracy, contention, diagnosis counts) | `src/aiperfopt/reporting/` | 26 | 23 | 3 |
 
-**Eleven-module total: 456 tests** (273 behavioural, 183 plumbing).
+**Eleven-module total: 460 tests** (275 behavioural, 185 plumbing).
 
-**Full suite: 555 tests.** The difference (99) is cross-cutting infrastructure not owned by a single module -- CLI, layered config, structured logging, readiness, replay, the synthetic scenario generator, the evaluation/ablation harness, overhead budget, end-to-end pipeline integration, and packaged-resources checks -- each already exercised directly by its own test file under `tests/`.
+**Full suite: 559 tests.** The difference (99) is cross-cutting infrastructure not owned by a single module -- CLI, layered config, structured logging, readiness, replay, the synthetic scenario generator, the evaluation/ablation harness, overhead budget, end-to-end pipeline integration, and packaged-resources checks -- each already exercised directly by its own test file under `tests/`.
 
 Any module whose Behavioural column is 0 has no test asserting a
 *correct answer* for that subsystem and should be treated as
