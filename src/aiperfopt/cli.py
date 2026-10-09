@@ -296,30 +296,20 @@ def _cmd_train(args: argparse.Namespace) -> int:
     from aiperfopt.contention.config import ContentionLabelingConfig
     from aiperfopt.features.config import FeatureEngineeringConfig
     from aiperfopt.retraining.deployment import confirm_deployment
-    from aiperfopt.retraining.pipeline import (
-        run_retraining_on_real_usage_data,
-        run_retraining_on_synthetic_data,
-    )
+    from aiperfopt.retraining.pipeline import run_retraining_on_real_usage_data
 
     ctx = _bootstrap(args)
     feature_config = FeatureEngineeringConfig()
     labeling_config = ContentionLabelingConfig()
     targets = args.metrics
 
-    print(f"Training model version {args.version!r} from {args.source} data ...")
+    print(f"Training model version {args.version!r} from recorded usage data ...")
     try:
-        if args.source == "real":
-            candidate = run_retraining_on_real_usage_data(
-                ctx.storage_engine, feature_config, ctx.settings.forecasting, ctx.settings.contention,
-                labeling_config, ctx.settings.retraining, new_model_version=args.version,
-                target_metrics=targets,
-            )
-        else:
-            candidate = run_retraining_on_synthetic_data(
-                ctx.storage_engine, feature_config, ctx.settings.forecasting, ctx.settings.contention,
-                labeling_config, ctx.settings.retraining, new_model_version=args.version,
-                target_metrics=targets,
-            )
+        candidate = run_retraining_on_real_usage_data(
+            ctx.storage_engine, feature_config, ctx.settings.forecasting, ctx.settings.contention,
+            labeling_config, ctx.settings.retraining, new_model_version=args.version,
+            target_metrics=targets,
+        )
     except RetrainingError as exc:
         print(f"Training failed: {exc}")
         return 1
@@ -368,10 +358,8 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
     against real accumulated usage data, optionally writing the Review 2
     evidence pack to disk.
 
-    Deliberately real-data-only, not synthetic -- synthetic scenarios have
-    no process data source at all, so a synthetic-data ablation would
-    compare a config against itself (see
-    :mod:`aiperfopt.evaluation.ablation`'s module docstring).
+    Uses recorded data only, since the ablation needs real process data
+    (see :mod:`aiperfopt.evaluation.ablation`'s module docstring).
     """
     from aiperfopt.common.exceptions import RetrainingError
     from aiperfopt.contention.config import ContentionLabelingConfig
@@ -555,7 +543,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_replay.set_defaults(func=_cmd_replay, default_log_level="WARNING")
 
     p_train = sub.add_parser("train", help="Train a candidate model, optionally deploying it.")
-    p_train.add_argument("--source", choices=("synthetic", "real"), default="synthetic")
     p_train.add_argument("--version", default="v1", help="Model version label to create.")
     p_train.add_argument(
         "--metrics", nargs="*", default=["cpu_percent", "mem_percent"],

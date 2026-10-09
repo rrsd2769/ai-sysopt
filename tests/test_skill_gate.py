@@ -20,7 +20,9 @@ from aiperfopt.contention.training_pipeline import ContentionTrainingSummary
 from aiperfopt.features import FeatureEngineeringConfig
 from aiperfopt.forecasting.training_pipeline import MetricHorizonOutcome, TrainingRunSummary
 from aiperfopt.retraining.comparison import evaluate_skill_gate
-from aiperfopt.retraining.pipeline import run_retraining_on_synthetic_data
+from aiperfopt.retraining.pipeline import run_retraining_on_real_usage_data
+from aiperfopt.storage import insert_system_metric_samples_batch
+from tests.factories import make_training_data
 
 pytestmark = pytest.mark.behavioural
 
@@ -164,18 +166,22 @@ def test_gate_ignores_a_missing_contention_summary_without_failing():
 # --- Integration: real, fixed-seed training -------------------------------
 
 
-def test_skill_gate_passes_on_a_fixed_seed_synthetic_training_run(storage_engine: Engine, tmp_path: Path):
-    """The literal automated success criterion: a real, deterministic
-    (synthetic-scenario-generator-seeded) training run's candidate clears
-    the gate. Synthetic scenarios have clean, learnable dynamics (a real
-    cpu_stress ramp, real threshold crossings), so both the forecaster and
-    the contention classifier should comfortably beat their baselines."""
+def _seed_usage_history(engine: Engine) -> None:
+    scenarios, holdout = make_training_data(n_train=400, n_holdout=100)
+    insert_system_metric_samples_batch(engine, [*scenarios["train"], *holdout])
+
+
+def test_skill_gate_passes_on_a_fixed_seed_training_run(storage_engine: Engine, tmp_path: Path):
+    """A real, deterministic (fixed-seed) training run's candidate clears
+    the gate. The data has clean, learnable dynamics (periodic threshold
+    crossings), so both the forecaster and the contention classifier
+    should comfortably beat their baselines."""
     fconfig, fsettings, csettings, labeling_config, rsettings = _fast_settings(tmp_path)
 
-    candidate = run_retraining_on_synthetic_data(
+    _seed_usage_history(storage_engine)
+    candidate = run_retraining_on_real_usage_data(
         storage_engine, fconfig, fsettings, csettings, labeling_config, rsettings,
         new_model_version="gate-fixed-seed", target_metrics=["cpu_percent"],
-        scenario_duration_seconds=900.0, interval_seconds=2.0,
     )
 
     assert candidate.contention_summary is not None
@@ -198,10 +204,10 @@ def test_skill_gate_fails_a_classifier_no_better_than_chance(storage_engine: Eng
     """
     fconfig, fsettings, csettings, labeling_config, rsettings = _fast_settings(tmp_path)
 
-    candidate = run_retraining_on_synthetic_data(
+    _seed_usage_history(storage_engine)
+    candidate = run_retraining_on_real_usage_data(
         storage_engine, fconfig, fsettings, csettings, labeling_config, rsettings,
         new_model_version="gate-crippled", target_metrics=["cpu_percent"],
-        scenario_duration_seconds=900.0, interval_seconds=2.0,
     )
     summary = candidate.contention_summary
     assert summary is not None

@@ -28,7 +28,7 @@ def test_run_retraining_real_usage_requires_data(tmp_path: Path):
 def test_run_retraining_real_usage_success(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         assert r.status_code == 200, r.text
         body = r.json()
@@ -38,21 +38,10 @@ def test_run_retraining_real_usage_success(tmp_path: Path):
 
 
 @pytest.mark.plumbing
-def test_run_retraining_synthetic_success(tmp_path: Path):
-    with build_test_client(tmp_path, with_history=False) as client:
-        r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "synthetic", "target_metrics": ["cpu_percent"],
-            "scenario_duration_seconds": 150, "interval_seconds": 2.0,
-        })
-        assert r.status_code == 200, r.text
-        assert r.json()["data_source"] == "synthetic"
-
-
-@pytest.mark.plumbing
 def test_confirm_deployment_activates_version(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate = r.json()
 
@@ -78,7 +67,7 @@ def test_confirm_deployment_on_a_failing_gate_returns_422_with_reasons(tmp_path:
     candidate would otherwise pass."""
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate = r.json()
         failing_gate = {
@@ -103,7 +92,7 @@ def test_confirm_deployment_on_a_failing_gate_returns_422_with_reasons(tmp_path:
 def test_confirm_deployment_rejected_does_not_activate(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate = r.json()
 
@@ -123,7 +112,7 @@ def test_confirm_deployment_rejected_does_not_activate(tmp_path: Path):
 def test_rollback_with_no_prior_version_returns_409(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate = r.json()
         client.post("/retraining/confirm", json={
@@ -140,7 +129,7 @@ def test_rollback_with_no_prior_version_returns_409(tmp_path: Path):
 def test_rollback_restores_previous_version(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate1 = r.json()
         client.post("/retraining/confirm", json={
@@ -150,7 +139,7 @@ def test_rollback_restores_previous_version(tmp_path: Path):
         })
 
         r = client.post("/retraining/run", json={
-            "new_model_version": "v2", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v2", "target_metrics": ["cpu_percent"],
         })
         candidate2 = r.json()
         client.post("/retraining/confirm", json={

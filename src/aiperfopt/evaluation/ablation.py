@@ -5,14 +5,9 @@ indicators actually help predict contention, or not?
 Runs the *same* real-usage data and chronological split through the
 training pipelines twice -- once with system-only features ("v1", what
 the model had before Phase 4's pivot), once with system+process features
-("v2", the pivot) -- and reports the delta. This is deliberately run
-against **real accumulated usage data**, not synthetic scenarios:
-synthetic scenarios have no process data source at all (Phase 4's own
-scope decision, :mod:`aiperfopt.contention.training_pipeline`'s
-docstring), so a "v2" arm fed only synthetic data would be identical to
-"v1" -- there would be nothing to ablate. Real passive data is also what
-Phase 5's imbalance-handling work (:mod:`aiperfopt.contention.evaluation`)
-is framed around.
+("v2", the pivot) -- and reports the delta. This runs against **real
+accumulated usage data**, since process data only exists for recorded
+sessions.
 
 Threads a process summary into the training pipelines via their Phase 5
 ``process_summaries``/``holdout_process_summary`` parameters -- see
@@ -154,8 +149,7 @@ def run_ablation(
     Raises :class:`aiperfopt.common.exceptions.RetrainingError` (via
     :func:`aiperfopt.retraining.real_usage_data.build_real_usage_training_data`)
     if there isn't yet enough accumulated real-usage data -- surfaced to
-    the caller rather than silently substituting synthetic data, which
-    would make the ablation vacuous (see module docstring).
+    the caller.
     """
     scenarios, holdout_samples = build_real_usage_training_data(
         engine, start=since, holdout_fraction=holdout_fraction, min_total_rows=min_total_rows,

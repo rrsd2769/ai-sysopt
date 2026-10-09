@@ -45,7 +45,7 @@ from aiperfopt.retraining.deployment import (
     get_active_model_version,
     rollback_to_last_known_good,
 )
-from aiperfopt.retraining.pipeline import run_retraining_on_real_usage_data, run_retraining_on_synthetic_data
+from aiperfopt.retraining.pipeline import run_retraining_on_real_usage_data
 
 router = APIRouter(prefix="/retraining", tags=["retraining"])
 
@@ -181,19 +181,11 @@ def run_retraining(body: RetrainRequest, ctx: Annotated[AppContext, Depends(get_
     feature_config = FeatureEngineeringConfig()
     labeling_config = ContentionLabelingConfig()
     try:
-        if body.data_source == "real_usage":
-            candidate = run_retraining_on_real_usage_data(
-                ctx.storage_engine, feature_config, ctx.settings.forecasting, ctx.settings.contention,
-                labeling_config, ctx.settings.retraining, new_model_version=body.new_model_version,
-                target_metrics=body.target_metrics, start=body.start, end=body.end,
-            )
-        else:
-            candidate = run_retraining_on_synthetic_data(
-                ctx.storage_engine, feature_config, ctx.settings.forecasting, ctx.settings.contention,
-                labeling_config, ctx.settings.retraining, new_model_version=body.new_model_version,
-                target_metrics=body.target_metrics, scenario_duration_seconds=body.scenario_duration_seconds,
-                interval_seconds=body.interval_seconds,
-            )
+        candidate = run_retraining_on_real_usage_data(
+            ctx.storage_engine, feature_config, ctx.settings.forecasting, ctx.settings.contention,
+            labeling_config, ctx.settings.retraining, new_model_version=body.new_model_version,
+            target_metrics=body.target_metrics, start=body.start, end=body.end,
+        )
     except RetrainingError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

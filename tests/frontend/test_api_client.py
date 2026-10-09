@@ -108,7 +108,7 @@ def test_retraining_round_trip(tmp_path: Path):
             assert client.get_active_model_version()["active_model_version"] is None
 
             candidate = client.run_retraining(
-                new_model_version="v1", data_source="real_usage", target_metrics=["cpu_percent"],
+                new_model_version="v1", target_metrics=["cpu_percent"],
             )
             assert candidate["model_version"] == "v1"
 

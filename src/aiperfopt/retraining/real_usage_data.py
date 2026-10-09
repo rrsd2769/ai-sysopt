@@ -1,24 +1,13 @@
 """
-Turns accumulated real-usage history (Section 10.3 Phase 2) into the same
-``scenarios`` / ``holdout_samples`` shape Forecasting and Contention's
-training pipelines already accept for synthetic data (Phase 4/5), so
-retraining against real data needs no separate dataset-construction logic
-of its own — see :mod:`aiperfopt.forecasting.training_pipeline` and
-:mod:`aiperfopt.contention.training_pipeline`'s new ``scenarios``/
-``holdout_samples`` parameters.
+Turns accumulated real-usage history into the ``scenarios`` /
+``holdout_samples`` shape the forecasting and contention training
+pipelines take (see :mod:`aiperfopt.forecasting.training_pipeline` and
+:mod:`aiperfopt.contention.training_pipeline`).
 
-Why a single chronological split, not synthetic's multi-scenario library
---------------------------------------------------------------------------
-Phase 4's synthetic bootstrap combines several *independent, deliberately
-varied* scenarios (idle, cpu_stress, ...) because walk-forward CV needs
-shape variety to generalize (see that module's docstring). Real-usage
-data has no such artificial scenario boundaries — it is one continuous
-recording of whatever the user's machine actually did. So this module
-does not try to invent scenario splits; it produces exactly one
-"scenario" (the training portion of history) plus one held-out slice,
-consistent with Section 11's requirement that the held-out check use the
-*most recent* data, never an earlier slice, to avoid future-to-past
-leakage (ADL-10) — the opposite of a random split.
+Real-usage data is one continuous recording, so this module produces
+exactly one "scenario" (the training portion of history) plus one
+held-out slice. The held-out slice is always the *most recent* data,
+never an earlier one, to avoid future-to-past leakage.
 """
 
 from __future__ import annotations
@@ -32,10 +21,7 @@ from aiperfopt.storage.records import SystemMetricSample
 
 logger = get_logger(__name__)
 
-# The scenario name real-usage training data is filed under — mirrors
-# how synthetic scenarios each get a name (Section 10.3 Phase 1), so
-# downstream code (feature computation, logging) has something
-# meaningful to attribute this data to.
+# The scenario name real-usage training data is filed under.
 REAL_USAGE_SCENARIO_NAME = "real_usage"
 
 

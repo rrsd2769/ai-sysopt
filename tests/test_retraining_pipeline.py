@@ -12,7 +12,6 @@ from aiperfopt.features import FeatureEngineeringConfig
 from aiperfopt.retraining.deployment import confirm_deployment, get_active_model_version
 from aiperfopt.retraining.pipeline import (
     run_retraining_on_real_usage_data,
-    run_retraining_on_synthetic_data,
 )
 from aiperfopt.storage import get_evaluations_by_version, insert_system_metric_samples_batch
 from aiperfopt.storage.records import SystemMetricSample
@@ -40,9 +39,7 @@ def _fast_settings(tmp_path: Path):
 def _rising_cpu_samples(n: int, start: float = 0.0, interval: float = 2.0) -> list[SystemMetricSample]:
     """A gently rising, noisy CPU trend -- enough signal for LightGBM and
     enough threshold-crossings for contention labeling to have positive
-    examples, without depending on the synthetic scenario library (which
-    is deliberately never mixed into raw_system_metrics -- see
-    aiperfopt.synthetic's module docstring).
+    examples.
     """
     samples = []
     for i in range(n):
@@ -75,23 +72,6 @@ def test_run_retraining_on_real_usage_data_produces_candidate(storage_engine: En
     rows = get_evaluations_by_version(storage_engine, "rt-v1")
     holdout_tags = {r.dataset_tag for r in rows if r.dataset_tag and r.dataset_tag.startswith("holdout_")}
     assert holdout_tags == {"holdout_real_usage"}
-
-
-@pytest.mark.behavioural
-def test_run_retraining_on_synthetic_data_produces_candidate(storage_engine: Engine, tmp_path: Path):
-    fconfig, fsettings, csettings, labeling_config, rsettings = _fast_settings(tmp_path)
-
-    candidate = run_retraining_on_synthetic_data(
-        storage_engine, fconfig, fsettings, csettings, labeling_config, rsettings,
-        new_model_version="rt-synth-v1", target_metrics=["cpu_percent"],
-        scenario_duration_seconds=150, interval_seconds=2.0,
-    )
-
-    assert candidate.data_source == "synthetic"
-    assert len(candidate.forecast_summary.outcomes) == 2
-    rows = get_evaluations_by_version(storage_engine, "rt-synth-v1")
-    holdout_tags = {r.dataset_tag for r in rows if r.dataset_tag and r.dataset_tag.startswith("holdout_")}
-    assert holdout_tags == {"holdout_cpu_stress"}  # unchanged default for the synthetic path
 
 
 @pytest.mark.behavioural

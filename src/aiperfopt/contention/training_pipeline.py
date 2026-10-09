@@ -1,17 +1,11 @@
 """
 Contention Prediction + Anomaly Detection training pipeline orchestrator.
 
-Depends on Phase 4's *already-trained* forecasters (FR-6.1: Contention
-Prediction consumes forecast outputs, not raw metrics) — callers must
-supply the winning short-horizon MetricHorizonOutcome for every target
-metric, typically the result of already having run
-aiperfopt.forecasting.train_and_evaluate_all.
-
-Reuses Forecasting's exact scenario-generation scheme
-(generate_training_scenarios / generate_holdout_scenario) so Contention
-Prediction and Anomaly Detection train against the identical synthetic
-data Forecasting did — deterministic given the same seeds, so this is a
-real guarantee, not a coincidence.
+Depends on already-trained forecasters: Contention Prediction consumes
+forecast outputs, not raw metrics. Callers must supply the winning
+short-horizon MetricHorizonOutcome for every target metric, typically the
+result of having run aiperfopt.forecasting.train_and_evaluate_all on the
+same ``scenarios`` / ``holdout_samples`` passed here.
 """
 
 from __future__ import annotations
@@ -46,11 +40,7 @@ from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.features.engine import compute_feature_matrix
 from aiperfopt.forecasting.baselines import Forecaster
 from aiperfopt.forecasting.deployment import load_deployed_forecaster
-from aiperfopt.forecasting.training_pipeline import (
-    MetricHorizonOutcome,
-    generate_holdout_scenario,
-    generate_training_scenarios,
-)
+from aiperfopt.forecasting.training_pipeline import MetricHorizonOutcome
 from aiperfopt.storage.records import EvaluationRecord, SystemMetricSample
 from aiperfopt.storage.writer import insert_evaluations_batch
 
@@ -62,8 +52,7 @@ def _interleave_scenario_chunks(datasets: list[pd.DataFrame], n_chunks: int = 4)
 
     Found necessary empirically, the same way Forecasting's multi-scenario
     combination was: block-concatenating whole scenarios (each internally
-    chronological, but with a huge synthetic time offset between them —
-    see :mod:`aiperfopt.synthetic`) means a walk-forward fold's test slice
+    chronological, but with a large time offset between them) means a walk-forward fold's test slice
     is often an entire single scenario in isolation. For the *rare-event
     binary* contention label this is far more damaging than it was for
     Forecasting's continuous MAE: a fold whose test set contains zero
@@ -141,60 +130,32 @@ def train_contention_and_anomaly_pipeline(
     labeling_config: ContentionLabelingConfig,
     forecast_outcomes: dict[str, MetricHorizonOutcome],
     model_version: str,
-    scenario_duration_seconds: float = 900.0,
-    interval_seconds: float = 2.0,
-    scenarios: dict[str, list[SystemMetricSample]] | None = None,
-    holdout_samples: list[SystemMetricSample] | None = None,
-    holdout_dataset_tag: str | None = None,
+    *,
+    scenarios: dict[str, list[SystemMetricSample]],
+    holdout_samples: list[SystemMetricSample],
+    holdout_dataset_tag: str,
     process_summaries: dict[str, pd.DataFrame] | None = None,
     holdout_process_summary: pd.DataFrame | None = None,
 ) -> ContentionTrainingSummary:
-    """Train Anomaly Detection and Contention Prediction together. The Phase 5 entrypoint.
+    """Train Anomaly Detection and Contention Prediction together.
 
     ``forecast_outcomes`` must supply one short-horizon
-    MetricHorizonOutcome per target metric — the result of an
-    already-completed Phase 4 training run for that metric's short
-    horizon. Only short-horizon forecasts are used (matching the
-    flagship demo's "within the next 30-60 seconds" framing — see
-    PROJECT_HANDOFF.md for why medium-horizon contention is deferred,
-    not required, for V1 Phase 5).
+    MetricHorizonOutcome per target metric. Only short-horizon forecasts
+    are used.
 
-    ``scenarios`` / ``holdout_samples``: optional pre-built training data
-    (the same shape ``aiperfopt.forecasting.training_pipeline`` accepts),
-    bypassing synthetic scenario generation. Model Retraining (Phase 8)
-    passes the *same* real-usage ``scenarios``/``holdout_samples`` here
-    that it passed to Forecasting's retraining call, so Contention
-    Prediction and Anomaly Detection retrain against the identical real
-    data Forecasting just did — the same determinism guarantee this
-    module's docstring already describes for the synthetic case. Must be
-    supplied together, or not at all.
-    holdout_dataset_tag:
-        Overrides the ``dataset_tag`` stored on the holdout evaluation
-        row (defaults to a synthetic-scenario-derived tag that is
-        misleading for real-usage data -- same rationale as
-        :func:`aiperfopt.forecasting.training_pipeline.train_and_evaluate_all`'s
-        identically-named parameter).
-    process_summaries / holdout_process_summary:
-        See :func:`aiperfopt.forecasting.training_pipeline.
-        train_evaluate_and_select_one`. Threaded into both the anomaly
-        detector's feature matrix and :func:`build_contention_dataset`'s
-        calls. Omitted (the default) reproduces exactly pre-Phase-5
-        behavior for every existing caller.
+    ``scenarios`` / ``holdout_samples``: training data and a later
+    held-out slice, the same shape the forecasting pipeline takes.
+    ``holdout_dataset_tag`` is stored on the holdout evaluation row.
+    ``process_summaries`` / ``holdout_process_summary``: see
+    :func:`aiperfopt.forecasting.training_pipeline.train_evaluate_and_select_one`;
+    threaded into the anomaly detector's feature matrix and
+    :func:`build_contention_dataset`.
     """
-    if (scenarios is None) != (holdout_samples is None):
-        raise ValueError("scenarios and holdout_samples must be supplied together, or not at all")
-
     deployed_forecasters = _load_deployed_forecasters(
         forecast_outcomes, forecasting_settings.models_dir, model_version
     )
     if not deployed_forecasters:
         raise ValueError("No deployed forecasters available — cannot train Contention Prediction")
-
-    if scenarios is None:
-        scenarios = generate_training_scenarios(scenario_duration_seconds, interval_seconds)
-        holdout_samples = generate_holdout_scenario(
-            scenario_duration_seconds, interval_seconds, scenario_count=len(scenarios)
-        )
 
     # --- Anomaly Detection: trained on the full engineered feature matrix
     # across all non-held-out scenarios (Section 7.2: same feature
@@ -281,7 +242,7 @@ def train_contention_and_anomaly_pipeline(
                 evaluated_at=pd.Timestamp.now(tz="UTC").timestamp(),
                 model_name="contention_classifier", model_version=model_version,
                 metric_name=None, horizon_label="short", fold_index=None,
-                dataset_tag=holdout_dataset_tag or "holdout_cpu_stress",
+                dataset_tag=holdout_dataset_tag,
                 mae=None, rmse=None, directional_accuracy=None, baseline_name=None,
                 extra=holdout_metrics,
             )

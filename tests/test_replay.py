@@ -26,6 +26,12 @@ from aiperfopt.replay.session import RecordedSession, load_session, record_sessi
 from aiperfopt.storage import create_all_tables, create_storage_engine, insert_system_metric_samples_batch
 from aiperfopt.storage.reader import get_system_metrics_range
 from aiperfopt.storage.records import ProcessMetricSample, SystemMetricSample
+from tests.factories import make_training_data
+
+
+def _training_data() -> dict:
+    scenarios, holdout = make_training_data()
+    return {"scenarios": scenarios, "holdout_samples": holdout, "holdout_dataset_tag": "holdout_test"}
 
 
 def _flat_samples(n: int, interval: float, start: float = 0.0) -> list[SystemMetricSample]:
@@ -240,7 +246,8 @@ def test_replayed_contention_event_matches_original_prediction_and_diagnosis(tmp
     insert_system_metric_samples_batch(source, _rising_cpu_samples(300, interval=2.0))
 
     forecast_summary = train_and_evaluate_all(
-        source, fconfig, fsettings, model_version="v1", target_metrics=["cpu_percent"]
+        source, fconfig, fsettings, model_version="v1", target_metrics=["cpu_percent"],
+        **_training_data(),
     )
     short_outcomes = {
         o.metric_name: o for o in forecast_summary.outcomes
@@ -248,6 +255,7 @@ def test_replayed_contention_event_matches_original_prediction_and_diagnosis(tmp
     }
     train_contention_and_anomaly_pipeline(
         source, fconfig, fsettings, csettings, labeling_config, short_outcomes, model_version="v1",
+        **_training_data(),
     )
 
     forecasters = resolve_deployed_forecasters(

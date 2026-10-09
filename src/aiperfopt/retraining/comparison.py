@@ -445,7 +445,7 @@ def evaluate_skill_gate(
             # F1 is bounded above at 1.0, and the threshold-rule baseline
             # can legitimately be very good -- even perfect -- on an
             # easy/small/separable holdout (a monotonic trend, a clean
-            # synthetic scenario): there, "beat an already-excellent
+            # flat series): there, "beat an already-excellent
             # baseline by a margin" is not a quality signal, it's a
             # mathematical impossibility. The gate's actual job (Overview:
             # "gives the Phase 5 numbers integrity -- currently nothing

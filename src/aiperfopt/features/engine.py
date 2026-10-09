@@ -160,9 +160,8 @@ def compute_feature_matrix(
     gauge/counter loop below runs, so any of its column names already
     present in ``config.gauge_metrics`` get the same lag/rolling/rate
     treatment as any other gauge, with no separate formula path. Passing
-    ``None`` (the default) computes system-metrics-only features exactly
-    as before Phase 4 — e.g. for synthetic scenarios, which have no
-    process data to align.
+    ``None`` (the default) computes system-metrics-only features system-metrics-only
+    features, e.g. when no process data was recorded.
 
     Returns a DataFrame with a ``timestamp`` column plus one column per
     engineered feature. Empty input returns an empty DataFrame with no

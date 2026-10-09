@@ -20,6 +20,12 @@ from aiperfopt.forecasting.training_pipeline import train_and_evaluate_all
 from aiperfopt.storage import insert_system_metric_samples_batch
 from aiperfopt.storage.reader import get_recent_system_metrics
 from aiperfopt.storage.records import SystemMetricSample
+from tests.factories import make_training_data
+
+
+def _training_data() -> dict:
+    scenarios, holdout = make_training_data()
+    return {"scenarios": scenarios, "holdout_samples": holdout, "holdout_dataset_tag": "holdout_test"}
 
 
 def _fast_settings(tmp_path: Path):
@@ -56,7 +62,8 @@ def test_resolve_deployed_forecasters_reconstructs_from_persisted_evaluations(
     insert_system_metric_samples_batch(storage_engine, _rising_cpu_samples(300))
 
     train_and_evaluate_all(
-        storage_engine, fconfig, fsettings, model_version="v1", target_metrics=["cpu_percent"]
+        storage_engine, fconfig, fsettings, model_version="v1", target_metrics=["cpu_percent"],
+        **_training_data(),
     )
 
     forecasters = resolve_deployed_forecasters(
@@ -75,7 +82,8 @@ def test_resolve_deployed_forecasters_skips_metric_with_no_holdout_evaluation(
     insert_system_metric_samples_batch(storage_engine, _rising_cpu_samples(300))
 
     train_and_evaluate_all(
-        storage_engine, fconfig, fsettings, model_version="v1", target_metrics=["cpu_percent"]
+        storage_engine, fconfig, fsettings, model_version="v1", target_metrics=["cpu_percent"],
+        **_training_data(),
     )
 
     # "mem_percent" was never trained under this model_version.
@@ -106,7 +114,8 @@ def test_build_live_contention_input_row_feeds_a_real_prediction(storage_engine:
     insert_system_metric_samples_batch(storage_engine, _rising_cpu_samples(300))
 
     forecast_summary = train_and_evaluate_all(
-        storage_engine, fconfig, fsettings, model_version="v1", target_metrics=["cpu_percent"]
+        storage_engine, fconfig, fsettings, model_version="v1", target_metrics=["cpu_percent"],
+        **_training_data(),
     )
     short_outcomes = {
         o.metric_name: o for o in forecast_summary.outcomes
@@ -115,6 +124,7 @@ def test_build_live_contention_input_row_feeds_a_real_prediction(storage_engine:
     train_contention_and_anomaly_pipeline(
         storage_engine, fconfig, fsettings, csettings, labeling_config,
         short_outcomes, model_version="v1",
+        **_training_data(),
     )
 
     forecasters = resolve_deployed_forecasters(

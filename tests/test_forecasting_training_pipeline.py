@@ -8,12 +8,16 @@ from sqlalchemy import Engine
 from aiperfopt.config.settings import ForecastingSettings
 from aiperfopt.features import FeatureEngineeringConfig
 from aiperfopt.forecasting.persistence import artifact_exists
-from aiperfopt.forecasting.training_pipeline import (
-    generate_holdout_scenario,
-    generate_training_scenarios,
-    train_and_evaluate_all,
-)
+from aiperfopt.forecasting.training_pipeline import train_and_evaluate_all
 from aiperfopt.storage import get_evaluations_range
+from tests.factories import make_training_data
+
+HOLDOUT_TAG = "holdout_test"
+
+
+def _data_kwargs() -> dict:
+    scenarios, holdout = make_training_data()
+    return {"scenarios": scenarios, "holdout_samples": holdout, "holdout_dataset_tag": HOLDOUT_TAG}
 
 
 def _fast_forecasting_settings(models_dir: Path) -> ForecastingSettings:
@@ -35,7 +39,7 @@ def test_full_training_pipeline_one_metric_end_to_end(storage_engine: Engine, tm
 
     summary = train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v1",
-        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+        target_metrics=["cpu_percent"], **_data_kwargs(),
     )
 
     assert len(summary.outcomes) == 2  # short + medium horizons
@@ -55,7 +59,7 @@ def test_walk_forward_evaluation_rows_persisted_to_storage(storage_engine: Engin
 
     train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v1",
-        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+        target_metrics=["cpu_percent"], **_data_kwargs(),
     )
 
     rows = get_evaluations_range(storage_engine)
@@ -76,7 +80,7 @@ def test_lightgbm_artifact_saved_only_when_selected(storage_engine: Engine, tmp_
 
     summary = train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v1",
-        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+        target_metrics=["cpu_percent"], **_data_kwargs(),
     )
 
     for outcome in summary.outcomes:
@@ -90,18 +94,13 @@ def test_lightgbm_artifact_saved_only_when_selected(storage_engine: Engine, tmp_
 
 
 @pytest.mark.behavioural
-def test_held_out_scenario_never_appears_in_walk_forward_training():
-    """The held-out scenario generator uses a different time block than
-    every training scenario — verifying this holds is what makes Section
-    11's "held out entirely from all training folds" claim checkable."""
-    scenarios = generate_training_scenarios(duration_seconds=100, interval_seconds=2.0)
-    holdout = generate_holdout_scenario(
-        duration_seconds=100, interval_seconds=2.0, scenario_count=len(scenarios)
-    )
+def test_holdout_is_strictly_later_than_training():
+    """The holdout slice is held out entirely from the training folds, which
+    is what makes the generalization check meaningful."""
+    scenarios, holdout = make_training_data()
 
-    training_timestamps = {s.timestamp for samples in scenarios.values() for s in samples}
-    holdout_timestamps = {s.timestamp for s in holdout}
-    assert training_timestamps.isdisjoint(holdout_timestamps)
+    latest_training = max(s.timestamp for samples in scenarios.values() for s in samples)
+    assert min(s.timestamp for s in holdout) > latest_training
 
 
 @pytest.mark.behavioural
@@ -117,8 +116,7 @@ def test_process_summaries_threaded_through_without_error(storage_engine: Engine
     fconfig = _fast_feature_config()
     fsettings = _fast_forecasting_settings(tmp_path / "models")
 
-    scenarios = generate_training_scenarios(duration_seconds=150, interval_seconds=2.0)
-    holdout_samples = generate_holdout_scenario(150, 2.0, scenario_count=len(scenarios))
+    scenarios, holdout_samples = make_training_data()
 
     def _fake_process_summary(samples) -> pd.DataFrame:
         return pd.DataFrame({
@@ -131,7 +129,7 @@ def test_process_summaries_threaded_through_without_error(storage_engine: Engine
 
     summary = train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v2",
-        target_metrics=["cpu_percent"], scenarios=scenarios, holdout_samples=holdout_samples,
+        target_metrics=["cpu_percent"], scenarios=scenarios, holdout_samples=holdout_samples, holdout_dataset_tag=HOLDOUT_TAG,
         process_summaries=process_summaries, holdout_process_summary=holdout_process_summary,
         compute_feature_importance=True,
     )
@@ -157,6 +155,6 @@ def test_feature_importance_absent_when_not_requested(storage_engine: Engine, tm
 
     summary = train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v1",
-        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+        target_metrics=["cpu_percent"], **_data_kwargs(),
     )
     assert all(o.feature_importance is None for o in summary.outcomes)

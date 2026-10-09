@@ -203,7 +203,7 @@ def main() -> None:
         f"**Full suite: {suite_total} tests.** The difference "
         f"({suite_total - module_sum}) is cross-cutting infrastructure not "
         "owned by a single module -- CLI, layered config, structured "
-        "logging, readiness, replay, the synthetic scenario generator, the "
+        "logging, readiness, replay, the "
         "evaluation/ablation harness, overhead budget, end-to-end pipeline "
         "integration, and packaged-resources checks -- each already "
         "exercised directly by its own test file under `tests/`.",

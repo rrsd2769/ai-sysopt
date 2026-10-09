@@ -227,10 +227,8 @@ class RetrainingSettings(BaseModel):
     # applied to candidate-vs-active rather than model-vs-baseline).
     regression_tolerance: float = Field(ge=0.0, lt=1.0)
     # Fraction of chronologically-ordered accumulated real-usage data
-    # (Section 10.3 Phase 2) reserved as a held-out generalization check,
-    # mirroring Section 11's synthetic held-out-scenario requirement but
-    # for real data — the most recent slice, never an earlier one, to
-    # avoid future-to-past leakage (Section 11, ADL-10).
+    # reserved as a held-out generalization check: the most recent slice,
+    # never an earlier one, to avoid future-to-past leakage.
     real_usage_holdout_fraction: float = Field(gt=0.0, lt=1.0)
     # Phase 6's quality gate (Section 11's precision-favoring stance,
     # extended from "don't regress vs. the active version" to "clear the

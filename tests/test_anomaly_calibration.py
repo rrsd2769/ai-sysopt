@@ -88,19 +88,3 @@ def test_calibration_fits_on_real_data_and_generalizes_to_holdout(storage_engine
     threshold = 0.7
     exceed_fraction = (holdout_scores >= threshold).mean()
     assert exceed_fraction < 0.10
-
-
-@pytest.mark.behavioural
-def test_calibration_blends_synthetic_only_after_real_floor_met(storage_engine: Engine):
-    """Synthetic rows may add capacity but can't substitute for the real floor."""
-    config = FeatureEngineeringConfig()
-    real_samples = _idle_like_samples(n=700, interval=3.0, start=0.0, seed=3)
-    insert_system_metric_samples_batch(storage_engine, real_samples)
-
-    real_matrix = build_calibration_matrix(storage_engine, config, min_real_rows=20)
-    synthetic_matrix = real_matrix.iloc[:10].copy()
-
-    combined = build_calibration_matrix(
-        storage_engine, config, min_real_rows=20, synthetic_features=synthetic_matrix
-    )
-    assert len(combined) == len(real_matrix) + len(synthetic_matrix)

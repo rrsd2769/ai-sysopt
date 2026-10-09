@@ -1,36 +1,27 @@
 """
 Forecasting training pipeline orchestrator.
 
-Ties together every other module in :mod:`aiperfopt.forecasting` into one
-callable: generate synthetic training scenarios, compute features
-per-scenario, run walk-forward evaluation against baselines, apply
-Section 10.7's contingency plan, persist evaluation results, save the
-winning artifact, and check generalization against a held-out scenario
-(Section 11).
+Ties together the rest of :mod:`aiperfopt.forecasting` into one callable:
+compute features per scenario, run walk-forward evaluation against
+baselines, persist evaluation results, save the winning artifact, and
+check generalization against a held-out slice.
 
-Why features are computed per-scenario, not on one concatenated series
---------------------------------------------------------------------------
-Each synthetic scenario is an independent simulated run — there's no real
-continuity between the end of "idle" and the start of "disk_io_burst".
-Computing lag/rolling features on a naive concatenation of all scenarios
-would let a rolling window at the start of one scenario silently include
-samples from the tail of the previous one, corrupting every feature near
-a scenario boundary. Each scenario is feature-computed independently
-(with its own timestamp range — see ``start_timestamp`` in
-:mod:`aiperfopt.forecasting.synthetic`, offset far enough apart that no
-window could ever bridge them), and only the resulting *labeled feature
-rows* are concatenated afterward for walk-forward cross-validation.
+Why features are computed per scenario, not on one concatenated series
+----------------------------------------------------------------------
+Scenarios are independent runs with no continuity between the end of one
+and the start of the next. Computing lag/rolling features on a naive
+concatenation would let a rolling window at the start of one scenario
+include samples from the tail of the previous one. Each scenario is
+feature-computed on its own, and only the resulting labeled feature rows
+are concatenated afterward for walk-forward cross-validation.
 
-Why walk-forward CV needs *multiple* scenarios, not one
-------------------------------------------------------------
-This was found empirically while building this module, not assumed:
-running walk-forward CV on a single deterministic scenario (e.g. just
-"cpu_stress") trains early folds only on that scenario's pre-ramp segment
-and tests them on the ramp/plateau it has never seen — not a fair
-evaluation of the model's ability to generalize, and it made LightGBM
-look artificially worse than every baseline. Combining several
-differently-shaped scenarios before running `TimeSeriesSplit` gives each
-fold's training data genuine variety to learn from.
+Why walk-forward CV wants more than one shape of data
+-----------------------------------------------------
+Running walk-forward CV on a single deterministic series trains early
+folds on one regime and tests them on another, which is not a fair
+evaluation and made LightGBM look worse than every baseline. Combining
+differently-shaped scenarios before running ``TimeSeriesSplit`` gives each
+fold's training data variety to learn from.
 """
 
 from __future__ import annotations
@@ -61,19 +52,10 @@ from aiperfopt.forecasting.evaluation import (
 )
 from aiperfopt.forecasting.model import MetricForecaster
 from aiperfopt.forecasting.persistence import save_forecaster
-from aiperfopt.synthetic import (
-    HELD_OUT_SCENARIO_GENERATOR,
-    HELD_OUT_SCENARIO_NAME,
-    SCENARIO_GENERATORS,
-)
 from aiperfopt.storage.records import EvaluationRecord, SystemMetricSample
 from aiperfopt.storage.writer import insert_evaluations_batch
 
 logger = get_logger(__name__)
-
-# Non-overlapping time blocks per scenario, large enough that no lag/
-# rolling window (max ~120s + tolerance) could ever bridge two scenarios.
-_SCENARIO_TIME_BLOCK_SECONDS = 1_000_000
 
 
 @dataclass
@@ -108,27 +90,6 @@ class MetricHorizonOutcome:
 class TrainingRunSummary:
     model_version: str
     outcomes: list[MetricHorizonOutcome] = field(default_factory=list)
-
-
-def generate_training_scenarios(
-    duration_seconds: float, interval_seconds: float
-) -> dict[str, list[SystemMetricSample]]:
-    scenarios = {}
-    for index, (name, generator) in enumerate(SCENARIO_GENERATORS.items()):
-        start = index * _SCENARIO_TIME_BLOCK_SECONDS
-        scenarios[name] = generator(
-            duration_seconds=duration_seconds, interval_seconds=interval_seconds, start_timestamp=start
-        )
-    return scenarios
-
-
-def generate_holdout_scenario(
-    duration_seconds: float, interval_seconds: float, scenario_count: int
-) -> list[SystemMetricSample]:
-    start = scenario_count * _SCENARIO_TIME_BLOCK_SECONDS
-    return HELD_OUT_SCENARIO_GENERATOR(
-        duration_seconds=duration_seconds, interval_seconds=interval_seconds, start_timestamp=start
-    )
 
 
 def _combined_raw_history(scenarios: dict[str, list[SystemMetricSample]], metric_name: str) -> pd.Series:
@@ -205,8 +166,8 @@ def train_evaluate_and_select_one(
     horizon_label: str,
     horizon_seconds: int,
     model_version: str,
+    holdout_dataset_tag: str,
     is_counter: bool = False,
-    holdout_dataset_tag: str | None = None,
     process_summaries: dict[str, pd.DataFrame] | None = None,
     holdout_process_summary: pd.DataFrame | None = None,
     compute_feature_importance: bool = False,
@@ -223,12 +184,10 @@ def train_evaluate_and_select_one(
     by scenario name (matching ``scenarios``) / for the holdout set
     respectively — an already-aligned process-summary frame (see
     :func:`aiperfopt.features.storage_bridge.aligned_process_summary`) to
-    merge into that scenario's feature matrix, Phase 4-style. Omitted
-    (the default) reproduces exactly pre-Phase-5 behavior: every existing
-    caller of this function is unaffected. This is the hook Phase 5's
-    ablation (:mod:`aiperfopt.evaluation.ablation`) uses to give the
-    "system + process" arm real process data — synthetic scenarios have
-    none, so this is only meaningful against real-usage data.
+    merge into that scenario's feature matrix. Omitted (the default)
+    trains on system metrics only. The ablation
+    (:mod:`aiperfopt.evaluation.ablation`) uses this to give the
+    "system + process" arm real process data.
     """
     tolerance = feature_config.tolerance_seconds
 
@@ -315,7 +274,7 @@ def train_evaluate_and_select_one(
     holdout_persistence_mae = holdout_persistence_directional = None
 
     if not holdout_dataset.empty:
-        holdout_history = _combined_raw_history({HELD_OUT_SCENARIO_NAME: holdout_samples}, metric_name)
+        holdout_history = _combined_raw_history({"holdout": holdout_samples}, metric_name)
         if is_counter:
                 holdout_history = counter_rate_per_second(holdout_history, max_gap_seconds=30.0)
         holdout_mae, holdout_rmse, holdout_directional = evaluate_forecaster_on_fold(
@@ -333,7 +292,7 @@ def train_evaluate_and_select_one(
                 evaluated_at=time.time(),
                 model_name=selected, model_version=model_version,
                 metric_name=metric_name, horizon_label=horizon_label, fold_index=None,
-                dataset_tag=holdout_dataset_tag or f"holdout_{HELD_OUT_SCENARIO_NAME}",
+                dataset_tag=holdout_dataset_tag,
                 mae=holdout_mae, rmse=holdout_rmse, directional_accuracy=holdout_directional,
                 baseline_name=None if selected == "lightgbm" else selected,
                 extra={"selected_forecaster": selected},
@@ -377,17 +336,16 @@ def train_and_evaluate_all(
     feature_config: FeatureEngineeringConfig,
     forecasting_settings: ForecastingSettings,
     model_version: str,
+    *,
+    scenarios: dict[str, list[SystemMetricSample]],
+    holdout_samples: list[SystemMetricSample],
+    holdout_dataset_tag: str,
     target_metrics: list[str] | None = None,
-    scenario_duration_seconds: float = 900.0,
-    interval_seconds: float = 2.0,
-    scenarios: dict[str, list[SystemMetricSample]] | None = None,
-    holdout_samples: list[SystemMetricSample] | None = None,
-    holdout_dataset_tag: str | None = None,
     process_summaries: dict[str, pd.DataFrame] | None = None,
     holdout_process_summary: pd.DataFrame | None = None,
     compute_feature_importance: bool = False,
 ) -> TrainingRunSummary:
-    """Train and evaluate every (metric, horizon) combination. The Phase 4 entrypoint.
+    """Train and evaluate every (metric, horizon) combination. The training entrypoint.
 
     Parameters
     ----------
@@ -396,61 +354,17 @@ def train_and_evaluate_all(
         is configured to compute features for (``feature_config.gauge_metrics
         + feature_config.counter_metrics``) — every metric we have
         engineered features for is also worth forecasting.
-    scenario_duration_seconds / interval_seconds:
-        Control synthetic training data volume. Callers with tight time
-        budgets (e.g. tests) should pass shorter durations; a real
-        training run should use the defaults or larger. Must comfortably
-        exceed the medium horizon's target seconds — a scenario shorter
-        than the horizon it's meant to train against cannot produce any
-        forward-looking label at all (every row's target would fall
-        past the end of the simulated series). This degrades gracefully
-        (an empty dataset skips that metric/horizon with a logged
-        warning rather than raising) but produces no model for that
-        combination, so it's worth choosing a duration deliberately
-        rather than discovering the constraint from a warning log.
-        Ignored when ``scenarios``/``holdout_samples`` are supplied
-        explicitly (see below).
     scenarios / holdout_samples:
-        Optional pre-built training data, bypassing synthetic scenario
-        generation entirely. This is the hook Model Retraining (Phase 8)
-        uses to train against accumulated real-usage data (Section 10.3
-        Phase 2) instead of Phase 1's synthetic bootstrap — see
-        :mod:`aiperfopt.retraining.real_usage_data`. Everything
-        downstream (per-scenario feature computation, walk-forward CV,
-        held-out generalization check, evaluation persistence, artifact
-        saving) is identical either way; only where the samples came
-        from differs. Must be supplied together, or not at all.
+        Training data and a chronologically later held-out slice, as built
+        by :mod:`aiperfopt.lifecycle.training_data`.
     holdout_dataset_tag:
-        Overrides the ``dataset_tag`` stored on holdout evaluation rows
-        (defaults to a tag derived from the synthetic held-out
-        scenario's name, which is only meaningful for the synthetic
-        path). Real-usage retraining passes an explicit tag (e.g.
-        ``"holdout_real_usage"``) so evaluation history stays accurate
-        about what the holdout data actually was.
+        Stored on holdout evaluation rows so evaluation history stays
+        accurate about what the holdout data was.
     process_summaries / holdout_process_summary:
         See :func:`train_evaluate_and_select_one`. Omitted (the default)
         reproduces exactly pre-Phase-5 behavior for every existing
         caller.
     """
-    if (scenarios is None) != (holdout_samples is None):
-        raise ValueError("scenarios and holdout_samples must be supplied together, or not at all")
-
-    if scenarios is not None:
-        assert holdout_samples is not None  # for type-checkers; guaranteed by the check above
-    else:
-        if scenario_duration_seconds <= forecasting_settings.medium_horizon_target_seconds:
-            logger.warning(
-                "scenario_duration_seconds is too short to produce medium-horizon labels",
-                extra={
-                    "scenario_duration_seconds": scenario_duration_seconds,
-                    "medium_horizon_target_seconds": forecasting_settings.medium_horizon_target_seconds,
-                },
-            )
-        scenarios = generate_training_scenarios(scenario_duration_seconds, interval_seconds)
-        holdout_samples = generate_holdout_scenario(
-            scenario_duration_seconds, interval_seconds, scenario_count=len(scenarios)
-        )
-
     metrics = target_metrics or list(feature_config.gauge_metrics) + list(feature_config.counter_metrics)
 
     horizons = [

@@ -57,7 +57,7 @@ def test_live_state_degrades_gracefully_with_no_deployed_model(tmp_path: Path):
 def test_live_loop_produces_real_prediction_after_deployment(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True, auto_start=False) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate = r.json()
         client.post("/retraining/confirm", json={
@@ -81,7 +81,7 @@ def test_live_loop_produces_real_prediction_after_deployment(tmp_path: Path):
 def test_websocket_receives_broadcast_state(tmp_path: Path):
     with build_test_client(tmp_path, with_history=True, auto_start=False) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate = r.json()
         client.post("/retraining/confirm", json={
@@ -115,7 +115,7 @@ def test_live_tick_persists_one_forecast_row_per_deployed_metric(tmp_path: Path)
     ForecastPredictionRecord, not just compute one and discard it."""
     with build_test_client(tmp_path, with_history=True, auto_start=False) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate = r.json()
         client.post("/retraining/confirm", json={
@@ -149,7 +149,7 @@ def test_persisted_forecasts_feed_predicted_vs_actual_and_summary(tmp_path: Path
     /reporting/summary's prediction_accuracy is populated."""
     with build_test_client(tmp_path, with_history=True, auto_start=False) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate = r.json()
         client.post("/retraining/confirm", json={
@@ -211,7 +211,7 @@ def test_live_tick_persists_forecasts_when_no_contention_classifier_trained(tmp_
     app = create_app(ctx, auto_start=False)
     with TestClient(app) as client:
         r = client.post("/retraining/run", json={
-            "new_model_version": "v1", "data_source": "real_usage", "target_metrics": ["cpu_percent"],
+            "new_model_version": "v1", "target_metrics": ["cpu_percent"],
         })
         candidate = r.json()
         client.post("/retraining/confirm", json={

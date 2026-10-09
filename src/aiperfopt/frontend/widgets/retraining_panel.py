@@ -14,7 +14,6 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtWidgets import (
-    QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -56,10 +55,6 @@ class RetrainingPanel(QWidget):
         self._new_version_edit = QLineEdit()
         self._new_version_edit.setPlaceholderText("e.g. v2")
         run_layout.addWidget(self._new_version_edit)
-        run_layout.addWidget(QLabel("Data source:"))
-        self._data_source_combo = QComboBox()
-        self._data_source_combo.addItems(["real_usage", "synthetic"])
-        run_layout.addWidget(self._data_source_combo)
         run_layout.addWidget(QLabel("Metrics (blank = all):"))
         self._target_metrics_edit = QLineEdit()
         self._target_metrics_edit.setPlaceholderText("cpu_percent, mem_percent")
@@ -116,7 +111,6 @@ class RetrainingPanel(QWidget):
             self._status_label.setText("Enter a new model version name first.")
             return
 
-        data_source = self._data_source_combo.currentText()
         target_metrics_text = self._target_metrics_edit.text().strip()
         target_metrics = (
             [m.strip() for m in target_metrics_text.split(",") if m.strip()]
@@ -127,7 +121,7 @@ class RetrainingPanel(QWidget):
 
         def _call():
             return self._api_client.run_retraining(
-                new_model_version=new_version, data_source=data_source, target_metrics=target_metrics
+                new_model_version=new_version, target_metrics=target_metrics
             )
 
         run_in_background(_call, on_success=self._on_candidate_ready, on_error=self._on_error)

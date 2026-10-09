@@ -205,12 +205,9 @@ class ApiClient:
     def run_retraining(
         self,
         new_model_version: str,
-        data_source: str = "real_usage",
         target_metrics: list[str] | None = None,
         start: float | None = None,
         end: float | None = None,
-        scenario_duration_seconds: float = 900.0,
-        interval_seconds: float = 2.0,
     ) -> dict:
         # PROJECT_HANDOFF.md flags /retraining/run as synchronous and
         # potentially multi-minute (Section 14's own performance notes) --
@@ -222,10 +219,8 @@ class ApiClient:
         return self._post(
             "/retraining/run",
             {
-                "new_model_version": new_model_version, "data_source": data_source,
+                "new_model_version": new_model_version,
                 "target_metrics": target_metrics, "start": start, "end": end,
-                "scenario_duration_seconds": scenario_duration_seconds,
-                "interval_seconds": interval_seconds,
             },
             timeout=600.0,
         )

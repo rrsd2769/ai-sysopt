@@ -45,7 +45,7 @@ def build_test_ctx(
 def rising_cpu_samples_now(n: int = 300, interval: float = 2.0) -> list[SystemMetricSample]:
     """Real wall-clock timestamps -- required for anything exercising the
     live-inference loop, which reads relative to ``time.time()``, not a
-    dataset's own synthetic clock (see PROJECT_HANDOFF.md's Phase 9 notes)."""
+    dataset's own clock."""
     now = time.time()
     return [
         SystemMetricSample(

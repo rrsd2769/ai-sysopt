@@ -11,9 +11,8 @@ type``.
 
 This is invisible with real wall-clock timestamps (``time.time()``
 always has a fractional component, which pandas infers as higher
-resolution from the start) but reliably reproduces with synthetic or
-test data built from whole-second timestamps — exactly what
-``synthetic`` generates. Pinning every
+resolution from the start) but reliably reproduces with test data built
+from whole-second timestamps. Pinning every
 timestamp conversion to a fixed resolution (nanoseconds) here means the
 resolution can never depend on whether the input floats happen to be
 whole numbers.

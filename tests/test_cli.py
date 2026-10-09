@@ -43,7 +43,7 @@ def clean_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         ["collect", "--minutes", "1"],
         ["collect", "--forever"],
         ["export-training-window", "--since", "0", "--out", "/tmp/export.json"],
-        ["train", "--source", "real", "--version", "v2", "--deploy"],
+        ["train", "--version", "v2", "--deploy"],
         ["train", "--metrics", "cpu_percent", "mem_percent"],
         ["evaluate", "--ablation"],
         ["evaluate", "--ablation", "--report"],
@@ -67,7 +67,6 @@ def test_a_subcommand_is_required() -> None:
 @pytest.mark.behavioural
 def test_train_defaults_are_the_documented_ones() -> None:
     args = build_parser().parse_args(["train"])
-    assert args.source == "synthetic"
     assert args.version == "v1"
     assert args.metrics == ["cpu_percent", "mem_percent"]
     assert args.deploy is False

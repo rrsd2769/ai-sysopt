@@ -1,24 +1,12 @@
 """
-Anomaly Detection calibration against real usage (Phase 3, F1's fix, item 2).
+Anomaly Detection calibration against real usage.
 
 The Isolation Forest scores "how unlike training-time normal is this
-row" — that judgment is only meaningful if training-time normal came
-from the machine it is later asked to score. Contention Prediction and
-Forecasting's synthetic scenario library (see
-:mod:`aiperfopt.forecasting.training_pipeline`) is fine for exercising
-their walk-forward/deployment machinery before real data accumulates
-(:func:`aiperfopt.retraining.pipeline.run_retraining_on_synthetic_data`
-exists for exactly that), but an Anomaly Detector fit *only* on that
-synthetic shape library has no basis for calling any particular real
-usage pattern normal or not.
-
-This module is the calibration path for a detector meant to actually
-score live traffic: it reads this machine's own collected feature
-vectors (Phase 2's passively-accumulating ``raw_system_metrics``) and
-refuses to fit if there isn't yet enough of it — see
-:func:`build_calibration_matrix`. Synthetic rows may still be blended in
-for extra capacity once that real floor is met, but they can never
-substitute for it.
+row", which is only meaningful if training-time normal came from the
+machine it is later asked to score. This module is the calibration path
+for a detector meant to score live traffic: it reads this machine's own
+collected feature vectors and refuses to fit if there isn't yet enough of
+it (see :func:`build_calibration_matrix`).
 """
 
 from __future__ import annotations
@@ -44,7 +32,6 @@ def build_calibration_matrix(
     start: float | None = None,
     end: float | None = None,
     min_real_rows: int = DEFAULT_MIN_REAL_ROWS,
-    synthetic_features: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build the feature matrix a live-serving :class:`AnomalyDetector` must fit on.
 
@@ -53,14 +40,8 @@ def build_calibration_matrix(
     feature matrix Forecasting and live inference use
     (:func:`aiperfopt.features.engine.compute_feature_matrix`), and
     raises :class:`AnomalyDetectionError` if fewer than ``min_real_rows``
-    real feature rows resulted — recoverable, since this is expected to
-    happen naturally before enough passive collection has accumulated
-    (see the Phase 2 handoff's note that this is a matter of wall-clock
-    time, not code).
-
-    ``synthetic_features`` (optional), if supplied, is concatenated in
-    *after* the real-row floor is confirmed — it can add capacity but
-    can never be the reason calibration succeeds.
+    feature rows resulted. This is recoverable: it happens naturally
+    before enough passive collection has accumulated.
     """
     real_samples = get_system_metrics_range(engine, start=start, end=end)
     real_matrix = compute_feature_matrix(real_samples, feature_config)
@@ -74,8 +55,6 @@ def build_calibration_matrix(
             context={"real_rows": len(real_matrix), "min_real_rows": min_real_rows},
         )
 
-    if synthetic_features is not None and not synthetic_features.empty:
-        return pd.concat([real_matrix, synthetic_features], ignore_index=True)
     return real_matrix
 
 
@@ -85,22 +64,19 @@ def calibrate_anomaly_detector(
     start: float | None = None,
     end: float | None = None,
     min_real_rows: int = DEFAULT_MIN_REAL_ROWS,
-    synthetic_features: pd.DataFrame | None = None,
     detector: AnomalyDetector | None = None,
 ) -> AnomalyDetector:
     """Fit and return an :class:`AnomalyDetector` calibrated against real usage.
 
     Thin wrapper around :func:`build_calibration_matrix` +
-    :meth:`AnomalyDetector.fit` — callers preparing a detector for live
-    scoring (as opposed to Phase 5/8's offline synthetic/real training
-    runs, which fit their own via
-    :mod:`aiperfopt.contention.training_pipeline`) should go through this
-    function rather than calling ``fit`` directly, so the real-data floor
-    is always enforced.
+    :meth:`AnomalyDetector.fit`. Callers preparing a detector for live
+    scoring (as opposed to the offline training runs, which fit their own
+    via :mod:`aiperfopt.contention.training_pipeline`) should use this
+    rather than calling ``fit`` directly, so the real-data floor is
+    always enforced.
     """
     matrix = build_calibration_matrix(
-        engine, feature_config, start=start, end=end,
-        min_real_rows=min_real_rows, synthetic_features=synthetic_features,
+        engine, feature_config, start=start, end=end, min_real_rows=min_real_rows,
     )
     feature_cols = [c for c in matrix.columns if c != "timestamp"]
 

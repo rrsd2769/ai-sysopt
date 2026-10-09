@@ -185,14 +185,9 @@ class LiveStateOut(BaseModel):
 
 class RetrainRequest(BaseModel):
     new_model_version: str = Field(min_length=1)
-    data_source: str = Field(default="real_usage", pattern="^(real_usage|synthetic)$")
     target_metrics: list[str] | None = None
-    # real_usage-only:
     start: float | None = None
     end: float | None = None
-    # synthetic-only:
-    scenario_duration_seconds: float = 900.0
-    interval_seconds: float = 2.0
 
 
 class MetricComparisonOut(BaseModel):

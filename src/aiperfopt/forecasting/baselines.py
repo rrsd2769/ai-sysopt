@@ -91,7 +91,7 @@ class ExponentialSmoothingForecaster:
     Capped to ``max_history_points`` for speed — fitting statsmodels'
     optimizer per evaluation row is the real cost driver of this
     baseline; V1 accepts this since walk-forward evaluation runs on
-    bounded synthetic datasets, not months of real data (Section 10.3).
+    bounded datasets, not months of data.
     """
 
     horizon_seconds: int
@@ -105,8 +105,8 @@ class ExponentialSmoothingForecaster:
             return ForecastResult(current_value, None, self.model_version)
 
         # Drop NaN *before* checking length/fitting — a trailing window
-        # that crosses a scenario boundary (huge time jump between two
-        # independent synthetic runs) or a counter reset can contain NaN
+        # that crosses a scenario boundary (a large time jump between two
+        # independent scenarios) or a counter reset can contain NaN
         # gaps. statsmodels' Holt does not reliably raise on NaN input;
         # it can silently propagate NaN through its computation and
         # return a NaN forecast without ever entering the except branch

@@ -32,7 +32,6 @@ def test_run_and_confirm_full_round_trip(qtbot, tmp_path: Path):
         qtbot.waitUntil(lambda: panel._active_version_label.text() == "--", timeout=5000)
 
         panel._new_version_edit.setText("v1")
-        panel._data_source_combo.setCurrentText("real_usage")
         panel._target_metrics_edit.setText("cpu_percent")
         panel._on_run_clicked()
 

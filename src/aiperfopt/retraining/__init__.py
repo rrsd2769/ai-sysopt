@@ -14,11 +14,7 @@ from aiperfopt.retraining.deployment import (
     get_active_model_version,
     rollback_to_last_known_good,
 )
-from aiperfopt.retraining.pipeline import (
-    RetrainingCandidate,
-    run_retraining_on_real_usage_data,
-    run_retraining_on_synthetic_data,
-)
+from aiperfopt.retraining.pipeline import RetrainingCandidate, run_retraining_on_real_usage_data
 from aiperfopt.retraining.real_usage_data import REAL_USAGE_SCENARIO_NAME, build_real_usage_training_data
 
 __all__ = [
@@ -38,6 +34,5 @@ __all__ = [
     "read_active_version",
     "rollback_to_last_known_good",
     "run_retraining_on_real_usage_data",
-    "run_retraining_on_synthetic_data",
     "write_active_version",
 ]

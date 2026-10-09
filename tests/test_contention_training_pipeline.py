@@ -17,11 +17,16 @@ from aiperfopt.forecasting.training_pipeline import train_and_evaluate_all
 from aiperfopt.anomaly.persistence import anomaly_artifact_exists
 from aiperfopt.contention.persistence import contention_artifact_exists, load_contention_classifier
 from aiperfopt.features.process_features import PROCESS_SUMMARY_COLUMNS
-from aiperfopt.forecasting.training_pipeline import (
-    generate_holdout_scenario,
-    generate_training_scenarios,
-)
 from aiperfopt.storage import get_evaluations_range
+from tests.factories import make_training_data
+
+HOLDOUT_TAG = "holdout_test"
+
+
+@pytest.fixture
+def data() -> dict:
+    scenarios, holdout = make_training_data()
+    return {"scenarios": scenarios, "holdout_samples": holdout, "holdout_dataset_tag": HOLDOUT_TAG}
 
 
 def _fast_settings(models_dir: Path):
@@ -42,19 +47,19 @@ def _fast_settings(models_dir: Path):
 
 
 @pytest.mark.plumbing
-def test_full_forecasting_then_contention_pipeline(storage_engine: Engine, tmp_path: Path):
+def test_full_forecasting_then_contention_pipeline(storage_engine: Engine, tmp_path: Path, data: dict):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
     forecast_summary = train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v1",
-        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+        target_metrics=["cpu_percent"], **data,
     )
     short_outcomes = {o.metric_name: o for o in forecast_summary.outcomes if o.horizon_label == "short"}
     assert "cpu_percent" in short_outcomes
 
     summary = train_contention_and_anomaly_pipeline(
         storage_engine, fconfig, fsettings, csettings, labeling_config, short_outcomes,
-        model_version="test-v1", scenario_duration_seconds=150, interval_seconds=2.0,
+        model_version="test-v1", **data,
     )
 
     assert summary.n_training_rows > 0
@@ -62,18 +67,18 @@ def test_full_forecasting_then_contention_pipeline(storage_engine: Engine, tmp_p
 
 
 @pytest.mark.plumbing
-def test_contention_evaluations_persisted_with_extra_metrics(storage_engine: Engine, tmp_path: Path):
+def test_contention_evaluations_persisted_with_extra_metrics(storage_engine: Engine, tmp_path: Path, data: dict):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
     forecast_summary = train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v1",
-        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+        target_metrics=["cpu_percent"], **data,
     )
     short_outcomes = {o.metric_name: o for o in forecast_summary.outcomes if o.horizon_label == "short"}
 
     train_contention_and_anomaly_pipeline(
         storage_engine, fconfig, fsettings, csettings, labeling_config, short_outcomes,
-        model_version="test-v1", scenario_duration_seconds=150, interval_seconds=2.0,
+        model_version="test-v1", **data,
     )
 
     rows = get_evaluations_range(storage_engine)
@@ -89,18 +94,18 @@ def test_contention_evaluations_persisted_with_extra_metrics(storage_engine: Eng
 
 
 @pytest.mark.plumbing
-def test_classifier_artifact_saved_when_training_succeeds(storage_engine: Engine, tmp_path: Path):
+def test_classifier_artifact_saved_when_training_succeeds(storage_engine: Engine, tmp_path: Path, data: dict):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
     forecast_summary = train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v1",
-        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+        target_metrics=["cpu_percent"], **data,
     )
     short_outcomes = {o.metric_name: o for o in forecast_summary.outcomes if o.horizon_label == "short"}
 
     summary = train_contention_and_anomaly_pipeline(
         storage_engine, fconfig, fsettings, csettings, labeling_config, short_outcomes,
-        model_version="test-v1", scenario_duration_seconds=150, interval_seconds=2.0,
+        model_version="test-v1", **data,
     )
 
     if summary.classifier_artifact_path is not None:
@@ -108,13 +113,13 @@ def test_classifier_artifact_saved_when_training_succeeds(storage_engine: Engine
 
 
 @pytest.mark.plumbing
-def test_no_deployed_forecasters_raises_value_error(storage_engine: Engine, tmp_path: Path):
+def test_no_deployed_forecasters_raises_value_error(storage_engine: Engine, tmp_path: Path, data: dict):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
     with pytest.raises(ValueError):
         train_contention_and_anomaly_pipeline(
             storage_engine, fconfig, fsettings, csettings, labeling_config, {},
-            model_version="test-v1", scenario_duration_seconds=150, interval_seconds=2.0,
+            model_version="test-v1", **data,
         )
 
 
@@ -156,18 +161,18 @@ def test_interleave_scenario_chunks_empty_input():
 
 
 @pytest.mark.behavioural
-def test_fitted_decision_threshold_set_on_saved_classifier(storage_engine: Engine, tmp_path: Path):
+def test_fitted_decision_threshold_set_on_saved_classifier(storage_engine: Engine, tmp_path: Path, data: dict):
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
     forecast_summary = train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v1",
-        target_metrics=["cpu_percent"], scenario_duration_seconds=150, interval_seconds=2.0,
+        target_metrics=["cpu_percent"], **data,
     )
     short_outcomes = {o.metric_name: o for o in forecast_summary.outcomes if o.horizon_label == "short"}
 
     summary = train_contention_and_anomaly_pipeline(
         storage_engine, fconfig, fsettings, csettings, labeling_config, short_outcomes,
-        model_version="test-v1", scenario_duration_seconds=150, interval_seconds=2.0,
+        model_version="test-v1", **data,
     )
 
     if summary.classifier_artifact_path is None:
@@ -190,8 +195,7 @@ def test_process_summaries_threaded_through_without_error(storage_engine: Engine
     this is the wiring the ablation's "v2" arm depends on."""
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 
-    scenarios = generate_training_scenarios(duration_seconds=150, interval_seconds=2.0)
-    holdout_samples = generate_holdout_scenario(150, 2.0, scenario_count=len(scenarios))
+    scenarios, holdout_samples = make_training_data()
 
     def _fake_process_summary(samples) -> "pd.DataFrame":
         import pandas as pd
@@ -206,7 +210,7 @@ def test_process_summaries_threaded_through_without_error(storage_engine: Engine
 
     forecast_summary = train_and_evaluate_all(
         storage_engine, fconfig, fsettings, model_version="test-v2",
-        target_metrics=["cpu_percent"], scenarios=scenarios, holdout_samples=holdout_samples,
+        target_metrics=["cpu_percent"], scenarios=scenarios, holdout_samples=holdout_samples, holdout_dataset_tag=HOLDOUT_TAG,
         process_summaries=process_summaries, holdout_process_summary=holdout_process_summary,
     )
     short_outcomes = {o.metric_name: o for o in forecast_summary.outcomes if o.horizon_label == "short"}
@@ -214,7 +218,7 @@ def test_process_summaries_threaded_through_without_error(storage_engine: Engine
 
     summary = train_contention_and_anomaly_pipeline(
         storage_engine, fconfig, fsettings, csettings, labeling_config, short_outcomes,
-        model_version="test-v2", scenarios=scenarios, holdout_samples=holdout_samples,
+        model_version="test-v2", scenarios=scenarios, holdout_samples=holdout_samples, holdout_dataset_tag=HOLDOUT_TAG,
         process_summaries=process_summaries, holdout_process_summary=holdout_process_summary,
     )
     assert summary.n_training_rows > 0

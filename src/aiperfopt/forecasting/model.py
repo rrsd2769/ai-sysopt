@@ -138,7 +138,7 @@ class MetricForecaster:
         """
         if target_std <= 0:
             # No variance in the validation target to normalize against —
-            # a degenerate case (e.g. a perfectly flat synthetic scenario).
+            # a degenerate case (e.g. a perfectly flat series).
             self.confidence = 0.5
             return
         normalized_error = rmse / target_std
