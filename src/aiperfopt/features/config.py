@@ -1,10 +1,10 @@
 """
-Configuration for Feature Engineering (Section 7.1, item 4).
+Configuration for Feature Engineering.
 
 Kept as an explicit, small dataclass — like every other subsystem's
 settings — rather than threading the full ``AppSettings`` object through
 :mod:`aiperfopt.features.engine`, so the feature computation functions
-stay testable in isolation (NFR-14.1) and don't acquire an implicit
+stay testable in isolation and don't acquire an implicit
 dependency on unrelated configuration sections.
 """
 
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from aiperfopt.features.process_features import PROCESS_SUMMARY_COLUMNS
 
 # The system-only gauges, named separately from PROCESS_SUMMARY_COLUMNS
-# so Phase 5's ablation (aiperfopt.evaluation.ablation) can build a "v1"
+# so the ablation (aiperfopt.evaluation.ablation) can build a "v1"
 # config (`FeatureEngineeringConfig(gauge_metrics=SYSTEM_GAUGE_METRICS)`)
 # for the "what did the model have before the pivot" arm, without
 # duplicating this tuple a second time.
@@ -31,15 +31,15 @@ class FeatureEngineeringConfig:
     lookback_windows_seconds:
         Window widths (seconds) used for both lag lookups and rolling
         statistics. Defaults are aligned with the two forecast horizons
-        (Section 10.2: 30-60s short, 2-5min medium) — a 30s window feeds
+        (30-60s short, 2-5min medium) — a 30s window feeds
         short-horizon forecasting features, 120s feeds medium-horizon
-        trend features. The pipeline wiring (Phase 4+) is expected to
+        trend features. The pipeline wiring is expected to
         derive these from ``AppSettings.forecasting`` rather than callers
         hardcoding a second copy of the horizon values.
     tolerance_seconds:
         Maximum allowed gap between a requested lag point (e.g. "30s ago")
         and the nearest actual sample for that lookup to be considered
-        valid (FR-4.3). If the nearest sample is farther away than this,
+        valid. If the nearest sample is farther away than this,
         the lag feature is ``None`` rather than a stale value.
     max_gap_seconds:
         Maximum time between two consecutive raw samples for a
@@ -49,7 +49,7 @@ class FeatureEngineeringConfig:
         instantaneous rate — the resulting rate feature is ``None``.
     gauge_metrics:
         Metrics used as-is (lag/rolling statistics computed directly on
-        the raw value). Includes the Phase 4 process-summary columns
+        the raw value). Includes the process-summary columns
         (:data:`aiperfopt.features.process_features.PROCESS_SUMMARY_COLUMNS`)
         alongside the original system-metric gauges — once
         :func:`aiperfopt.features.engine.compute_feature_matrix` is given

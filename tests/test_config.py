@@ -94,7 +94,7 @@ def test_non_mapping_yaml_top_level_rejected(minimal_env, tmp_path: Path):
 
 @pytest.mark.behavioural
 def test_no_exclusions_by_default(minimal_env):
-    """Section 13 / NFR-7.4: no process exclusions unless explicitly configured."""
+    """No process exclusions unless explicitly configured."""
     settings = load_settings()
     assert settings.privacy.excluded_processes == []
 

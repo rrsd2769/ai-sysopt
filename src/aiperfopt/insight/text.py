@@ -1,17 +1,17 @@
 """
-Technical and plain-language explanation text (FR-8.1, FR-8.2).
+Technical and plain-language explanation text.
 
-FR-8.1 requires Developer Mode attribution; FR-8.2 requires the same
+Developer Mode shows attribution; General Mode gets the same
 underlying diagnosis translated into plain language for General Mode.
 Both are produced from the *same* resolved
 :class:`~aiperfopt.insight.taxonomy.DiagnosisCategory` and the same
 underlying contributing-metrics/processes data — General Mode is not a
 separately-computed, potentially-inconsistent narrative, it is a
-plain-language rendering of the identical diagnosis (FR-8.3's "single
+plain-language rendering of the identical diagnosis (the "single
 dominant diagnosis category... regardless of which single label is
 user-facing").
 
-Section 6's "Operating Systems concept demonstration" requirement is
+The "Operating Systems concept demonstration" requirement is
 implemented here specifically: each category's plain-language template
 includes one sentence connecting the observed symptom to the underlying
 OS mechanism (scheduling pressure, memory paging, I/O queuing, ...),
@@ -42,11 +42,11 @@ def _confidence_bucket(probability: float) -> str:
     """Qualitative confidence wording for General Mode.
 
     A display nicety, not a spec-mandated scale — Developer Mode always
-    shows the raw numeric probability alongside this (FR-8.1/FR-8.2 both
-    require confidence, but General Mode's audience is better served by
-    words than a bare float, per Section 4's "minimal jargon" framing).
+    shows the raw numeric probability alongside this (both modes
+    show confidence, but General Mode's audience is better served by
+    words than a bare float, per the "minimal jargon" framing).
     Boundaries are set relative to typical decision-threshold territory
-    (Section 11's conservative tuning means a "triggered" prediction is
+    (the conservative tuning means a "triggered" prediction is
     already at least moderately confident by construction).
     """
     if probability >= 0.9:
@@ -74,7 +74,7 @@ def build_plain_language_explanation(
     category: DiagnosisCategory,
     contention_record: ContentionPredictionRecord,
 ) -> str:
-    """General Mode explanation (FR-8.2): plain language, minimal jargon, one OS-concept sentence."""
+    """General Mode explanation: plain language, minimal jargon, one OS-concept sentence."""
     all_names = _process_names(contention_record.contributing_processes or [])
     # CPU_SINGLE_PROCESS's whole claim is that *one* process dominates —
     # naming the runner-up alongside it would contradict the category
@@ -159,7 +159,7 @@ def build_technical_explanation(
     explanation_tier: str,
     trigger_reason: str,
 ) -> str:
-    """Developer Mode explanation (FR-8.1): category, numeric confidence, and full attribution."""
+    """Developer Mode explanation: category, numeric confidence, and full attribution."""
     display_name = _CATEGORY_DISPLAY_NAME[category]
     metrics_line = ", ".join(
         f"{m.get('metric')}={m.get('contribution'):+.3f}" for m in (contention_record.contributing_metrics or [])

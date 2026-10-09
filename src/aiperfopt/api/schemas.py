@@ -5,7 +5,7 @@ Every storage record type (:mod:`aiperfopt.storage.records`) already has
 exactly the fields a REST response needs — these wrapper models exist
 only so FastAPI can validate them (``from_attributes=True`` lets a
 Pydantic model be built directly from a dataclass instance, no manual
-field copying) and auto-generate accurate OpenAPI documentation (FR-12.3)
+field copying) and auto-generate accurate OpenAPI documentation
 from them. None of these add or rename fields relative to their source
 dataclass; that 1:1 mapping is deliberate; a REST consumer reading this
 API's docs sees exactly the same shape a Python caller reading
@@ -136,29 +136,14 @@ class ModelDeploymentOut(_RecordSchema):
     comparison_summary: dict[str, Any] | None = None
 
 
-class RecommendationActionOut(_RecordSchema):
-    """One curated action from a :class:`RecommendationOut.actions` entry.
-
-    Not used directly as a response model (``actions`` is a plain list of
-    dicts sourced from ``aiperfopt/resources/recommendations.yaml``, per Phase 7's
-    design — see that phase's YAML-is-the-source-of-truth rationale) —
-    provided here only so the OpenAPI schema documents the shape a
-    consumer should expect inside each dict.
-    """
-
-    title: str
-    description: str
-    rationale: str
-
-
 # --- Live state ----------------------------------------------------------------------
 
 
 class LiveStateOut(BaseModel):
-    """One snapshot from the live-inference loop (FR-12.1).
+    """One snapshot from the live-inference loop.
 
     Fields are progressively optional in the order the loop's pipeline
-    can stop early (NFR-11.1/11.2 graceful degradation): no feature
+    can stop early (graceful degradation): no feature
     vector yet (insufficient trailing history) -> no active model
     deployed yet -> a model deployed but this cycle produced no
     triggered contention event to diagnose. A client should treat
@@ -235,7 +220,7 @@ class ContentionGateCriterionOut(BaseModel):
 
 
 class SkillGateOut(BaseModel):
-    """Phase 6's absolute quality bar -- see :func:`aiperfopt.lifecycle.
+    """The absolute quality bar -- see :func:`aiperfopt.lifecycle.
     comparison.evaluate_skill_gate`. Unlike ``RetrainingComparisonOut``'s
     ``recommendation`` (advisory), ``passed=False`` here blocks
     ``/retraining/confirm`` even with ``confirmed=True``."""
@@ -269,7 +254,7 @@ class RollbackRequest(BaseModel):
 
 
 class PredictedVsActualPointOut(BaseModel):
-    """One joined predicted/actual pair for the FR-13.3 comparison view.
+    """One joined predicted/actual pair for the comparison view.
 
     ``actual_value`` (and therefore ``error``) is ``None`` when no
     observed sample fell close enough to ``target_timestamp`` to count
@@ -288,7 +273,7 @@ class PredictedVsActualPointOut(BaseModel):
     model_version: str
 
 
-# --- Reporting summary (Phase 11, FR-14.1/FR-14.2) --------------------------------
+# --- Reporting summary --------------------------------
 
 
 class SystemMetricSummaryOut(BaseModel):
@@ -329,9 +314,8 @@ class RecommendationSummaryOut(BaseModel):
 
 
 class ReportSummaryOut(BaseModel):
-    """FR-14.1's exportable summary: system-metrics context plus, per
-    FR-14.2, prediction accuracy -- and, per ADL-22's flagship-pillar
-    scoping, diagnosis and recommendation summaries alongside it.
+    """The exportable summary: system-metrics context plus prediction accuracy -- and, per the
+    flagship-pillar scoping, diagnosis and recommendation summaries alongside it.
     """
 
     start: float

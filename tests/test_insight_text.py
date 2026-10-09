@@ -26,7 +26,7 @@ def _record(**overrides) -> ContentionPredictionRecord:
 
 
 def test_cpu_single_process_names_only_the_dominant_process():
-    """Regression test for a real bug caught during Phase 6 development:
+    """Regression test for a real bug caught during development:
     the single-process template originally named every returned process
     (e.g. "stress_test and idle_proc is using..."), contradicting the
     category's own claim that one process dominates."""
@@ -62,7 +62,7 @@ def test_every_actionable_category_produces_nonempty_distinct_text():
 def test_anomaly_category_text_does_not_recommend_action():
     record = _record()
     text = build_plain_language_explanation(DiagnosisCategory.UNUSUAL_PATTERN_ANOMALY, record)
-    # ADL-36: informational only. The plain-language text shouldn't read
+    # Informational only. The plain-language text shouldn't read
     # as an actionable recommendation the way the other categories do.
     assert "no action is being recommended" in text.lower() or "isn't a specific problem" in text.lower()
 

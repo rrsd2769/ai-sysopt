@@ -1,11 +1,10 @@
 """
-Diagnosis / Explainable AI orchestrator — the Phase 6 entrypoint (Section 7.1
-item 8, FR-8.1-8.3).
+Diagnosis / Explainable AI orchestrator — the entrypoint.
 
 :func:`diagnose_contention_event` is the single place that reconciles
 Contention Prediction's output with Forecasting's per-metric models into
 one persisted :class:`~aiperfopt.storage.records.DiagnosisRecord` — the
-"genuine integration point" Section 7.3 describes. It deliberately does
+"genuine integration point" between the models. It deliberately does
 *not* take a live :class:`~aiperfopt.contention.model.ContentionClassifier`
 as an argument: everything Diagnosis needs from Contention Prediction is
 already present on the triggering
@@ -14,7 +13,7 @@ already present on the triggering
 attribution — see :mod:`aiperfopt.insight.explainer`'s module
 docstring), which keeps Diagnosis a true downstream consumer of
 Contention Prediction's *output* rather than reaching back into its
-internals — the same boundary FR-6.1 already draws between Contention
+internals — the same boundary already drawn between Contention
 Prediction and raw metrics.
 
 What Diagnosis *does* need beyond the contention record:
@@ -27,7 +26,7 @@ What Diagnosis *does* need beyond the contention record:
   and the full feature set every ``MetricForecaster`` was actually
   trained on, needed for SHAP attribution (explainer.py).
 - The currently-deployed :class:`~aiperfopt.forecasting.baselines.Forecaster`
-  per metric (LightGBM or a baseline, per Section 10.7's contingency
+  per metric (LightGBM or a baseline's contingency
   plan) — the same ``deployed_forecasters`` mapping
   :func:`aiperfopt.contention.dataset.build_contention_dataset` and
   :func:`aiperfopt.contention.prediction.predict_contention`'s caller
@@ -41,7 +40,7 @@ whenever :func:`~aiperfopt.insight.taxonomy.resolve_diagnosis_category`
 does — i.e. contention wasn't triggered and there is no significant
 anomaly. The overwhelming majority of monitoring cycles are exactly this
 "system is healthy" case; manufacturing a diagnosis record for each one
-would violate NFR-1.1's overhead budget for no interpretive benefit.
+would violate the overhead budget for no interpretive benefit.
 """
 
 from __future__ import annotations

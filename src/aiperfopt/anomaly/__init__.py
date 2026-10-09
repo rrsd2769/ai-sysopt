@@ -1,5 +1,5 @@
-"""Anomaly Detection (Section 7.1, item 7): Isolation Forest on engineered
-feature vectors (Section 10.4, FR-7.1)."""
+"""Anomaly Detection: Isolation Forest on engineered
+feature vectors."""
 
 from aiperfopt.anomaly.calibration import build_calibration_matrix, calibrate_anomaly_detector
 from aiperfopt.anomaly.detector import ANOMALY_ARTIFACT_SCHEMA_VERSION, DEFAULT_ISOLATION_FOREST_PARAMS, AnomalyDetector

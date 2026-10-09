@@ -1,10 +1,10 @@
 """
-Reporting tab (Section 7.1 item 14, FR-14.1/FR-14.2, Phase 11). Renders
+Reporting tab. Renders
 ``GET /reporting/summary``'s report -- system-metrics context,
 prediction accuracy, contention, diagnosis, and recommendation
 summaries -- for a chosen period. Available in both modes (unlike
 Retraining, which is Developer-only): the report ties directly back to
-the flagship pillars (ADL-22) a General Mode user cares about too (e.g.
+the flagship pillars a General Mode user cares about too (e.g.
 "how accurate were the predictions this week"), it just doesn't expose
 anything as technical as SHAP attribution or model versions.
 """

@@ -1,13 +1,13 @@
 """
-Data Ingestion / Collector (Section 7.1, item 2).
+Data Ingestion / Collector.
 
-The consumer side of ADL-18's producer-consumer pattern: one dedicated
+The consumer side of the producer-consumer pattern: one dedicated
 thread drains the shared queue populated by
 :class:`~aiperfopt.monitoring.engine.MonitoringEngine`, accumulates
 same-type records into batches, and flushes each batch to storage via
-:mod:`aiperfopt.storage.writer`'s batch insert functions (FR-2.1).
+:mod:`aiperfopt.storage.writer`'s batch insert functions.
 
-Ordering (FR-2.3)
+Ordering
 ------------------
 ``queue.Queue`` is strictly FIFO, and this module uses exactly one
 consumer thread, so items are dequeued in the exact order Monitoring
@@ -19,7 +19,7 @@ chronological correctness never actually depends on physical insertion
 order; FIFO consumption here is what makes the *ordering guarantee*
 provable rather than incidental.)
 
-Non-blocking with respect to Monitoring (FR-2.2)
+Non-blocking with respect to Monitoring
 --------------------------------------------------
 This consumer runs on its own thread entirely separate from Monitoring's
 two producer threads. A slow storage write here can only ever make this
@@ -27,12 +27,12 @@ thread's own batches accumulate for longer — it cannot block a
 ``MonitoringEngine`` poll cycle, since the two communicate exclusively
 through the (non-blocking-to-write, per ``engine.py``) shared queue.
 
-Failure isolation (NFR-5.4)
+Failure isolation
 ------------------------------
 A storage failure during flush is logged and the batch is dropped rather
 than retried in a tight loop or allowed to crash the consumer thread —
 retrying indefinitely against a persistently broken storage layer would
-itself become an unbounded-memory backpressure problem, and per NFR-5.4 a
+itself become an unbounded-memory backpressure problem, and a
 failure in this subsystem must not halt Monitoring, which continues
 regardless of Ingestion's state.
 """
@@ -87,7 +87,7 @@ class IngestionConsumer:
     full_resolution_retention_hours, process_retention_hours:
         Passed through to :func:`aiperfopt.storage.rollup.apply_retention_policy`
         on each retention check — independent windows, see that
-        function's docstring for why (Phase 2, NFR-4.3).
+        function's docstring for why.
     """
 
     def __init__(
@@ -235,7 +235,7 @@ class IngestionConsumer:
 
     def _run_retention_check(self) -> None:
         try:
-            # Summarize process-level data before pruning it (Phase 2):
+            # Summarize process-level data before pruning it:
             # the derived process_feature_summaries rows this writes must
             # exist before prune_process_level_data (inside
             # apply_retention_policy) deletes the raw rows they're

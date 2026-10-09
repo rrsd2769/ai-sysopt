@@ -183,7 +183,7 @@ def test_second_poll_bounds_metrics_via_settings_top_n():
 
 @pytest.mark.plumbing
 def test_process_disappearing_mid_poll_does_not_raise(monkeypatch):
-    """Simulates FR-1.4's per-process degradation: a pid vanishes between
+    """Simulates the per-process degradation: a pid vanishes between
     being listed and being queried."""
     tracker = ProcessTracker()
     tracker.poll()

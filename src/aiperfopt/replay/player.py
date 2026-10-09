@@ -1,8 +1,8 @@
 """
 Replays a :class:`~aiperfopt.replay.session.RecordedSession` into a
 separate database, standing in for the live collector so a recorded real
-pressure event can be reproduced on demand (Phase 8, "the demonstration
-mechanism"). The live inference loop (:mod:`aiperfopt.api.live_state`)
+pressure event can be reproduced on demand (the demonstration
+mechanism). The live inference loop (:mod:`aiperfopt.api.live_state`)
 then runs over the replay database unmodified -- nothing about it knows
 or needs to know its data came from a replay rather than a live collector.
 
@@ -24,9 +24,8 @@ session is moved.
 ``speed`` therefore controls exactly one thing: how fast, in real
 wall-clock seconds, the insertion loop below advances through the
 (unrescaled) rewritten data -- a playback-pacing knob for the live demo
-(Phase 9's chart), never a transformation of the data itself. Pacing is
-anchored to system-metric samples (Monitoring's steady heartbeat,
-Section 7.1 item 1) the same way the real
+(the chart), never a transformation of the data itself. Pacing is
+anchored to system-metric samples (Monitoring's steady heartbeat) the same way the real
 :class:`~aiperfopt.monitoring.engine.MonitoringEngine` produces one
 system sample per poll cycle -- process-level rows that arrived before a
 given system sample (but after the previous one) are written alongside

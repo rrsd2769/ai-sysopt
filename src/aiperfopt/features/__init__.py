@@ -1,8 +1,8 @@
-"""Feature Engineering (Section 7.1, item 4).
+"""Feature Engineering.
 
 - ``config``            -> FeatureEngineeringConfig (which metrics, windows, tolerances)
-- ``engine``             -> pure computation functions, the FR-4.2 single source of truth
-- ``process_features``   -> pure process summary series computation (Phase 2)
+- ``engine``             -> pure computation functions, the single source of truth
+- ``process_features``   -> pure process summary series computation
 - ``storage_bridge``     -> storage-aware convenience wrappers used by live inference / training
 """
 

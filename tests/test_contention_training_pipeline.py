@@ -157,7 +157,7 @@ def test_interleave_scenario_chunks_empty_input():
     assert result.empty
 
 
-# --- Phase 5: fitted decision threshold, base rate, threshold-rule baseline ---
+# --- fitted decision threshold, base rate, threshold-rule baseline ---
 
 
 @pytest.mark.behavioural
@@ -191,7 +191,7 @@ def test_fitted_decision_threshold_set_on_saved_classifier(storage_engine: Engin
 
 @pytest.mark.plumbing
 def test_process_summaries_threaded_through_without_error(storage_engine: Engine, tmp_path: Path):
-    """Phase 5: supplying a process summary must not break the pipeline --
+    """Supplying a process summary must not break the pipeline --
     this is the wiring the ablation's "v2" arm depends on."""
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path / "models")
 

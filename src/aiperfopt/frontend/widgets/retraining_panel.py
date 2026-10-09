@@ -1,8 +1,7 @@
 """
-Developer Mode's Model Retraining controls (Section 7.1 item 11,
-FR-11.1-11.3, ADL-23). Every action here is a thin call into
+Developer Mode's Model Retraining controls. Every action here is a thin call into
 ``ApiClient``'s retraining methods run in the background (``workers.py``)
--- FR-11.2's "never silently activate" is enforced by the backend itself
+-- the "never silently activate" is enforced by the backend itself
 (``confirm_deployment`` has no default for ``confirmed`` there either);
 this panel does not add or relax that requirement, it just can't skip
 the confirmation step even if it wanted to, since ``confirmed=True`` is
@@ -75,7 +74,7 @@ class RetrainingPanel(QWidget):
         self._reasons_list = QListWidget()
         result_layout.addWidget(self._reasons_list)
 
-        result_layout.addWidget(QLabel("Quality gate (Phase 6 -- blocks deployment even if confirmed):"))
+        result_layout.addWidget(QLabel("Quality gate (blocks deployment even if confirmed):"))
         self._gate_label = QLabel("--")
         result_layout.addWidget(self._gate_label)
         self._gate_criteria_list = QListWidget()

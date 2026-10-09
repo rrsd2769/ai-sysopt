@@ -54,7 +54,7 @@ def test_calibration_raises_when_no_real_data_at_all(storage_engine: Engine):
 
 @pytest.mark.behavioural
 def test_calibration_fits_on_real_data_and_generalizes_to_holdout(storage_engine: Engine):
-    """The two 'real normal data' success criteria from the Phase 3 plan.
+    """The two 'real normal data' success criteria from the plan.
 
     Trains on one stretch of real-shaped collected data, scores that same
     training matrix (should be typical, mean < 0.3), then scores a

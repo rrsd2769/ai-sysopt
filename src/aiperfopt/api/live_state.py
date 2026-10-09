@@ -3,11 +3,11 @@ The live-inference loop: the piece of the system that turns "Monitoring
 is collecting raw samples" into "there is a current prediction/diagnosis/
 recommendation to show," continuously, while the API server is running.
 
-Nothing before Phase 9 runs on a cadence like this. Phases 3-8 are all
+Nothing else in the system runs on a cadence like this. Training, diagnosis and the rest are all
 one-shot calls (compute one feature vector, train one model, diagnose one
 event) — deliberately, so each phase could be built and tested in
-isolation (NFR-14.1). This loop is where they're finally wired together
-into the running system Section 6's flagship demo actually needs: predict
+isolation. This loop is where they're finally wired together
+into the running system the flagship demo actually needs: predict
 *before* the user notices a slowdown, not just answer a query about it.
 
 Threading, not asyncio, for the loop itself
@@ -16,20 +16,20 @@ Every step in the pipeline this loop drives — reading from SQLite,
 running a LightGBM/statsmodels forecaster, scikit-learn inference, SHAP
 attribution — is synchronous, CPU/IO-bound library code with no async
 variant. Following the same pattern already established for Monitoring
-(ADL-18: a dedicated thread, not asyncio, for exactly this kind of
+(a dedicated thread, not asyncio, for exactly this kind of
 work), this loop runs on its own thread; the FastAPI/WebSocket layer
 (which *is* async) only ever reads the loop's latest published
 :class:`LiveState` snapshot, never blocks waiting on it.
 
-Graceful degradation is not an afterthought (NFR-11.1/11.2)
+Graceful degradation is not an afterthought
 ------------------------------------------------------------
 Every stage after "read recent metrics" can legitimately have nothing to
 report yet: not enough trailing history for a feature vector, no model
-deployed yet (Phase 8 never confirmed one), a deployed model that fails
+deployed yet (none ever confirmed), a deployed model that fails
 to load, or a cycle where the forecast simply didn't cross the
 contention threshold. None of these are treated as errors — the loop
 degrades to whatever's available and moves on to the next cycle, exactly
-mirroring how Monitoring Engine's own per-source degradation (FR-1.4)
+mirroring how Monitoring Engine's own per-source degradation
 already treats a failing metric source as "skip it, don't crash."
 """
 
@@ -72,7 +72,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class LiveState:
-    """One snapshot of the live pipeline (FR-12.1's WebSocket payload)."""
+    """One snapshot of the live pipeline (the WebSocket payload)."""
 
     timestamp: float
     latest_metrics: SystemMetricSample | None = None
@@ -155,17 +155,17 @@ class LiveInferenceLoop:
 
         feature_record = compute_and_store_live_feature_vector(self.storage_engine, self.feature_config)
         if feature_record is None:
-            return state  # not enough trailing history yet — NFR-11.1
+            return state  # not enough trailing history yet
         state.feature_vector = feature_record.feature_values
 
         active_version = get_active_model_version(self.retraining_settings)
         state.active_model_version = active_version
         if active_version is None:
-            return state  # nothing deployed yet (Phase 8 never confirmed one) — NFR-11.1
+            return state  # nothing deployed yet (none ever confirmed)
 
         forecasters, anomaly_detector, classifier = self._load_active_models(active_version, state)
         if forecasters is None or anomaly_detector is None:
-            return state  # NFR-5.3's fallback already attempted inside _load_active_models
+            return state # the fallback already attempted inside _load_active_models
 
         row = build_live_contention_input_row(
             recent, feature_record, forecasters, anomaly_detector, self.feature_config
@@ -187,15 +187,15 @@ class LiveInferenceLoop:
         )
 
         if classifier is None:
-            return state  # Phase 6: this version's training data was single-class -- nothing to classify yet
+            return state  # this version's training data was single-class -- nothing to classify yet
 
-        # Phase 5: a classifier trained since then carries its own
+        # A classifier trained with a fitted threshold carries its own
         # PR-curve-fitted decision threshold (aiperfopt.contention.
         # evaluation.fit_decision_threshold) -- prefer it over the static
         # config constant. An older artifact (or one never run through
         # the training pipeline's holdout step) has decision_threshold
         # unset (None), and falls back to the config value exactly as
-        # before Phase 5.
+        # before that existed.
         decision_threshold = (
             classifier.decision_threshold
             if classifier.decision_threshold is not None
@@ -217,7 +217,7 @@ class LiveInferenceLoop:
         )
         state.diagnosis = diagnosis
         if diagnosis is None:
-            return state  # nothing rose to the level of a diagnosis this cycle (Section 12)
+            return state  # nothing rose to the level of a diagnosis this cycle
 
         state.recommendation = generate_recommendations(self.storage_engine, diagnosis, self.catalog)
         return state
@@ -225,7 +225,7 @@ class LiveInferenceLoop:
     def _build_forecast_records(
         self, row: Any, generated_at: float, metric_names: list[str], model_version: str
     ) -> list[ForecastPredictionRecord]:
-        """One :class:`ForecastPredictionRecord` per deployed forecaster (Phase 7 / F5).
+        """One :class:`ForecastPredictionRecord` per deployed forecaster.
 
         ``row`` already carries each target's ``forecast_{metric}``/
         ``confidence_{metric}`` columns (:func:`build_live_contention_input_row`
@@ -233,7 +233,7 @@ class LiveInferenceLoop:
         calling ``forecaster.predict()`` a second time. Horizon comes from
         settings, not the forecaster object: ``_load_active_models`` always
         resolves forecasters with ``horizon_label="short"``, and a deployed
-        *baseline* forecaster (Section 10.7's contingency plan) carries no
+        *baseline* forecaster (the contingency plan) carries no
         ``horizon_seconds``/``horizon_label`` attribute of its own.
         """
         horizon_label = "short"
@@ -266,26 +266,26 @@ class LiveInferenceLoop:
         """Load the forecasters/anomaly detector (required) and contention
         classifier (optional) for the active version.
 
-        A *missing* contention classifier is not a load failure: Phase 6's
+        A *missing* contention classifier is not a load failure: the
         quality gate deliberately allows deploying a version whose
         accumulated training data was still single-class for contention,
         in which case ``train_contention_and_anomaly_pipeline`` never
-        trains or saves one at all (an expected, honest outcome — see
-        Phase 5/6's handoffs). That must degrade to "no contention
-        prediction/diagnosis/recommendation this cycle" (NFR-11.1), not
+        trains or saves one at all (an expected, honest outcome).
+        That must degrade to "no contention
+        prediction/diagnosis/recommendation this cycle", not
         trigger the same automatic-rollback path a genuinely
         missing/corrupted forecaster or anomaly-detector artifact does —
         the anomaly detector, unlike the classifier, is unconditionally
         trained and saved on every training run, so *its* absence does
-        mean real corruption. Persisting forecasts (Phase 7 / F5) must not
+        mean real corruption. Persisting forecasts must not
         be held hostage to contention ever having trained a classifier.
 
         On any load failure of the required models (a missing/corrupted
-        artifact — the concrete "deployment failure" NFR-5.3 has in
-        mind), attempts one automatic rollback to the last known-good
+        artifact — the concrete "deployment failure"
+        case), attempts one automatic rollback to the last known-good
         version and reports which happened via ``state.error`` — never
         raises out to the caller, since one bad model must not stop the
-        loop (mirrors Monitoring's own per-source degradation, FR-1.4).
+        loop (mirrors Monitoring's own per-source degradation).
         """
         try:
             forecasters = resolve_deployed_forecasters(

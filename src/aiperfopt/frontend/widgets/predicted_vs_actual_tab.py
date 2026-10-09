@@ -1,7 +1,7 @@
 """
-Controller widget for FR-13.3's comparison view: lets the user pick a
+Controller widget for the comparison view: lets the user pick a
 metric and a lookback window, fetches the join from
-``GET /reporting/predicted-vs-actual`` (Phase 10's own endpoint) in the
+``GET /reporting/predicted-vs-actual`` (its own endpoint) in the
 background (see ``workers.py``), and feeds the result to
 ``PredictedVsActualChart``.
 """

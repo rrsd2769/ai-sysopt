@@ -1,8 +1,8 @@
 """
-Exposes Phase 8's Model Retraining subsystem over REST. This module adds
+Exposes the Model Retraining subsystem over REST. This module adds
 no retraining logic of its own — it validates a request, calls straight
 into :mod:`aiperfopt.lifecycle`, and maps the result onto a response
-schema. FR-11.2's "never silently activate" is enforced by
+schema. The "never silently activate" is enforced by
 :func:`aiperfopt.lifecycle.deployment.confirm_deployment` itself
 (``confirmed`` has no default there either); this router does not add or
 relax that requirement, only exposes it.
@@ -84,7 +84,7 @@ def _comparison_from_request(comparison: RetrainingComparisonOut) -> RetrainingC
     client round-trips the exact comparison it was shown (from
     ``/retraining/run``'s response) rather than this server re-deriving
     or re-fetching it, so what a human confirms is provably the same
-    evidence they reviewed (ADL-23's human-confirmation requirement would
+    evidence they reviewed (the human-confirmation requirement would
     be weaker if the server could silently substitute a fresher
     comparison between "run" and "confirm").
     """
@@ -144,7 +144,7 @@ def _gate_out(gate: SkillGateResult) -> SkillGateOut:
 def _gate_from_request(gate: SkillGateOut) -> SkillGateResult:
     """Reconstruct a domain :class:`SkillGateResult` from what the client sends
     back -- same round-trip-what-was-shown rationale as
-    :func:`_comparison_from_request` (ADL-23)."""
+    :func:`_comparison_from_request`."""
     return SkillGateResult(
         passed=gate.passed,
         reasons=gate.reasons,

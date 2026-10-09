@@ -1,19 +1,19 @@
 """
-Builds one ``ReportSummary`` for a time window (FR-14.1's "exportable
-daily/weekly summaries"), reusing every already-tested reader/evaluation
+Builds one ``ReportSummary`` for a time window (exportable
+daily/weekly summaries), reusing every already-tested reader/evaluation
 function rather than re-deriving any of them:
 
-- **Prediction accuracy** (FR-14.2's explicit requirement -- "tying
-  reporting back to the prediction pillar") reuses
+- **Prediction accuracy** (tying
+  reporting back to the prediction pillar) reuses
   ``reporting.predicted_vs_actual.join_predicted_vs_actual`` for the
   matching and ``forecasting.evaluation.compute_mae_rmse``/
-  ``compute_directional_accuracy`` for the same metrics Section 11's
-  walk-forward validation reports, computed here over live-observed
+  ``compute_directional_accuracy`` for the same metrics walk-forward
+  validation reports, computed here over live-observed
   predictions instead of held-out training folds.
-- **Diagnosis and recommendation summaries** exist because Section 6's
+- **Diagnosis and recommendation summaries** exist because the
   other two flagship pillars (explainability, traceable recommendations)
   deserve the same "how did this actually perform" treatment prediction
-  gets -- not because ADL-22 wants generic dashboarding of every table.
+  gets -- not because generic dashboarding of every table is wanted.
   System-metrics summaries are the one exception, included only as
   interpretive context for the other three (e.g. "CPU averaged 80% this
   week" explains *why* CPU-Bound diagnoses were frequent), not as an end
@@ -40,7 +40,7 @@ from aiperfopt.storage.reader import (
     get_system_metrics_range,
 )
 
-# Section 9's core monitoring metric set, restricted to the numeric
+# The core monitoring metric set, restricted to the numeric
 # columns that have a meaningful avg/min/max (excludes booleans like
 # power_plugged and identifiers). This is the *system-metrics context*
 # default; prediction-accuracy coverage is independent of this list --
@@ -187,7 +187,7 @@ def build_contention_summary(engine: Engine, start: float, end: float) -> Conten
 
 def build_diagnosis_summary(engine: Engine, start: float, end: float) -> DiagnosisSummary:
     diagnoses = get_diagnoses_range(engine, start=start, end=end)
-    # Zero-filled for every real taxonomy category (Section 12) so a
+    # Zero-filled for every real taxonomy category so a
     # report consumer never has to special-case a missing key for a
     # category that simply didn't occur this window.
     counts = {category.value: 0 for category in DiagnosisCategory}

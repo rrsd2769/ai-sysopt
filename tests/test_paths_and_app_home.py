@@ -1,4 +1,4 @@
-"""Phase 0: the application data root, and every path derived from it.
+"""The application data root, and every path derived from it.
 
 These exist because runtime paths were previously resolved against the
 *current working directory*: starting the server from one directory and

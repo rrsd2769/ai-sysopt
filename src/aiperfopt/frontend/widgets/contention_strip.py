@@ -1,5 +1,5 @@
 """
-Contention-probability strip for the dashboard (Phase 9 sub-part 3): a
+Contention-probability strip for the dashboard: a
 slim rolling chart of predicted contention probability with the fitted
 decision threshold marked, so a viewer can see the probability rise
 *before* a spike rather than only learn about it after a diagnosis fires.
@@ -28,7 +28,7 @@ class ContentionStrip(QWidget):
     Only ticks that actually produced a ``contention`` prediction append a
     point -- a cycle that returned early (no active model, no trained
     classifier, no usable feature row; see
-    ``LiveInferenceLoop._tick``'s early returns, all NFR-11.1 graceful
+    ``LiveInferenceLoop._tick``'s early returns, all graceful
     degradation) leaves a gap in the line rather than plotting a
     fabricated zero.
     """

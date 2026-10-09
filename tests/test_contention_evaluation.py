@@ -78,7 +78,7 @@ def test_run_walk_forward_evaluation_skips_single_class_folds_without_raising():
     assert results == []  # every fold skipped, but no exception raised
 
 
-# --- Phase 5: base rate, PR-AUC, fitted threshold, threshold-rule baseline ---
+# --- base rate, PR-AUC, fitted threshold, threshold-rule baseline ---
 
 
 def test_compute_base_rate():

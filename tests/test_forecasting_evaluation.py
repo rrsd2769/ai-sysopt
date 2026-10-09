@@ -101,7 +101,7 @@ def test_select_best_forecaster_no_baselines_defaults_to_lightgbm():
 
 
 def test_feature_columns_of_excludes_metadata_columns():
-    # Phase 5: current_value is a real feature now, only timestamp/target
+    # current_value is a real feature now, only timestamp/target
     # are metadata.
     df = pd.DataFrame({"timestamp": [1.0], "current_value": [2.0], "target": [3.0], "feat_a": [4.0]})
     assert feature_columns_of(df) == ["current_value", "feat_a"]

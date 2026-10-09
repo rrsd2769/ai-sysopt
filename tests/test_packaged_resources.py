@@ -1,4 +1,4 @@
-"""Phase 0: the YAML configuration must ship inside the distribution.
+"""The YAML configuration must ship inside the distribution.
 
 ``config/default.yaml`` and ``config/recommendations.yaml`` used to live
 in a top-level ``config/`` directory resolved via

@@ -105,8 +105,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 def _cmd_collect(args: argparse.Namespace) -> int:
     """Run monitoring + ingestion, with no API server.
 
-    ``--forever`` is the mode the presentable-predictive-monitor plan's
-    Phase 2 actually wants: passive collection running unattended across
+    ``--forever`` is the mode real use wants: passive collection running unattended across
     normal daily use for days, not a fixed lab-style window. A SIGTERM
     handler is installed so stopping a backgrounded (``nohup ... &``)
     process still flushes the pipeline's in-flight batch and stops the
@@ -170,7 +169,7 @@ def _cmd_export_training_window(args: argparse.Namespace) -> int:
     """Export system metrics + the durable process summary series for a window.
 
     Process-level detail (``raw_process_metrics``/``process_events``) is
-    pruned after a few hours (Phase 2, NFR-4.3) so multi-day passive
+    pruned after a few hours so multi-day passive
     collection stays storage-bounded, but the *derived* process summary
     series survives that pruning in ``process_feature_summaries`` (see
     ``aiperfopt.features.storage_bridge.summarize_and_persist_process_features``,
@@ -354,8 +353,8 @@ def _cmd_train(args: argparse.Namespace) -> int:
 
 
 def _cmd_evaluate(args: argparse.Namespace) -> int:
-    """Run Phase 5's ablation (system-only vs system+process features)
-    against real accumulated usage data, optionally writing the Review 2
+    """Run the ablation (system-only vs system+process features)
+    against real accumulated usage data, optionally writing the
     evidence pack to disk.
 
     Uses recorded data only, since the ablation needs real process data
@@ -505,7 +504,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="aiperfopt",
-        description="Predictive, explainable system health monitor (Windows and macOS).",
+        description="Predictive, explainable system health monitor (macOS).",
     )
     parser.add_argument(
         "--config", type=Path, default=None,
@@ -570,7 +569,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_train.set_defaults(func=_cmd_train, default_log_level="WARNING")
 
     p_evaluate = sub.add_parser(
-        "evaluate", help="Run Phase 5's ablation (system-only vs system+process) on real usage data.",
+        "evaluate", help="Run the ablation (system-only vs system+process) on real usage data.",
     )
     p_evaluate.add_argument("--ablation", action="store_true", help="Print the two-arm comparison.")
     p_evaluate.add_argument("--report", action="store_true", help="Also write the results/ evidence pack.")

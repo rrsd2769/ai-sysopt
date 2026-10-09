@@ -1,17 +1,16 @@
 """
-Read API for the Data Storage subsystem (FR-3.3).
+Read API for the Data Storage subsystem.
 
 Every range query filters and orders on an indexed timestamp column
-(Section 3's ``ix_*_timestamp`` indexes), so these stay fast as raw
+(the ``ix_*_timestamp`` indexes), so these stay fast as raw
 tables grow toward their retention bound.
 
 :func:`get_recent_system_metrics` in particular is on the *live inference*
-critical path (Section 7.3: "Feature Engineering depends on Data Storage
-even for live inference — a historical window is read on every cycle").
+critical path (Feature Engineering reads a historical window on every cycle).
 It is kept intentionally simple — one indexed range scan — since it will
-be called once per monitoring cycle (NFR-2.1: every 1-2 seconds) and its
+be called once per monitoring cycle (every 1-2 seconds) and its
 latency contributes directly to the end-to-end pipeline latency budget
-(NFR-3.1: <= 1 second, sample to prediction).
+(target: <= 1 second, sample to prediction).
 """
 
 from __future__ import annotations
@@ -108,9 +107,9 @@ def get_recent_system_metrics(
 ) -> list[SystemMetricSample]:
     """Read the trailing window of system metrics ending at ``as_of`` (default: now).
 
-    This is the query Feature Engineering (Phase 3) will call once per
+    This is the query Feature Engineering will call once per
     monitoring cycle to compute lag/rolling-window features for live
-    inference (Section 7.3).
+    inference.
     """
     reference = as_of if as_of is not None else time.time()
     return get_system_metrics_range(engine, start=reference - window_seconds, end=reference)
@@ -168,7 +167,7 @@ def get_rollup_range(
     engine: Engine, start: float | None = None, end: float | None = None, limit: int | None = None
 ) -> list[RollupBucket]:
     """Read rolled-up (downsampled) history — used for reporting beyond the
-    full-resolution retention window (NFR-4.1)."""
+    full-resolution retention window."""
     rows = _execute_range(
         engine,
         raw_system_metrics_rollup,
@@ -252,7 +251,7 @@ def get_contention_predictions_range(
     return [ContentionPredictionRecord.from_row(r) for r in rows]
 
 
-# --- Diagnosis (Phase 6) -----------------------------------------------------------
+# --- Diagnosis -----------------------------------------------------------
 
 
 def get_diagnoses_range(
@@ -262,7 +261,7 @@ def get_diagnoses_range(
     return [DiagnosisRecord.from_row(r) for r in rows]
 
 
-# --- Recommendations (Phase 7) ------------------------------------------------------
+# --- Recommendations ------------------------------------------------------
 
 
 def get_recommendations_range(
@@ -285,7 +284,7 @@ def get_evaluations_range(
 def get_evaluations_by_version(engine: Engine, model_version: str) -> list[EvaluationRecord]:
     """Every evaluation row (walk-forward fold + holdout) recorded for one model_version.
 
-    Used by Retraining (Phase 8) to reconstruct a previously-deployed
+    Used by Retraining to reconstruct a previously-deployed
     version's holdout results for comparison against a new candidate,
     without needing a separate "which version was this trained as"
     lookup elsewhere.
@@ -297,7 +296,7 @@ def get_evaluations_by_version(engine: Engine, model_version: str) -> list[Evalu
     return [EvaluationRecord.from_row(r) for r in rows]
 
 
-# --- Model deployments (Phase 8) ----------------------------------------------------
+# --- Model deployments ----------------------------------------------------
 
 
 def get_model_deployments_range(

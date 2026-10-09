@@ -1,20 +1,20 @@
 """
-The Phase 5 ablation: does giving the model process-level leading
+The ablation: does giving the model process-level leading
 indicators actually help predict contention, or not?
 
 Runs the *same* real-usage data and chronological split through the
 training pipelines twice -- once with system-only features ("v1", what
-the model had before Phase 4's pivot), once with system+process features
+the model had before the pivot), once with system+process features
 ("v2", the pivot) -- and reports the delta. This runs against **real
 accumulated usage data**, since process data only exists for recorded
 sessions.
 
-Threads a process summary into the training pipelines via their Phase 5
+Threads a process summary into the training pipelines via their
 ``process_summaries``/``holdout_process_summary`` parameters -- see
 :mod:`aiperfopt.forecasting.training_pipeline` and
-:mod:`aiperfopt.contention.training_pipeline`. This resolves, for the
-ablation specifically, the open question Phase 4's handoff left about
-whether real-usage training should ever see process features; it does
+:mod:`aiperfopt.contention.training_pipeline`. This answers, for the
+ablation specifically, whether real-usage training should ever see
+process features; it does
 **not** change what a real retraining run (:mod:`aiperfopt.lifecycle.
 pipeline`) deploys by default -- that stays v1-shaped pending this
 ablation's actual result.

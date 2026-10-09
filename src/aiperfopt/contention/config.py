@@ -7,7 +7,7 @@ pattern deliberately: a plain dataclass, not a layered pydantic
 derived* (an ML/data-preparation concern analogous to Feature
 Engineering's window/tolerance choices) rather than a runtime operational
 parameter a deployed system needs to reconfigure without a retrain.
-FR-6.3's *decision threshold*, by contrast, genuinely is an operational
+The *decision threshold*, by contrast, genuinely is an operational
 parameter (used at inference time against an already-trained model's
 output) and lives in ``AppSettings.contention`` accordingly — see
 :mod:`aiperfopt.config.settings`.
@@ -25,11 +25,11 @@ class ContentionLabelingConfig:
 
     A row is labeled positive if *any* tracked metric's actual future
     value (at the short forecast horizon) meets or exceeds its threshold
-    here. These map loosely to Section 12's diagnosis taxonomy triggering
+    here. These map loosely to the diagnosis taxonomy triggering
     patterns (e.g. CPU-Bound categories trigger on forecasted CPU rise,
     Memory Pressure on forecasted memory saturation) without resolving to
-    a specific taxonomy label — that resolution is Diagnosis's job
-    (Phase 6), not Contention Prediction's.
+    a specific taxonomy label — that resolution is Diagnosis's job,
+    not Contention Prediction's.
     """
 
     value_thresholds: dict[str, float] = field(

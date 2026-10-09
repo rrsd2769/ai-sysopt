@@ -5,7 +5,7 @@ Call :func:`configure_logging` exactly once, near process startup (before
 any subsystem is constructed), then have every module obtain its logger
 via :func:`get_logger` using its module's dotted name. Using the module
 name as the logger name means the logger name itself doubles as the
-"pipeline stage" tag required by FR-16.1 — e.g. records from
+"pipeline stage" tag — e.g. records from
 ``aiperfopt.monitoring.engine`` are trivially filterable by stage without
 any extra bookkeeping.
 """

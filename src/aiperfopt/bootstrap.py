@@ -12,12 +12,12 @@ initialization order that later subsystems depend on:
        failure constructing the storage engine is logged, not just
        raised).
     3. Create the storage engine and ensure its schema exists
-       (Phase 1: ``aiperfopt.storage.create_all_tables``).
+       (``aiperfopt.storage.create_all_tables``).
 
 Returns an :class:`AppContext` bundling the three, which downstream
 subsystems (Monitoring, Ingestion, etc. in later phases) take as a
 constructor argument rather than reaching for globals — keeping every
-subsystem independently testable (NFR-14.1).
+subsystem independently testable.
 """
 
 from __future__ import annotations

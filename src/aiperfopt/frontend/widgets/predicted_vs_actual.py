@@ -1,7 +1,7 @@
 """
-The predicted-vs-actual comparison view required by FR-13.3, rendering
-Section 6's flagship "wow moment": predicted values plotted alongside
-actual observed values over time, sourced from the Phase 10 reporting
+The predicted-vs-actual comparison view, rendering
+The flagship "wow moment": predicted values plotted alongside
+actual observed values over time, sourced from the reporting
 endpoint (``GET /reporting/predicted-vs-actual``) rather than any
 client-side joining logic (see that endpoint's module docstring for why
 the join lives server-side).

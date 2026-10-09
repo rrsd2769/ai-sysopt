@@ -1,4 +1,4 @@
-"""Phase 10: `create_app(auto_start=True, start_monitoring=False)` must run
+"""`create_app(auto_start=True, start_monitoring=False)` must run
 the live-inference loop without also starting the bundled Monitoring
 pipeline.
 

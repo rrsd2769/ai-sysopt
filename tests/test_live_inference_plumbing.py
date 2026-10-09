@@ -108,7 +108,7 @@ def test_resolve_deployed_forecasters_empty_for_unknown_version(storage_engine: 
 def test_build_live_contention_input_row_feeds_a_real_prediction(storage_engine: Engine, tmp_path: Path):
     """End-to-end: real trained forecaster + classifier + anomaly detector,
     fed a live row built from real stored history, produces a real
-    contention prediction — the exact path Phase 9's live-inference loop
+    contention prediction — the exact path the live-inference loop
     exercises every cycle."""
     fconfig, fsettings, csettings, labeling_config = _fast_settings(tmp_path)
     insert_system_metric_samples_batch(storage_engine, _rising_cpu_samples(300))
@@ -143,7 +143,7 @@ def test_build_live_contention_input_row_feeds_a_real_prediction(storage_engine:
     assert row is not None
     assert "forecast_cpu_percent" in row
     assert "current_cpu_percent" in row
-    assert "confidence_cpu_percent" in row  # Phase 7: persisted alongside the forecast
+    assert "confidence_cpu_percent" in row  # persisted alongside the forecast
     assert "anomaly_score" in row
     assert 0.0 <= row["anomaly_score"] <= 1.0
 
@@ -171,8 +171,8 @@ def test_build_live_contention_input_row_returns_none_with_no_forecasters(storag
 
 @pytest.mark.behavioural
 def test_build_forecast_records_coerces_missing_confidence_and_uses_settings_horizon(tmp_path: Path):
-    """A deployed *baseline* forecaster (Section 10.7's contingency plan) has
-    no ``confidence``/``horizon_seconds`` attribute of its own -- Phase 7's
+    """A deployed *baseline* forecaster (the contingency plan) has
+    no ``confidence``/``horizon_seconds`` attribute of its own -- forecast
     persistence must read those from the row / settings, not the forecaster
     object, and turn pandas' NaN-for-missing-confidence back into ``None``."""
     from types import SimpleNamespace

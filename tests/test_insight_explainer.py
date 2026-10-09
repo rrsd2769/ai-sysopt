@@ -37,7 +37,7 @@ def _trained_forecaster(rng: np.random.Generator, n: int = 150) -> tuple[MetricF
     return forecaster, feature_row
 
 
-# --- should_use_shap_tier: Section 10.5's three triggers, priority order ---
+# --- should_use_shap_tier: the three triggers, priority order ---
 
 
 def test_explicit_request_wins_regardless_of_other_signals():
@@ -107,7 +107,7 @@ def test_shap_forecast_explanation_matches_real_tree_shap_values():
 
 
 def test_shap_and_lightweight_explanations_carry_the_full_v2_column_set():
-    """Phase 4 success criterion: once a forecaster is trained on the v2
+    """Once a forecaster is trained on the v2
     feature set (system gauges + process-summary columns), both
     explanation tiers must carry every one of those columns -- not a
     subset. explain_forecast doesn't hardcode a column list; it reads

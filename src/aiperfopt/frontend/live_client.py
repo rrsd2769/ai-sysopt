@@ -1,18 +1,18 @@
 """
-Streams ``/ws/live`` broadcasts (FR-12.1) into the Qt event loop.
+Streams ``/ws/live`` broadcasts into the Qt event loop.
 
 Uses ``PySide6.QtWebSockets.QWebSocket`` rather than a second background
 thread pushing through queues/signals -- ``QWebSocket`` already integrates
 with Qt's own event loop, so there's no synchronization primitive to
-build here the way the Monitoring Engine needed one (ADL-18's
+build here the way the Monitoring Engine needed one (the
 thread+queue pattern solves a different problem: getting *out* of a
 non-Qt polling thread; this client never leaves the Qt event loop in the
 first place).
 
 Reconnection is deliberately simple: on any disconnect or error, wait a
-fixed backoff and try again, indefinitely, via a ``QTimer``. FR-13's
+fixed backoff and try again, indefinitely, via a ``QTimer``. The
 "consume only through the API" scope doesn't include reasoning about
-backend restarts specially -- the *frontend's* job under NFR-11.2 ("if
+backend restarts specially -- the *frontend's* job ("if
 the backend/Monitoring is unavailable, the UI remains usable") is simply
 to keep trying and let widgets keep showing their last-known state in
 the meantime, not to implement anything fancier (exponential backoff,

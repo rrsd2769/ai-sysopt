@@ -1,4 +1,4 @@
-"""Phase 6's quality gate (Section 11's precision-favoring stance, extended
+"""The quality gate (the precision-favoring stance, extended
 from "don't regress vs. active" to "clear an absolute bar"). See
 :mod:`aiperfopt.lifecycle.comparison`'s module-level docstring for how
 this differs from ``compare_candidate_to_active``.
@@ -146,7 +146,7 @@ def test_gate_excludes_outcomes_with_no_holdout_evaluation_rather_than_failing_t
 
 
 def test_gate_passes_and_says_so_when_nothing_at_all_is_evaluable():
-    """Mirrors Phase 5's honest single-class real-data result: no forecast
+    """Mirrors the honest single-class real-data result: no forecast
     outcome had holdout data and no contention classifier trained. Not a
     failure -- there's nothing to fail -- but not silent either."""
     forecast_summary = TrainingRunSummary(model_version="v1", outcomes=[])

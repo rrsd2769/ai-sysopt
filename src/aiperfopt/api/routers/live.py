@@ -18,7 +18,7 @@ def get_live_state(loop: Annotated[LiveInferenceLoop, Depends(get_live_loop)]):
 
     Returns ``None`` if the live-inference loop hasn't completed a cycle
     yet (e.g. it was only just started, or was never started at all) --
-    not an error; NFR-11.2 requires the API to stay usable even with
+    not an error; the API stays usable even with
     nothing to show yet.
     """
     return loop.latest_state()
@@ -30,7 +30,7 @@ async def live_websocket(
     manager: Annotated[ConnectionManager, Depends(get_connection_manager_ws)],
     loop: Annotated[LiveInferenceLoop, Depends(get_live_loop_ws)],
 ):
-    """Streams every live-inference snapshot to this client as it's produced (FR-12.1).
+    """Streams every live-inference snapshot to this client as it's produced.
 
     On connect, immediately sends whatever the latest snapshot already
     is (if any) so a client doesn't have to wait a full

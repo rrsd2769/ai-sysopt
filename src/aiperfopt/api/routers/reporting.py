@@ -1,22 +1,20 @@
 """
-Reporting endpoints (Section 7.1 item 14, FR-14.1/FR-14.2).
+Reporting endpoints.
 
 Thin wrapper over :mod:`aiperfopt.reporting` -- matching the pattern
 every other subsystem's router already follows (e.g.
 ``routers/retraining.py`` over ``aiperfopt.lifecycle``): the actual
 join/aggregation logic lives in the subsystem package, not here.
 
-- ``GET /reporting/predicted-vs-actual`` -- FR-13.3's per-metric
-  predicted-vs-actual comparison view (built in Phase 10; the join logic
-  itself moved into ``aiperfopt.reporting.predicted_vs_actual`` in Phase
-  11 once ``/reporting/summary`` below became a second consumer of it).
-- ``GET /reporting/summary`` -- FR-14.1's exportable daily/weekly
-  summary, combining system-metrics context with prediction-accuracy
-  (FR-14.2), contention, diagnosis, and recommendation summaries
+- ``GET /reporting/predicted-vs-actual`` -- the per-metric
+  predicted-vs-actual comparison view (the join logic
+  itself moved into ``aiperfopt.reporting.predicted_vs_actual`` once ``/reporting/summary`` below became a second consumer of it).
+- ``GET /reporting/summary`` -- the exportable daily/weekly
+  summary, combining system-metrics context with prediction-accuracy, contention, diagnosis, and recommendation summaries
   (``aiperfopt.reporting.summary.build_report``). ``?download=true``
   returns the same JSON body as a downloadable attachment rather than an
-  inline response -- satisfying FR-14.1's "exportable" without inventing
-  a second format (Section 18 defers format specifics; JSON-over-REST is
+  inline response -- satisfying the "exportable" without inventing
+  a second format (JSON-over-REST is
   the project's existing default everywhere else in the API).
 """
 
@@ -49,7 +47,7 @@ def predicted_vs_actual(
 ):
     """Join forecast predictions against the actual metric value nearest each ``target_timestamp``.
 
-    Powers FR-13.3's predicted-vs-actual comparison view: for every
+    Powers the predicted-vs-actual comparison view: for every
     forecast this model/metric produced in range, this returns the
     predicted value alongside whatever was actually observed closest to
     the moment that prediction was targeting -- ``actual_value`` is
@@ -82,11 +80,11 @@ def summary(
     period: Annotated[str | None, Query(description="'daily' or 'weekly'; ignored if start and end are both given")] = None,
     start: Annotated[float | None, Query(description="Inclusive start timestamp (epoch seconds)")] = None,
     end: Annotated[float | None, Query(description="Inclusive end timestamp (epoch seconds); defaults to now")] = None,
-    download: Annotated[bool, Query(description="Return as a downloadable attachment (FR-14.1)")] = False,
+    download: Annotated[bool, Query(description="Return as a downloadable attachment")] = False,
 ):
     """An exportable report combining system-metrics context with prediction
-    accuracy (FR-14.2), contention, diagnosis, and recommendation summaries
-    over a window (FR-14.1) -- either a named ``period`` ("daily"/"weekly")
+    accuracy, contention, diagnosis, and recommendation summaries
+    over a window -- either a named ``period`` ("daily"/"weekly")
     ending now/at ``end``, or an explicit ``start``/``end`` pair.
     """
     try:
@@ -108,7 +106,7 @@ def summary(
 @router.get("/metrics", response_model=list[str])
 def valid_metric_names() -> list[str]:
     """The metric names ``/predicted-vs-actual`` accepts -- lets a client
-    (e.g. Phase 10's metric picker) build its options from the backend's
+    (e.g. The metric picker) build its options from the backend's
     actual forecasting target set instead of a hardcoded duplicate list.
     """
     return sorted(VALID_METRIC_NAMES)

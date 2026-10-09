@@ -173,12 +173,12 @@ def _seed_process_history(engine: Engine, base: float, poll_interval: float, cou
 
 @pytest.mark.behavioural
 def test_read_process_summary_series_combines_persisted_and_raw(storage_engine: Engine):
-    """Phase 2's retention split means old data survives only as a
+    """The retention split means old data survives only as a
     persisted ProcessFeatureSummaryRecord while recent data is still raw
     -- read_process_summary_series must transparently cover both."""
     old_ts, recent_ts = 100.0, 900.0
 
-    # Old poll: already summarized-and-pruned (Phase 2's steady state) --
+    # Old poll: already summarized-and-pruned (the steady state) --
     # simulate directly via the persisted summaries table.
     insert_process_metric_sample(
         storage_engine, ProcessMetricSample(timestamp=old_ts, pid=1, name="a", cpu_percent=20.0)

@@ -43,7 +43,7 @@ def test_not_triggered_and_no_anomaly_resolves_to_none():
 
 
 def test_triggered_resource_category_wins_over_high_anomaly():
-    """Phase 3, F2: contention/dominance resolution runs before anomaly, not after.
+    """Contention/dominance resolution runs before anomaly, not after.
 
     A high anomaly score no longer short-circuits diagnosis when
     contention is triggered and a resource is dominant -- the resource

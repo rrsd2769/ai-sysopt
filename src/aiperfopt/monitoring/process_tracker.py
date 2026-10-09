@@ -1,7 +1,6 @@
 """
 Process-level polling: per-process metrics plus launch/termination
-detection (FR-1.3), with the process-exclusion privacy mechanism
-(Section 13, NFR-7.4) applied at the source.
+detection, with the process-exclusion privacy mechanism applied at the source.
 
 Correctness note on CPU percent
 --------------------------------
@@ -17,7 +16,7 @@ launch is detected, and every subsequent poll of that pid returns a real
 interval-based delta.
 
 This cache is also exactly the data structure that makes launch/
-termination detection (FR-1.3) a cheap set-diff: pids present now but not
+termination detection a cheap set-diff: pids present now but not
 in the cache are launches; pids in the cache but no longer present are
 terminations.
 """
@@ -34,7 +33,7 @@ from aiperfopt.storage.records import ProcessEvent, ProcessMetricAggregate, Proc
 
 logger = get_logger(__name__)
 
-# Default storage bound (Phase 2): top-N by CPU union top-N by memory RSS
+# Default storage bound: top-N by CPU union top-N by memory RSS
 # are individually stored; used when a caller doesn't pass its own
 # top_n (e.g. direct ProcessTracker() construction in tests). Production
 # callers should pass MonitoringSettings.process_capture_top_n instead of
@@ -67,7 +66,7 @@ def bound_process_metrics(
     """
     if len(metrics) <= top_n * 2:
         # Nothing to truncate -- still emit a zero aggregate row so every
-        # poll cycle produces exactly one (Phase 2 success criterion).
+        # poll cycle produces exactly one.
         return list(metrics), ProcessMetricAggregate(
             timestamp=timestamp, other_count=0, other_cpu_sum=0.0, other_mem_rss_sum=0
         )
@@ -100,7 +99,7 @@ class ProcessTracker:
         self._excluded = excluded_process_names
         self._capture_top_n = capture_top_n
         # The very first poll establishes a baseline of already-running
-        # processes; those are not "launches" (FR-1.3 concerns *new*
+        # processes; those are not "launches" (launches mean *new*
         # events observed during monitoring, not a dump of everything
         # already running when the engine starts).
         self._baseline_established = False
@@ -118,7 +117,7 @@ class ProcessTracker:
         Returns metrics for every non-excluded live process, plus launch
         events for newly-seen pids and termination events for pids that
         vanished since the last poll. Excluded processes never appear in
-        the returned metrics *or* events, satisfying Section 13's "exclude
+        the returned metrics *or* events, satisfying the "exclude
         specific processes from historical storage, analytics,
         prediction, and reporting" — exclusion happens before anything is
         even queued, so no downstream stage ever sees them.
@@ -185,7 +184,7 @@ class ProcessTracker:
 
             except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as exc:
                 # A single process disappearing or being unreadable mid-scan
-                # is routine, not an engine-level failure (FR-1.4's
+                # is routine, not an engine-level failure (the
                 # per-source degradation philosophy applied at process
                 # granularity). Drop it from the cache so it doesn't leak.
                 self._processes.pop(pid, None)

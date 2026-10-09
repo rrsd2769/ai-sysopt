@@ -6,7 +6,7 @@ their shared queue.
 background threads itself — it only prepares config/logging/storage.
 Starting the live pipeline is a distinct, explicit action, taken here by
 whichever entrypoint wants a running monitor (a future CLI command, the
-Phase 9 API server's startup hook, or a test/demo script). Keeping this
+API server's startup hook, or a test/demo script). Keeping this
 separate from ``bootstrap()`` means importing the package, or running its
 test suite, never has the side effect of spawning threads.
 """

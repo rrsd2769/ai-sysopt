@@ -1,8 +1,8 @@
 """
 Read-only historical query endpoints. Every one of these is a thin
 wrapper over an already-existing, already-tested
-:mod:`aiperfopt.storage.reader` function — FR-12.2 requires historical
-queries be exposed via REST, not that this layer invent new query logic.
+:mod:`aiperfopt.storage.reader` function — historical
+queries are exposed via REST; this layer does not invent new query logic.
 Query parameters (``start``, ``end``, ``limit``) map directly onto each
 reader function's own parameters.
 """

@@ -70,13 +70,13 @@ class MetricHorizonOutcome:
     holdout_directional_accuracy: float | None
     artifact_path: str | None = None
     is_counter: bool = False
-    # Phase 5's evidence pack (aiperfopt.evaluation.report): mean |SHAP
+    # The evidence pack (aiperfopt.evaluation.report): mean |SHAP
     # value| per feature over the holdout set, for the winning LightGBM
     # model only. Only populated when the caller opts in via
     # ``compute_feature_importance`` -- computing SHAP on every ordinary
     # training/retraining run would be pure overhead nobody asked for.
     feature_importance: dict[str, float] | None = None
-    # Phase 6's quality gate needs a persistence-baseline number measured
+    # The quality gate needs a persistence-baseline number measured
     # on the *same* holdout set the deployed model was scored on (not the
     # walk-forward CV mean, which is a different data slice) -- otherwise
     # "beats persistence" would be comparing two different evaluations.
@@ -240,7 +240,7 @@ def train_evaluate_and_select_one(
 
     selected = select_best_forecaster_name(summary, forecasting_settings.baseline_improvement_margin)
 
-    # Held-out generalization check (Section 11) — the scenario reserved
+    # Held-out generalization check — the scenario reserved
     # here never appeared in any walk-forward training fold above.
     holdout_fm = compute_feature_matrix(holdout_samples, feature_config, process_summary=holdout_process_summary)
     holdout_dataset = build_supervised_dataset(
@@ -319,7 +319,7 @@ def train_evaluate_and_select_one(
 
 
 def _shap_feature_importance(model: MetricForecaster, X: pd.DataFrame) -> dict[str, float]:
-    """Mean |SHAP value| per feature over ``X`` — Phase 5's evidence-pack
+    """Mean |SHAP value| per feature over ``X`` — the evidence-pack
     feature ranking (expected to show process features ranking highly for
     the "system + process" ablation arm)."""
     import numpy as np

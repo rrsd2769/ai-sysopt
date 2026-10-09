@@ -3,10 +3,10 @@ Live contention prediction: the classifier's raw probability, adjusted by
 Anomaly Detection's score, resolved into contributing metrics/processes,
 and packaged as a storable :class:`ContentionPredictionRecord`.
 
-Anomaly-score dampening (FR-7.2)
+Anomaly-score dampening
 ------------------------------------
-FR-7.2 requires anomaly output to "modulate contention-prediction
-confidence." The ``contention_predictions`` schema (Phase 1) has no
+Anomaly output must "modulate contention-prediction
+confidence." The ``contention_predictions`` schema has no
 separate confidence column distinct from ``probability`` — so probability
 itself is the carrier: ``adjusted = raw * (1 - dampening_factor *
 anomaly_score)``. A highly anomalous reading (the classifier is

@@ -1,9 +1,9 @@
 """
 Evaluation for the Contention Prediction classifier.
 
-FR-10.1's specific metrics (MAE, RMSE, directional accuracy) are defined
+The specific metrics (MAE, RMSE, directional accuracy) are defined
 for *forecasting* models — they don't apply to a binary classifier.
-Section 11's broader methodology (chronological walk-forward folds,
+The broader methodology (chronological walk-forward folds,
 precision favored over recall since false positives erode trust faster
 than occasional misses) does apply, and is what this module implements:
 ``TimeSeriesSplit`` chronological folds (consistent with
@@ -12,7 +12,7 @@ configured decision threshold. Results are persisted into the same
 ``evaluations`` table Forecasting uses, with the classification-specific
 metrics carried in the nullable ``extra`` JSON column rather than the
 MAE/RMSE/directional_accuracy columns (which are left null for these
-rows) — no schema change needed, since Phase 1's schema already
+rows) — no schema change needed, since the schema already
 anticipated evaluation rows not populating every numeric column.
 """
 
@@ -56,7 +56,7 @@ class ContentionFoldMetrics:
 
 def compute_base_rate(labels: pd.Series) -> float:
     """Fraction of positive labels — the number an accuracy figure would
-    hide (Section 5's "report the base rate explicitly": real passive
+    hide (report the base rate explicitly: real passive
     data is heavily negative, so even a model that always predicts "no
     contention" scores a deceptively high accuracy)."""
     if len(labels) == 0:
@@ -79,7 +79,7 @@ def compute_pr_auc(probabilities: pd.Series, labels: pd.Series) -> float:
 
 def fit_decision_threshold(probabilities: pd.Series, labels: pd.Series) -> tuple[float, dict[str, float]]:
     """Pick the decision threshold from a precision-recall curve rather
-    than a config constant (Section 5, FR-6.3's operational parameter
+    than a config constant (the operational parameter
     now has a data-driven starting point): the threshold on the curve
     that maximizes F1.
 
@@ -123,7 +123,7 @@ def fit_decision_threshold(probabilities: pd.Series, labels: pd.Series) -> tuple
 def evaluate_threshold_rule_baseline(
     dataset: pd.DataFrame, labeling_config: ContentionLabelingConfig
 ) -> dict[str, float]:
-    """The baseline contention prediction never had (Section 5): predict
+    """The baseline contention prediction never had: predict
     contention iff the *current* value of any tracked metric already
     meets its own labeling threshold -- no model, no forecast, just "is
     it already bad right now."

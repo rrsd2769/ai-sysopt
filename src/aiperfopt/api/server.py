@@ -4,7 +4,7 @@ Run with: ``python -m aiperfopt.api.server``
 The real server entrypoint -- builds the app with ``auto_start=True`` (so
 Monitoring and live inference are running from the moment the server is
 up, matching the flagship demo's expectation of a continuously-running
-monitor, Section 6) and serves it with uvicorn on the configured host/port.
+monitor) and serves it with uvicorn on the configured host/port.
 
 ``start_monitoring=False`` (``aiperfopt serve --no-monitor``) skips only
 the bundled Monitoring pipeline, keeping the live-inference loop running

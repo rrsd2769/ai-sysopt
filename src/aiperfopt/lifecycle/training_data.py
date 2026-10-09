@@ -41,14 +41,13 @@ def build_real_usage_training_data(
         available history when omitted.
     holdout_fraction:
         Fraction of the chronologically-ordered rows reserved as the
-        held-out generalization check (Section 11) — always the *most
+        held-out generalization check — always the *most
         recent* fraction, never an earlier slice, so training data never
-        contains information from after the holdout period (ADL-10).
+        contains information from after the holdout period.
     min_total_rows:
         Minimum number of rows required across the whole window before
         this is considered usable retraining data. Real usage data
-        accumulates gradually (Section 10.3: "not required to mature
-        within the course timeline") — calling this too early should
+        accumulates gradually — calling this too early should
         fail clearly rather than silently training on a handful of rows.
 
     Returns

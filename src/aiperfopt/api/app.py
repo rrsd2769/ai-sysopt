@@ -1,8 +1,8 @@
 """
-The API Layer entrypoint (Section 7.1 item 12). FR-12.4 requires this to
-be the *only* access path to backend functionality — every route here
-calls into an already-existing, already-tested subsystem function
-(Phases 1-8); this module's own job is strictly wiring: build an
+The API Layer entrypoint. This is
+the *only* access path to backend functionality — every route here
+calls into an already-existing, already-tested subsystem function;
+this module's own job is strictly wiring: build an
 :class:`AppContext`, assemble the Monitoring pipeline and live-inference
 loop around it, and mount the REST/WebSocket routers.
 
@@ -122,7 +122,7 @@ def create_app(
 
     app = FastAPI(
         title="AI System Performance Optimizer API",
-        description="Predictive, explainable macOS system health monitor -- API Layer (Phase 9, FR-12).",
+        description="Predictive, explainable macOS system health monitor -- API Layer.",
         lifespan=lifespan,
     )
     app.state.ctx = ctx

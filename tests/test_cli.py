@@ -1,4 +1,4 @@
-"""Phase 0: the command-line entrypoint.
+"""The command-line entrypoint.
 
 The project previously had no entrypoint at all -- no ``console_scripts``
 and no ``python -m aiperfopt`` -- so reaching a working system required
@@ -143,7 +143,7 @@ def test_export_training_window_writes_system_metrics_and_process_summaries(
 
 @pytest.mark.plumbing
 def test_collect_forever_stops_cleanly_on_sigterm(clean_home: Path) -> None:
-    """The Phase 2 background-collection mode: SIGTERM must flush and exit 0,
+    """The background-collection mode: SIGTERM must flush and exit 0,
     not be killed mid-write the way the default SIGTERM handler would."""
     env = {**os.environ, HOME_ENV_VAR: str(clean_home)}
     proc = subprocess.Popen(

@@ -1,11 +1,11 @@
-"""Forecasting Models + Model Evaluation & Validation (Section 7.1, items 5 & 10).
+"""Forecasting Models + Model Evaluation & Validation.
 
 - ``dataset``             -> supervised dataset construction (feature matrix + forward-looking label)
-- ``baselines``            -> the shared Forecaster protocol + 3 mandatory baselines (Section 10.8)
-- ``model``                 -> MetricForecaster, the LightGBM-backed forecaster (ADL-13)
+- ``baselines``            -> the shared Forecaster protocol + 3 mandatory baselines
+- ``model``                 -> MetricForecaster, the LightGBM-backed forecaster
 - ``persistence``           -> save/load trained model artifacts
-- ``evaluation``             -> walk-forward validation harness (Section 11, FR-10.1)
-- ``training_pipeline``       -> the Phase 4 entrypoint: train_and_evaluate_all()
+- ``evaluation``             -> walk-forward validation harness
+- ``training_pipeline`` -> the entrypoint: train_and_evaluate_all
 """
 
 from aiperfopt.forecasting.baselines import (

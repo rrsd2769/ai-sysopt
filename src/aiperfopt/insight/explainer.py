@@ -1,7 +1,7 @@
 """
-Tiered explainability (Section 10.5, FR-8.1, NFR-1.3, NFR-9.1, ADL-14, ADL-21).
+Tiered explainability.
 
-Section 10.5 requires explanation generation to be *tiered*: a lightweight
+Explanation generation is *tiered*: a lightweight
 explanation available during routine monitoring, escalating to expensive
 SHAP-class computation only on high-confidence contention predictions,
 significant anomalies, or explicit Developer Mode request. This module is
@@ -15,13 +15,13 @@ two real options exist with a real cost difference:
 
 - **Lightweight**: the booster's own native ``feature_importance()`` — a
   global, training-time-computed ranking, effectively free to read at
-  request time (NFR-1.3's "must not run on the default monitoring
+  request time (the "must not run on the default monitoring
   cycle" is trivially satisfied since nothing is computed per-request).
 - **SHAP**: ``shap.TreeExplainer(booster).shap_values(row)`` — a genuine
-  per-instance, per-request computation (ADL-14), more expensive and
-  exactly what Section 10.5 means by "SHAP-class methods."
+  per-instance, per-request computation, more expensive and
+  exactly the "SHAP-class methods" tier.
 
-Section 10.7's contingency plan means the *deployed* forecaster for a
+The contingency plan means the *deployed* forecaster for a
 given metric/horizon may not be LightGBM at all (a baseline can win).
 Baselines have no learned per-feature attribution to give at either
 tier — :func:`explain_forecast` handles this by returning a
@@ -102,11 +102,11 @@ def should_use_shap_tier(
     anomaly_significant_threshold: float,
     explicit_request: bool,
 ) -> tuple[bool, str]:
-    """Section 10.5's three SHAP triggers, in priority order.
+    """The three SHAP triggers, in priority order.
 
-    Returns ``(use_shap, trigger_reason)``. ``triggered`` (FR-6.3's
+    Returns ``(use_shap, trigger_reason)``. ``triggered`` (the
     conservative decision threshold already having cleared) stands in for
-    "high-confidence contention prediction" — Section 11 already tunes
+    "high-confidence contention prediction" — that threshold is already tuned
     that threshold conservatively in favor of precision, so a triggered
     prediction *is* the system's own definition of high-confidence; a
     separate, stricter "high confidence" threshold here would be a second
@@ -164,7 +164,7 @@ def explain_forecast(
             tier=EXPLANATION_TIER_NOT_APPLICABLE,
             note=(
                 f"'{metric_name}' is currently forecast by the {kind} baseline, not the "
-                "LightGBM model — Section 10.7's contingency plan selected it because it "
+                "LightGBM model — the contingency plan selected it because it "
                 "validated at least as well as LightGBM for this metric. It is a simple, "
                 "formula-based extrapolation (not a learned model), so no per-feature "
                 "attribution applies; the forecast itself is still shown, just without "

@@ -1,11 +1,11 @@
 """
-Thin synchronous REST client over the Phase 9 API layer (FR-13.2).
+Thin synchronous REST client over the API layer.
 
 Deliberately dumb: every method is a one-line ``self._client.get/post``
 plus response-JSON return. No caching, no retry logic, no business rules
--- those all already live on the backend (Phases 1-9); this module's only
-job is "make the HTTP call and hand back parsed JSON," matching FR-12.4's
-"the API is the only access path" from the client side, not layering a
+-- those all already live on the backend; this module's only
+job is "make the HTTP call and hand back parsed JSON,"
+keeping the API the only access path, not layering a
 second copy of any pipeline decision.
 
 Deliberately framework-agnostic (no PySide6 import here) so it's testable
@@ -86,7 +86,7 @@ class ApiClient:
         response = self._client.post(path, json=json, timeout=timeout)
         return _unwrap(response)
 
-    # --- system (Phase 9 api/routers/system.py) -----------------------------
+    # --- system (api/routers/system.py) -----------------------------
 
     def health(self) -> dict:
         return self._get("/health")
@@ -120,7 +120,7 @@ class ApiClient:
     def get_live_state(self) -> dict | None:
         return self._get("/live/state")
 
-    # --- history (Phase 9 api/routers/history.py) ---------------------------
+    # --- history (api/routers/history.py) ---------------------------
 
     def get_system_metrics(
         self, start: float | None = None, end: float | None = None, limit: int | None = None
@@ -168,7 +168,7 @@ class ApiClient:
     def get_latest_deployment(self) -> dict | None:
         return self._get("/deployments/latest")
 
-    # --- reporting (Phase 10's own small addition) ---------------------------
+    # --- reporting (its own small addition) ---------------------------
 
     def get_predicted_vs_actual(
         self,
@@ -197,7 +197,7 @@ class ApiClient:
     ) -> dict:
         return self._get("/reporting/summary", {"period": period, "start": start, "end": end})
 
-    # --- retraining (Phase 9 api/routers/retraining.py) ----------------------
+    # --- retraining (api/routers/retraining.py) ----------------------
 
     def get_active_model_version(self) -> dict:
         return self._get("/retraining/active-version")
@@ -209,8 +209,7 @@ class ApiClient:
         start: float | None = None,
         end: float | None = None,
     ) -> dict:
-        # PROJECT_HANDOFF.md flags /retraining/run as synchronous and
-        # potentially multi-minute (Section 14's own performance notes) --
+        # /retraining/run is synchronous and potentially multi-minute, so
         # a much longer per-request timeout than the default is used here
         # deliberately, rather than the caller's UI-responsive default;
         # the caller (RetrainingPanel) already runs this off the UI thread

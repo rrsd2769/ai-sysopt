@@ -1,12 +1,12 @@
 """
-Rolling actual-vs-forecast trend chart for the dashboard (Phase 9 sub-part
-2, F9's flagship "predictive" moment): a rolling window of actual CPU and
+Rolling actual-vs-forecast trend chart for the dashboard (the
+flagship "predictive" moment): a rolling window of actual CPU and
 memory as solid lines, with the current forecast drawn as a dashed
 continuation past "now" plus a confidence band.
 
 Fed one ``LiveStateOut``-shaped dict per tick via :meth:`update_state`,
 same pattern as ``DashboardWidget`` -- this widget holds no fetching logic
-of its own (FR-13.2). Unlike ``PredictedVsActualChart`` (which renders an
+of its own. Unlike ``PredictedVsActualChart`` (which renders an
 already-complete history from the reporting endpoint), this widget has to
 build its own rolling history client-side: a ``LiveStateOut`` snapshot
 carries only the current tick's ``latest_metrics``/``forecasts``, never a
@@ -180,7 +180,7 @@ class LiveTrendChart(QWidget):
         forecast_series.append(now_ms, float(current_value))
         forecast_series.append(target_ms, predicted)
 
-        # `confidence` is a 0-1 model-derived scalar (ADL-11: "uncalibrated"),
+        # `confidence` is a 0-1 model-derived scalar ("uncalibrated"),
         # not an interval, so there is no true upper/lower bound to plot.
         # This widens the band linearly as confidence drops toward 0, up to
         # a fixed cap, so a low-confidence forecast visibly hedges more

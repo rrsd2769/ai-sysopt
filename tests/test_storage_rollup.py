@@ -161,7 +161,7 @@ def test_process_retention_is_independent_of_system_retention(storage_engine: En
     """A row too old for the (short) process window but well within the
     (long) system window: system metrics at that timestamp survive while
     process rows at the same timestamp are pruned -- the two retention
-    windows are separate cutoffs, not one shared cutoff (Phase 2)."""
+    windows are separate cutoffs, not one shared cutoff."""
     now = 100_000.0
     mid_age_ts = now - (10 * 3600)  # 10 hours old: > 6h process window, < 72h system window
 

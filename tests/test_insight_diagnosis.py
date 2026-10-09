@@ -102,7 +102,7 @@ def test_triggered_cpu_event_persists_single_process_diagnosis(storage_engine: E
     assert result is not None
     assert result.category == DiagnosisCategory.CPU_SINGLE_PROCESS.value
     assert result.is_actionable is True
-    assert result.explanation_tier == "shap"  # triggered => high-confidence trigger per Section 10.5
+    assert result.explanation_tier == "shap"  # triggered => high-confidence trigger
     assert "stress_test" in result.plain_language_explanation
     assert len(result.forecast_explanations) == 1
     assert result.forecast_explanations[0]["metric_name"] == "cpu_percent"
@@ -110,10 +110,10 @@ def test_triggered_cpu_event_persists_single_process_diagnosis(storage_engine: E
 
     # Regression test: diagnose_contention_event() originally discarded the
     # int id returned by insert_diagnosis(), leaving result.id == None even
-    # though the row was persisted — silently breaking FR-9.3's requirement
-    # that a downstream Recommendation Engine (Phase 7) be able to trace
+    # though the row was persisted — silently breaking the requirement
+    # that a downstream Recommendation Engine be able to trace
     # back to the specific diagnosis. Caught via manual smoke-testing
-    # while building Phase 7, before Phase 7's own tests were written.
+    # while building recommendations, before its own tests were written.
     assert result.id is not None
 
     persisted = get_diagnoses_range(storage_engine)
@@ -123,12 +123,12 @@ def test_triggered_cpu_event_persists_single_process_diagnosis(storage_engine: E
 
 
 def test_high_anomaly_with_triggered_cpu_contention_resolves_to_cpu_category(storage_engine: Engine):
-    """Phase 3, F2: a triggered resource category wins over a high anomaly score.
+    """A triggered resource category wins over a high anomaly score.
 
     Same triggering row as ``test_triggered_cpu_event_persists_single_process_diagnosis``,
     but with ``anomaly_score`` significant (0.9 >= the 0.7 threshold). Before
-    Phase 3 this used to short-circuit straight to UNUSUAL_PATTERN_ANOMALY,
-    which is exactly the F1/F2 bug: since a pre-Phase-3 detector scored
+    this was fixed it used to short-circuit straight to UNUSUAL_PATTERN_ANOMALY,
+    which is exactly the old bug: since the earlier detector scored
     every real sample close to 1.0, this path was effectively the *only*
     one ever reachable in practice, and the other 7 actionable categories
     were dead. The anomaly score is still visible on the record; it's

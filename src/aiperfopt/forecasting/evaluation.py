@@ -1,16 +1,15 @@
 """
-Model Evaluation & Validation (Section 7.1, item 10).
+Model Evaluation & Validation.
 
 Walk-forward (rolling-origin) validation via ``sklearn.model_selection.
-TimeSeriesSplit`` — the chronological-fold primitive Section 11/ADL-10
-specifically calls for, as opposed to a random train/test split (which
+TimeSeriesSplit`` — the chronological-fold primitive, as opposed to a random train/test split (which
 would leak future information into training for time-series data).
 
 Every fold trains a fresh :class:`~aiperfopt.forecasting.model.MetricForecaster`
 on the fold's training rows and evaluates it, plus every baseline from
 :mod:`aiperfopt.forecasting.baselines`, on the same held-out fold — so
 model-vs-baseline comparisons are always apples-to-apples on identical
-test data (FR-10.2).
+test data.
 """
 
 from __future__ import annotations
@@ -56,7 +55,7 @@ def compute_directional_accuracy(
     current: np.ndarray, y_true: np.ndarray, y_pred: np.ndarray, stability_threshold: float
 ) -> float:
     """Fraction of test points where the predicted direction (rising/falling/stable
-    relative to ``current``) matches the actual direction (Section 11).
+    relative to ``current``) matches the actual direction.
 
     A change is "stable" if it's within ``stability_threshold`` of
     ``current`` in relative terms — without this, two values that are
@@ -235,15 +234,15 @@ def mean_metrics_by_model(fold_results: list[FoldMetrics]) -> dict[str, dict[str
 def select_best_forecaster_name(
     summary: dict[str, dict[str, float]], improvement_margin: float
 ) -> str:
-    """Section 10.7's contingency plan: pick "lightgbm" only if it beats every
+    """The contingency plan: pick "lightgbm" only if it beats every
     baseline's mean MAE by at least ``improvement_margin`` (relative); otherwise
     fall back to whichever baseline had the lowest mean MAE.
 
     A model that does not meaningfully outperform the baselines is not
-    deployed as the primary forecaster (Section 10.8) — this function is
+    deployed as the primary forecaster — this function is
     the concrete decision point that enforces that rule, and its outcome
     is always stored (see :mod:`aiperfopt.forecasting.training_pipeline`)
-    so the choice is documented transparently either way (ADL-35).
+    so the choice is documented transparently either way.
     """
     baseline_names = [name for name in summary if name != "lightgbm"]
     if not baseline_names:

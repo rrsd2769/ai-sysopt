@@ -1,11 +1,10 @@
-"""Phase 2 of docs/plans/2026-09-12-presentable-predictive-monitor.md:
-the monitor must not be a burden on a machine it's expected to run on
+"""The monitor must not be a burden on a machine it's expected to run on
 passively for days. These are the tests that fail if a future change
 makes the pipeline itself heavy.
 
 The measurement itself lives in :mod:`aiperfopt.monitoring.overhead`
-(extracted in Phase 5 so the same function also produces
-``results/overhead.txt`` for the Review 2 evidence pack, instead of this
+(extracted so the same function also produces
+``results/overhead.txt`` for the evidence pack, instead of this
 budget-enforcement logic being test-only) -- these tests just call it and
 assert against its documented budgets.
 """

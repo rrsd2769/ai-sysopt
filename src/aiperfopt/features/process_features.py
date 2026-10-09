@@ -1,8 +1,7 @@
 """
 Process summary series — pure functions turning a window of raw
-process-level data into a compact, per-poll-timestamp summary (Phase 2 of
-``docs/plans/2026-09-12-presentable-predictive-monitor.md``), plus the
-Phase 4 alignment step that re-expresses that summary on an arbitrary
+process-level data into a compact, per-poll-timestamp summary, plus the
+alignment step that re-expresses that summary on an arbitrary
 timeline (the system-metric one, in practice).
 
 Two timelines, two functions
@@ -11,14 +10,14 @@ Process metrics are polled on their own loop
 (``AppSettings.process_polling_interval_seconds``), independent of the
 system-metrics loop (see ``aiperfopt.monitoring.engine``) — the two sets
 of timestamps generally don't coincide. :func:`compute_process_summary_series`
-produces one row per *process-poll* timestamp (Phase 2's durability
+produces one row per *process-poll* timestamp (the durability
 concern, below). :func:`align_process_summary_to_timestamps` re-samples
 that per-poll series onto a *different*, caller-supplied set of
-timestamps — what Feature Engineering (Phase 4) needs to feed these
+timestamps — what Feature Engineering needs to feed these
 columns through :func:`aiperfopt.features.engine.compute_feature_matrix`
 alongside the system metrics, which are keyed by the system-metric
 timeline. Keeping these as two functions (rather than one that takes an
-optional "eval timestamps" override) keeps Phase 2's persistence path
+optional "eval timestamps" override) keeps the persistence path
 byte-for-byte unchanged: it always aligns to its own poll timestamps at
 zero tolerance, exactly as it always has.
 
@@ -34,7 +33,7 @@ summarize_and_persist_process_features` for where that happens.
 
 Working at the process poll's own timestamp, not the system-metric
 timeline, keeps this module a pure function of process-level tables only
-(NFR-14.1's testability-in-isolation, same rationale as
+(testable in isolation, same rationale as
 ``aiperfopt.features.engine`` for system metrics) — it has no dependency
 on ``FeatureEngineeringConfig`` and doesn't need to know the system
 polling interval to do its job correctly.
@@ -46,11 +45,11 @@ timestamp (event-derived columns use strictly backward-looking windows:
 "launches in the 30s *before* t"). No feature at time t is ever affected
 by a sample recorded after t.
 
-Reconstructing whole-population sums under the Phase 2 storage bound
+Reconstructing whole-population sums under the storage bound
 ----------------------------------------------------------------------
 ``process_metrics`` only contains the top-N-by-CPU union top-N-by-memory
 rows that :func:`aiperfopt.monitoring.process_tracker.bound_process_metrics`
-decided to keep (Phase 2's storage bound) — not every process. Passing
+decided to keep (the storage bound) — not every process. Passing
 the accompanying ``process_aggregates`` ("everything else") rows lets
 whole-population sums/counts (``proc_cpu_sum``, ``proc_mem_rss_sum``,
 ``proc_count_active``) be reconstructed exactly by adding the aggregate
@@ -94,10 +93,6 @@ _LAUNCH_COUNT_WINDOWS = {"proc_launch_count_30s": 30.0, "proc_launch_count_120s"
 _TERMINATE_COUNT_WINDOWS = {"proc_terminate_count_30s": 30.0}
 _BURST_LOOKBACK_SECONDS = 30.0
 _BURST_WINDOW_SECONDS = 10.0
-
-_PROCESS_METRICS_COLUMNS = ("timestamp", "pid", "cpu_percent", "memory_rss", "num_threads", "create_time")
-_PROCESS_EVENTS_COLUMNS = ("timestamp", "event_type")
-_PROCESS_AGGREGATE_COLUMNS = ("timestamp", "other_count", "other_cpu_sum", "other_mem_rss_sum")
 
 
 def _empty_summary_frame() -> pd.DataFrame:
@@ -231,17 +226,17 @@ def compute_process_summary_series(
         Rows shaped like ``raw_process_metrics`` — must have at least
         ``timestamp``, ``pid``, ``cpu_percent``; ``memory_rss``,
         ``num_threads``, ``create_time`` are treated as 0/absent if
-        missing or null. May be top-N-bounded (Phase 2) rather than a
+        missing or null. May be top-N-bounded rather than a
         full per-process enumeration.
     process_events:
         Rows shaped like ``process_events`` (``timestamp``, ``event_type``
         of "launch"/"terminate") — always a complete enumeration,
-        unaffected by the Phase 2 storage bound. May be empty.
+        unaffected by the storage bound. May be empty.
     process_aggregates:
         Rows shaped like ``raw_process_metrics_other`` (``timestamp``,
         ``other_count``, ``other_cpu_sum``, ``other_mem_rss_sum``) — at
         most one row per poll timestamp. May be empty (e.g. for data
-        collected before Phase 2, or a poll with nothing truncated).
+        collected before process summaries existed, or a poll with nothing truncated).
     """
     if process_metrics.empty:
         return _empty_summary_frame()

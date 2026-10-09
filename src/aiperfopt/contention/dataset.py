@@ -1,14 +1,14 @@
 """
-Supervised dataset construction for Contention Prediction (FR-6.1).
+Supervised dataset construction for Contention Prediction.
 
-FR-6.1 requires the classifier to consume "forecast outputs plus current
+The classifier consumes "forecast outputs plus current
 system state" — explicitly *not* raw/engineered metrics directly. This
 module is what enforces that boundary structurally: it builds a dataset
 whose only feature columns are ``forecast_{metric}`` (from each target
-metric's already-trained, already-selected Phase 4 forecaster),
+metric's already-trained, already-selected forecaster),
 ``current_{metric}`` (the metric's own present value), and
 ``anomaly_score`` (from a trained :class:`~aiperfopt.anomaly.detector.AnomalyDetector`
-on the same feature vectors, per Section 7.2's data-flow diagram). The
+on the same feature vectors). The
 full lag/rolling/rate engineered feature matrix from
 :mod:`aiperfopt.features` is used only as an *intermediate* — to compute
 forecasts and the anomaly score — and never appears directly in the
@@ -63,7 +63,7 @@ def build_contention_dataset(
     dataset construction handles the tail of a series).
 
     ``process_summary``: optional, already-aligned process-summary frame
-    (Phase 4/5) merged into the intermediate engineered feature matrix
+    merged into the intermediate engineered feature matrix
     used to compute the anomaly score -- see
     :func:`aiperfopt.features.engine.compute_feature_matrix`. Omitted
     (the default) reproduces exactly pre-Phase-5 behavior.
@@ -92,7 +92,7 @@ def build_contention_dataset(
         # would silently degrade to its history=None fallback (effectively
         # naive persistence), understating what the actually-deployed
         # forecaster (which may genuinely be ExponentialSmoothingForecaster
-        # — Section 10.7's contingency plan can and does select it) would
+        # — the contingency plan can and does select it) would
         # really produce.
         raw_df = pd.DataFrame.from_records(
             [{"timestamp": s.timestamp, metric_name: getattr(s, metric_name)} for s in samples]
@@ -163,10 +163,10 @@ def build_live_contention_input_row(
     the classifier's model features (``ContentionClassifier.predict_proba``
     reindexes to its own trained ``feature_columns`` and ignores it), but
     the live-inference loop needs each forecaster's per-call confidence to
-    persist alongside its prediction (Phase 7), and this is the one place
+    persist alongside its prediction, and this is the one place
     that already calls ``forecaster.predict()`` per metric — recomputing
     it a second time downstream would double the cost of the classical
-    (Holt/ETS) baseline's per-tick fit, which Phase 2's overhead budget
+    (Holt/ETS) baseline's per-tick fit, which the overhead budget
     exists precisely to keep in check.
 
     Returns ``None`` if there are no deployed forecasters, or if any

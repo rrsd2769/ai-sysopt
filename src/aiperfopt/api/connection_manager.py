@@ -2,9 +2,9 @@
 Tracks connected WebSocket clients and broadcasts each live-inference
 snapshot to all of them. Deliberately minimal: no per-client filtering
 or backpressure handling beyond "drop a connection that errors on
-send" — Section 5's single-machine, single-user V1 scope means this
+send" — the single-machine, single-user V1 scope means this
 never needs to handle more than a handful of concurrent local
-connections (NFR-6.1).
+connections.
 """
 
 from __future__ import annotations

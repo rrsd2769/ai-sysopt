@@ -1,11 +1,11 @@
 """
-Contributing processes lookup (FR-6.2's "list of contributing... processes").
+Contributing processes lookup (the list of contributing processes).
 
 Not a learned model — a straightforward lookup against recent
 ``raw_process_metrics``, resolved once the dominant contributing *metric*
 is already known (from :class:`~aiperfopt.contention.model.ContentionClassifier`'s
 coefficient-based attribution). This matches the flagship demo's own
-framing (Section 6): "Primary contributing processes are X, Y, Z" is
+framing: "Primary contributing processes are X, Y, Z" is
 presented as a straightforward attribution, not as a separately-trained
 per-process prediction — which the spec never asks for and which would
 require an entirely different, much larger-scoped model (per-process
@@ -23,8 +23,8 @@ from aiperfopt.storage.reader import get_process_metrics_range
 # Maps a contention-relevant metric name to the raw_process_metrics column
 # that best explains "which processes are driving this metric." Counter
 # metrics (disk/net) don't have a direct per-process byte-rate column in
-# the current schema (Section 9's process-level metric set is CPU/memory/
-# threads/priority — see PROJECT_SPEC.md Section 9), so they fall back to
+# the current schema (the process-level metric set is CPU/memory/
+# threads/priority), so they fall back to
 # CPU as the most broadly available proxy for "which processes are busy
 # right now" rather than returning nothing.
 _METRIC_TO_PROCESS_COLUMN = {

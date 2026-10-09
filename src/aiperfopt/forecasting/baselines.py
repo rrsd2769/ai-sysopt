@@ -1,15 +1,14 @@
 """
-The shared ``Forecaster`` interface and the three mandatory baselines
-(Section 10.8): naive persistence, moving average, and a classical
+The shared ``Forecaster`` interface and the three mandatory baselines: naive persistence, moving average, and a classical
 statistical method.
 
 Every forecaster — baseline or the real LightGBM model in
 :mod:`aiperfopt.forecasting.model` — implements the same
 ``predict(row, history) -> ForecastResult`` signature. This is what
-makes FR-5.3 ("independently swappable per metric without changing
-downstream consumers' interface") concrete rather than aspirational: the
+makes each forecaster independently swappable per metric without changing
+downstream consumers' interface: the
 walk-forward evaluation harness (:mod:`aiperfopt.forecasting.evaluation`)
-and Section 10.7's contingency plan (fall back to the best baseline if
+and the contingency plan (fall back to the best baseline if
 LightGBM doesn't meaningfully outperform it) both just call
 ``forecaster.predict(...)`` without caring which implementation they hold.
 
@@ -21,12 +20,10 @@ actually uniform.
 
 Classical statistical baseline choice
 ----------------------------------------
-Section 10.8 allows either ARIMA or Exponential Smoothing. Exponential
+Either ARIMA or Exponential Smoothing would do. Exponential
 Smoothing (Holt's linear-trend method) is used here rather than ARIMA:
 it's more robust to fit reliably on the short, noisy windows available
-per evaluation point, requires no order-selection step, and per Section
-3's stated principle ("if a simpler model performs comparably, the
-simpler model is preferred, and the decision documented transparently"),
+per evaluation point, requires no order-selection step, and, since a simpler model is preferred when it performs comparably,
 that's exactly the tradeoff being made here.
 """
 

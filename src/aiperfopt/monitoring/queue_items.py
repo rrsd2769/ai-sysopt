@@ -2,7 +2,7 @@
 The item type carried on the shared Monitoring -> Ingestion queue.
 
 Monitoring Engine threads are the only producers; the Data Ingestion
-consumer thread is the only consumer (ADL-18's explicit producer-consumer
+consumer thread is the only consumer (the explicit producer-consumer
 pattern). Wrapping every payload in a tagged ``QueueItem`` lets a single
 shared ``queue.Queue`` carry all three raw-sample record types — system
 metrics, process metrics, and process events — without the consumer

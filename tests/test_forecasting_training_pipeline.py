@@ -67,7 +67,7 @@ def test_walk_forward_evaluation_rows_persisted_to_storage(storage_engine: Engin
     walk_forward_rows = [r for r in rows if r.dataset_tag == "walk_forward"]
     holdout_rows = [r for r in rows if r.dataset_tag.startswith("holdout_")]
     assert len(walk_forward_rows) > 0
-    assert len(holdout_rows) > 0  # held-out generalization check (Section 11) ran and was recorded
+    assert len(holdout_rows) > 0  # held-out generalization check ran and was recorded
 
     assert any(r.baseline_name is None and r.model_name == "lightgbm" for r in walk_forward_rows)
     assert any(r.baseline_name is not None for r in walk_forward_rows)
@@ -105,7 +105,7 @@ def test_holdout_is_strictly_later_than_training():
 
 @pytest.mark.behavioural
 def test_process_summaries_threaded_through_without_error(storage_engine: Engine, tmp_path: Path):
-    """Phase 5: an optional process summary can be merged into the feature
+    """An optional process summary can be merged into the feature
     matrix without breaking training -- the wiring the ablation's "v2" arm
     depends on. Omitting it (the default) is exercised by every other test
     in this file."""

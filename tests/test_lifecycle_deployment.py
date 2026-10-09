@@ -55,10 +55,10 @@ def test_confirm_deployment_true_activates_and_records(storage_engine: Engine, t
 def test_confirm_deployment_true_on_a_failing_gate_raises_and_does_not_activate(
     storage_engine: Engine, tmp_path: Path
 ):
-    """Phase 6's core defect fix: human confirmation is necessary but no
+    """The core defect fix: human confirmation is necessary but no
     longer sufficient. Even ``confirmed=True`` must not activate a
     candidate that fails the quality gate -- and the refusal is still
-    recorded to the audit trail (FR-11.2, R-8), not silently dropped."""
+    recorded to the audit trail, not silently dropped."""
     settings = _retraining_settings(tmp_path)
     comparison = RetrainingComparison(candidate_version="v1", active_version=None, recommendation="no_active_baseline")
 

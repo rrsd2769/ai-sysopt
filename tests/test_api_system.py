@@ -69,7 +69,7 @@ def test_live_start_and_stop(tmp_path: Path):
         assert r.json() == {"running": False}
 
 
-# --- readiness (Phase 0) -------------------------------------------------
+# --- readiness -------------------------------------------------
 #
 # The live loop returns early on two conditions and previously did so
 # silently while the UI showed a green "Live" banner. These assert the

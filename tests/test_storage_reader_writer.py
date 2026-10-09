@@ -339,7 +339,7 @@ def test_log_event_round_trip(storage_engine: Engine):
     insert_log_event(
         storage_engine,
         LogEvent(
-            timestamp=10.0, level="ERROR", logger="aiperfopt.retraining",
+            timestamp=10.0, level="ERROR", logger="aiperfopt.lifecycle",
             message="model deployment failed validation",
             context={"model_version": "v3"},
         ),

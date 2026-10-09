@@ -60,7 +60,7 @@ def test_confirm_deployment_activates_version(tmp_path: Path):
 @pytest.mark.behavioural
 def test_confirm_deployment_on_a_failing_gate_returns_422_with_reasons(tmp_path: Path):
     """The router maps a gate failure to 422 listing the failed criteria
-    (Phase 6, point 2) -- the confirm endpoint is stateless and trusts
+    -- the confirm endpoint is stateless and trusts
     the client to round-trip exactly what ``/retraining/run`` showed it
     (see ``_gate_from_request``'s docstring), so a failing gate is
     exercised the same way: substitute a failing one for what a real

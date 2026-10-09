@@ -2,10 +2,10 @@
 Runs a single blocking callable (typically an ``ApiClient`` method) on
 ``QThreadPool`` and delivers its result back via a Qt signal.
 
-Exists specifically because of the retraining flag in
-PROJECT_HANDOFF.md's Phase 9 notes: ``/retraining/run`` blocks
+Exists specifically because of the fact that
+``/retraining/run`` blocks
 synchronously for the duration of training (tens of seconds to a few
-minutes, per Section 14). A "Retrain now" button in Developer Mode must
+minutes). A "Retrain now" button in Developer Mode must
 not freeze the whole UI for that entire window -- this is the
 background-job pattern that note calls for, applied client-side (the
 backend endpoint itself is unchanged; the frontend just never calls it

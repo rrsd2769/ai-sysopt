@@ -1,4 +1,4 @@
-"""Layered configuration (FR-15.1): defaults + user override + environment."""
+"""Layered configuration: defaults + user override + environment."""
 
 from aiperfopt.config.settings import (
     ApiSettings,

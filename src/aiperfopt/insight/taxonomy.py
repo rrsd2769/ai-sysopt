@@ -1,23 +1,23 @@
 """
-Diagnosis taxonomy resolution (Section 12, FR-8.3, ADL-24, ADL-36).
+Diagnosis taxonomy resolution.
 
 Reconciles Contention Prediction's output (probability, coefficient-based
 contributing metrics/processes) and Anomaly Detection's score into
-exactly one of Section 12's eight standardized categories. This is the
-genuine integration point Section 7.3 calls out explicitly ("Diagnosis
+exactly one of the eight standardized categories. This is the
+genuine integration point: Diagnosis
 depends on both Forecasting and Contention Prediction outputs and must
-reconcile them into one consistent causal narrative") — it is
-deliberately rule-based, not a second learned model, matching Section 3's
-"simpler mechanism preferred, documented transparently" principle: the
-taxonomy is a small, spec-fixed set (Section 12), not something that
+reconcile them into one consistent causal narrative. It is
+deliberately rule-based, not a second learned model, in line with the
+simpler-mechanism-preferred principle: the
+taxonomy is a small, spec-fixed set, not something that
 benefits from training a classifier over a classifier's own output.
 
 Resolution order
 -----------------
 1. **Unusual Pattern (Anomaly-Flagged)** wins outright whenever the
    anomaly score is significant, *regardless* of whether contention was
-   also triggered. This matches ADL-36 ("anomaly-flagged events bypass
-   the Recommendation Engine entirely") and the rationale already applied
+   also triggered. This matches the rule that anomaly-flagged events bypass
+   the Recommendation Engine entirely, and the rationale already applied
    to probability dampening in :mod:`aiperfopt.contention.prediction`: a
    significant anomaly means the classifier is extrapolating well outside
    its training distribution, so any *causal* narrative built from its
@@ -25,21 +25,21 @@ Resolution order
    probability still cleared the decision threshold.
 2. If contention was not triggered and there is no significant anomaly,
    there is nothing to diagnose — :func:`resolve_diagnosis_category`
-   returns ``None``. FR-8.3's "every prediction event resolves to exactly
+   returns ``None``. "Every prediction event resolves to exactly
    one category" is read here as scoped to actual triggered/flagged
    events (the flagship demo's "an estimated high probability of
-   contention" moment, Section 6), not to routine below-threshold cycles
+   contention" moment), not to routine below-threshold cycles
    that make up the overwhelming majority of runtime — assigning a
    taxonomy label to "everything is fine" would be manufacturing a
-   narrative FR-9.1's explanation requirement was never meant to force.
+   narrative the explanation requirement was never meant to force.
 3. Otherwise, the dominant *resource type* (cpu/memory/disk/network) is
    found by summing |contribution| per type across
    :attr:`ContentionPredictionRecord.contributing_metrics`. If no type
    clearly dominates (its share of the total is below
    ``DiagnosisSettings.cross_resource_dominance_ratio``), the result is
-   **Cross-Resource Contention** — Section 12's category for exactly this
+   **Cross-Resource Contention** — the category for exactly this
    "genuinely multi-factor" case, and the taxonomy's own designated
-   escape hatch (R-9's mitigation) for any resource type this module
+   escape hatch for any resource type this module
    doesn't recognize.
 4. A CPU-dominant event is further split into **CPU-Bound Single
    Process** vs. **CPU-Bound Multi-Process Contention** using
@@ -48,13 +48,12 @@ Resolution order
    **Sudden** using the engineered ``mem_percent_rate_of_change`` feature
    (not available from the contention record alone — see
    :mod:`aiperfopt.insight.diagnosis`). Disk and network map directly to
-   their single Section 12 categories (no further split is defined).
+   their single categories (no further split is defined).
 
 Why the anomaly-significance threshold isn't duplicated here
 -----------------------------------------------------------------
 :class:`~aiperfopt.config.settings.ContentionSettings.anomaly_significant_threshold`
-is the single source of truth for "what counts as a significant anomaly"
-(FR-7.2) — it already gates
+is the single source of truth for "what counts as a significant anomaly" — it already gates
 :func:`aiperfopt.anomaly.notifications.emit_anomaly_notification_if_significant`.
 Giving :class:`~aiperfopt.config.settings.DiagnosisSettings` its own copy
 of that number would be exactly the kind of config-drift bug class this
@@ -77,7 +76,7 @@ from aiperfopt.storage.records import ContentionPredictionRecord
 
 
 class DiagnosisCategory(str, Enum):
-    """Section 12's eight standardized diagnosis categories."""
+    """The eight standardized diagnosis categories."""
 
     CPU_SINGLE_PROCESS = "cpu_bound_single_process"
     CPU_MULTI_PROCESS = "cpu_bound_multi_process_contention"
@@ -89,10 +88,10 @@ class DiagnosisCategory(str, Enum):
     UNUSUAL_PATTERN_ANOMALY = "unusual_pattern_anomaly_flagged"
 
 
-# The one category that never reaches the Recommendation Engine (ADL-36,
-# Section 7.2, FR-7.2). Kept as a set (not a boolean-on-the-enum) so the
+# The one category that never reaches the Recommendation Engine.
+# Kept as a set (not a boolean-on-the-enum) so the
 # is_actionable rule lives in exactly one place a future Recommendation
-# Engine (Phase 7) can import directly rather than re-deriving it.
+# Engine can import directly rather than re-deriving it.
 NON_ACTIONABLE_CATEGORIES = frozenset({DiagnosisCategory.UNUSUAL_PATTERN_ANOMALY})
 
 
@@ -103,9 +102,9 @@ def is_actionable(category: DiagnosisCategory) -> bool:
 # Maps a raw metric column name (after stripping the contention dataset's
 # "forecast_"/"current_" prefix — see
 # aiperfopt.contention.prediction._strip_feature_prefix) to the coarse
-# resource type it represents. Mirrors PROJECT_SPEC.md Section 9's core
+# resource type it represents. Mirrors the core
 # metric set; any metric not listed here (there shouldn't be one, given
-# Section 9 and aiperfopt.features.config.FeatureEngineeringConfig's
+# aiperfopt.features.config.FeatureEngineeringConfig's
 # gauge/counter lists are the exhaustive V1 metric set) is simply excluded
 # from resource-type totals rather than raising, keeping this module
 # forward-compatible with a metric set change without a hard failure.
@@ -131,8 +130,8 @@ def _strip_feature_prefix(feature_name: str) -> str:
 
     Duplicated rather than imported: importing from ``contention.prediction``
     into ``diagnosis.taxonomy`` would create a reverse dependency (Contention
-    Prediction is upstream of Diagnosis per Section 7.2's data flow, and
-    Section 7.3 already treats Diagnosis as the consumer, never the other
+    Prediction is upstream of Diagnosis in the data flow, and
+    Diagnosis is already the consumer, never the other
     way around). The rule itself is a one-line, spec-independent string
     operation with no risk of drifting out of sync with its counterpart.
     """
@@ -190,8 +189,8 @@ def _resolve_memory_subcategory(
 
     ``memory_rate_of_change`` is ``None`` when the live engineered feature
     vector doesn't carry ``mem_percent_rate_of_change`` (e.g. too little
-    trailing history for a lag lookup within tolerance — FR-4.3). Gradual
-    is the safe default in that case: it is Section 12's less dramatic
+    trailing history for a lag lookup within tolerance). Gradual
+    is the safe default in that case: it is the less dramatic
     framing, and claiming "Sudden" without the evidence a real spike
     exists would be exactly the kind of overclaiming this module tries to
     avoid elsewhere (see the CPU-subcategory docstring above).
@@ -207,12 +206,12 @@ def resolve_diagnosis_category(
     anomaly_significant_threshold: float,
     config: DiagnosisSettings,
 ) -> DiagnosisCategory | None:
-    """Resolve one of Section 12's eight categories, or ``None`` if nothing to diagnose.
+    """Resolve one of the eight categories, or ``None`` if nothing to diagnose.
 
     Parameters
     ----------
     contention_record:
-        The triggering Contention Prediction output (FR-6.2's probability,
+        The triggering Contention Prediction output (the probability,
         contributing metrics/processes, and anomaly score).
     memory_rate_of_change:
         The current ``mem_percent_rate_of_change`` engineered feature
@@ -224,7 +223,7 @@ def resolve_diagnosis_category(
         module docstring for why this is a parameter, not a
         ``DiagnosisSettings`` field of its own.
 
-    Anomaly is a fallback, not a short-circuit (Phase 3, F2)
+    Anomaly is a fallback, not a short-circuit
     -------------------------------------------------------------
     A high anomaly score used to be checked *first*, so it pre-empted
     every other category even when contention was triggered and a
@@ -248,8 +247,8 @@ def resolve_diagnosis_category(
             # Contention was triggered but nothing in contributing_metrics
             # maps to a recognized resource type (e.g. an empty/malformed
             # payload). Cross-Resource is the taxonomy's own escape hatch
-            # (Section 12, R-9's mitigation) — refusing to diagnose here
-            # would silently drop a triggered event FR-8.3 requires resolve
+            # — refusing to diagnose here
+            # would silently drop a triggered event that must resolve
             # to *something*.
             return DiagnosisCategory.CROSS_RESOURCE_CONTENTION
 

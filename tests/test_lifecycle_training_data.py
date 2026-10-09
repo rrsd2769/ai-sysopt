@@ -33,7 +33,7 @@ def test_build_real_usage_training_data_splits_chronologically(storage_engine: E
     assert len(training_samples) == 80
     assert len(holdout_samples) == 20
 
-    # Chronological, non-overlapping, holdout strictly after training (ADL-10).
+    # Chronological, non-overlapping, holdout strictly after training.
     assert training_samples[-1].timestamp < holdout_samples[0].timestamp
     assert [s.timestamp for s in training_samples] == sorted(s.timestamp for s in training_samples)
     assert [s.timestamp for s in holdout_samples] == sorted(s.timestamp for s in holdout_samples)

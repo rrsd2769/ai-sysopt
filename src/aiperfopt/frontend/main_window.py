@@ -1,7 +1,7 @@
 """
-Top-level window (FR-13.1). Assembles the widgets built above around one
+Top-level window. Assembles the widgets built above around one
 ``ApiClient`` (REST) and one ``LiveWebSocketClient`` (``/ws/live``
-streaming), and implements the General/Developer mode toggle (Section 4)
+streaming), and implements the General/Developer mode toggle
 as a pure rendering switch -- both modes are fed the exact same
 ``LiveStateOut`` payload (see the package docstring).
 """
@@ -39,7 +39,7 @@ logger = get_logger(__name__)
 _MODE_GENERAL = "General Mode"
 _MODE_DEVELOPER = "Developer Mode"
 
-# Readiness (Phase 9 F9) is polled on its own cadence via REST, separate
+# Readiness is polled on its own cadence via REST, separate
 # from the WebSocket LiveStateOut stream -- it answers "can this system
 # predict right now, and why not" (aiperfopt.readiness), not part of any
 # single live-inference tick's payload.
@@ -125,7 +125,7 @@ class MainWindow(QMainWindow):
         self.developer_panel.setVisible(is_developer)
         if self._mode_combo.currentText() != mode:
             self._mode_combo.setCurrentText(mode)
-        # Retraining is a Developer Mode concern (Phase 8/9's manual,
+        # Retraining is a Developer Mode concern (the manual,
         # human-confirmed deployment machinery isn't something a General
         # Mode user needs or should casually stumble into).
         self._tabs.setTabVisible(self._tabs.indexOf(self.retraining_panel), is_developer)

@@ -70,7 +70,7 @@ def test_load_missing_artifact_raises(tmp_path: Path):
 @pytest.mark.plumbing
 def test_load_v1_feature_set_artifact_against_v2_raises(tmp_path: Path):
     """A forecaster whose metadata.json predates FEATURE_SET_VERSION="v2"
-    (Phase 4's process columns) must be rejected -- loading it silently
+    (the process columns) must be rejected -- loading it silently
     would mean predict()'s reindex(self.feature_columns) drops every
     process column a v2 live feature vector now offers."""
     import json

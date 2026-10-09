@@ -1,8 +1,8 @@
 """
-Monitoring Engine (Section 7.1, item 1).
+Monitoring Engine.
 
 Implements the producer side of the explicit thread + queue
-producer-consumer pattern required by ADL-18 (chosen over
+producer-consumer pattern (chosen over
 ``asyncio.run_in_executor`` specifically because a plain
 ``threading.Thread`` + ``queue.Queue`` is the clearer demonstration of
 the underlying OS concept for this course project).
@@ -10,22 +10,20 @@ the underlying OS concept for this course project).
 Two independent polling threads run concurrently:
 
 - **System metrics thread** — polls at ``monitoring.polling_interval_seconds``
-  (NFR-2.1 default 1-2s), producing one :class:`SystemMetricSample` per
+  (default 1-2s), producing one :class:`SystemMetricSample` per
   cycle.
 - **Process metrics thread** — polls at
-  ``monitoring.process_polling_interval_seconds`` (NFR-2.2: coarser than
-  aggregate metrics is explicitly allowed), producing
+  ``monitoring.process_polling_interval_seconds`` (coarser than
+  aggregate metrics is allowed), producing
   :class:`ProcessMetricSample` rows plus any launch/termination
-  :class:`ProcessEvent` rows detected that cycle (FR-1.3).
+  :class:`ProcessEvent` rows detected that cycle.
 
-Both threads push onto one shared, bounded ``queue.Queue`` (FR-1.2: "on a
-dedicated thread independent of the API event loop" — there is no event
-loop yet in Phase 2, but the separation from the future API loop is
-already structurally guaranteed by these being plain OS threads).
+Both threads push onto one shared, bounded ``queue.Queue`` (collection runs on dedicated threads independent of the API event loop;
+the separation is structurally guaranteed by these being plain OS threads).
 
 Backpressure handling
 ----------------------
-FR-2.2 requires Ingestion to never block Monitoring regardless of storage
+Ingestion must never block Monitoring regardless of storage
 write latency. If Ingestion falls behind and the queue fills up, a
 *blocking* ``queue.put()`` here would defeat that guarantee by blocking
 the producer instead. Producers therefore use ``put_nowait`` and, on
@@ -64,8 +62,7 @@ class MonitoringEngine:
         share the same queue instance without either owning the other's
         lifecycle.
     excluded_process_names:
-        Process names to exclude from collection entirely (Section 13,
-        NFR-7.4). Matched case-insensitively.
+        Process names to exclude from collection entirely. Matched case-insensitively.
     """
 
     def __init__(
@@ -155,11 +152,10 @@ class MonitoringEngine:
             try:
                 sample = collect_system_metrics()
                 self._put(QueueItem.system_metric(sample))
-            except Exception as exc:  # noqa: BLE001 - deliberate: see FR-1.4/NFR-5.1
+            except Exception as exc:  # noqa: BLE001 - deliberate:
                 # collect_system_metrics() only lets exceptions through
                 # for its two mandatory sources; a failure here means the
-                # environment itself is broken for this cycle. Per
-                # NFR-5.1, this must not crash the engine — log and retry
+                # environment itself is broken for this cycle. This must not crash the engine — log and retry
                 # next cycle.
                 logger.error(
                     "System metrics collection cycle failed",

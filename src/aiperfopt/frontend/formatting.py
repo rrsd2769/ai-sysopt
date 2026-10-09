@@ -5,14 +5,14 @@ Deliberately Qt-free so these are trivially unit-testable without an
 ``QApplication``/offscreen platform plugin -- widgets import from here
 rather than reimplementing formatting inline, keeping the same "one
 source of truth" discipline the rest of the project applies to
-production logic (e.g. Feature Engineering's FR-4.2).
+production logic (e.g. Feature Engineering).
 """
 
 from __future__ import annotations
 
-# Section 12's eight diagnosis categories, each with a short plain-language
+# The eight diagnosis categories, each with a short plain-language
 # label for General Mode and an icon-ish glyph for quick visual scanning.
-# This is *display* mapping only -- Diagnosis (Phase 6) already produces
+# This is *display* mapping only -- Diagnosis already produces
 # ``plain_language_explanation`` text; this is just the category chip/badge
 # label, not a duplicate of that generated explanation.
 _CATEGORY_LABELS: dict[str, str] = {
@@ -31,7 +31,7 @@ def humanize_category(category: str) -> str:
     """Map a ``DiagnosisRecord.category`` value to a General-Mode-friendly label.
 
     Falls back to a readable title-cased version of the raw category for
-    any value not in the taxonomy snapshot above, so a future Section 12
+    any value not in the taxonomy snapshot above, so a future taxonomy
     addition degrades gracefully instead of showing a KeyError or a raw
     enum string.
     """
@@ -95,7 +95,7 @@ def format_duration_short(seconds: float) -> str:
 
 
 def readiness_banner_text(state: str, detail: str, history_seconds: float, history_seconds_required: float) -> str:
-    """Short banner text for a ``GET /readiness`` state (Phase 9 F9), the
+    """Short banner text for a ``GET /readiness`` state, the
     replacement for the previously-hardcoded "Live" banner
     (``DashboardWidget`` used to show green "Live" unconditionally,
     identical whether or not anything was actually being predicted).
@@ -116,7 +116,7 @@ def readiness_banner_text(state: str, detail: str, history_seconds: float, histo
 def confidence_tier(value: float | None) -> str:
     """A coarse label for confidence, used to pick a status color.
 
-    Thresholds are deliberately conservative to echo Section 11's
+    Thresholds are deliberately conservative to echo the project's
     "false positives are more damaging than false negatives" stance --
     the UI should not paint something "High" confidence unless it really
     is, since an over-confident-looking display undermines the same

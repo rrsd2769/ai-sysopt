@@ -2,7 +2,7 @@
 Compares a freshly-trained retraining candidate against whatever model
 version is currently deployed, and produces a recommendation — never a
 decision. Deployment always requires a separate, explicit human
-confirmation step (:mod:`aiperfopt.lifecycle.deployment`, ADL-23); this
+confirmation step (:mod:`aiperfopt.lifecycle.deployment`); this
 module only answers "does the evidence support deploying this candidate".
 
 What "regressed" means here
@@ -11,12 +11,12 @@ A candidate's holdout MAE/RMSE/F1/directional-accuracy is compared to the
 active version's own previously-recorded holdout evaluation for the same
 (metric, horizon) or contention classifier. A regression beyond
 ``regression_tolerance`` on *any* comparable outcome blocks the "deploy"
-recommendation — this mirrors Section 11's precision-favoring,
-trust-first stance (ADL-8): a candidate that's better on nine metrics and
+recommendation — this mirrors the precision-favoring,
+trust-first stance: a candidate that's better on nine metrics and
 meaningfully worse on one is not an unambiguous improvement, and a false
 "upgrade" that quietly regresses one forecast is exactly the kind of
 silent erosion of trust the project's evaluation philosophy exists to
-prevent (Section 3, Section 11).
+prevent.
 
 Where no baseline data exists for a given outcome (e.g. the active
 version never trained that metric, or has no active version at all yet),
@@ -164,7 +164,7 @@ def compare_candidate_to_active(
     ``active_version`` is normally the result of
     :func:`aiperfopt.lifecycle.deployment.get_active_model_version` —
     passed in explicitly here (rather than read internally) to keep this
-    module free of file I/O and independently testable (NFR-14.1).
+    module free of file I/O and independently testable.
     """
     comparison = RetrainingComparison(candidate_version=candidate_version, active_version=active_version)
 

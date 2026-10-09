@@ -5,8 +5,7 @@ Starts the Qt event loop, builds an ``ApiClient``/``LiveWebSocketClient``
 pair against the locally configured backend (``frontend/config.py``),
 and shows the main window. This process assumes the backend
 (``python -m aiperfopt.api.server``) is already running or will become
-reachable shortly -- ``LiveWebSocketClient`` retries indefinitely
-(NFR-11.2) rather than requiring a particular startup order.
+reachable shortly -- ``LiveWebSocketClient`` retries indefinitely rather than requiring a particular startup order.
 """
 
 from __future__ import annotations

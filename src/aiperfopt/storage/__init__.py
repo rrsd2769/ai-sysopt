@@ -1,11 +1,11 @@
-"""Data Storage subsystem (Section 7.1, item 3).
+"""Data Storage subsystem.
 
-- ``engine``            -> connection bootstrap (Phase 0)
-- ``schema``             -> table definitions (Phase 1, FR-3.1)
-- ``schema_management``  -> create/verify schema (Phase 1)
-- ``records``            -> typed row dataclasses (Phase 1)
+- ``engine``            -> connection bootstrap
+- ``schema``             -> table definitions
+- ``schema_management``  -> create/verify schema
+- ``records``            -> typed row dataclasses
 - ``writer`` / ``reader`` -> the only supported way to read/write storage
-- ``rollup``             -> downsampling + retention (Phase 1, FR-3.2)
+- ``rollup``             -> downsampling + retention
 """
 
 from aiperfopt.storage.engine import (

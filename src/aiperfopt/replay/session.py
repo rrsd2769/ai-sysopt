@@ -1,9 +1,9 @@
 """
-Recording and portable serialization of a real monitoring window (Phase 8).
+Recording and portable serialization of a real monitoring window.
 
 A :class:`RecordedSession` is a snapshot of exactly what Data Storage
 accumulated over some real time window -- the four raw-sample tables
-Monitoring/Ingestion populate (Section 7.1, items 1-2): system metrics,
+Monitoring/Ingestion populate: system metrics,
 process metrics, process events, and the "everything else" process
 aggregate. Nothing here computes or interprets anything; recording is a
 pure read-and-serialize step so a replayed session, once its timestamps

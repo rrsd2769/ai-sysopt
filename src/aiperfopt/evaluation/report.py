@@ -1,8 +1,6 @@
 """
-Writes Phase 5's Review 2 evidence pack from an
-:class:`aiperfopt.evaluation.ablation.AblationReport` — the artifacts named
-in ``docs/plans/2026-09-12-presentable-predictive-monitor.md``'s Phase 5
-section: ``dataset_summary.txt``, ``ablation.csv``,
+Writes the evidence pack from an
+:class:`aiperfopt.evaluation.ablation.AblationReport`: ``dataset_summary.txt``, ``ablation.csv``,
 ``baseline_comparison.csv``, ``pr_curve_contention.png``,
 ``confusion_matrix.png``, ``feature_importance.png``, ``overhead.txt``.
 
@@ -31,7 +29,7 @@ _TOP_N_FEATURES = 20
 
 
 def _write_dataset_summary(report: AblationReport, out_dir: Path) -> None:
-    lines = ["Phase 5 ablation — dataset summary", "=" * 40]
+    lines = ["Ablation — dataset summary", "=" * 40]
     for key, value in report.dataset_summary.items():
         lines.append(f"{key:<24}: {value}")
 
@@ -184,7 +182,7 @@ def _write_overhead(out_dir: Path, warmup_seconds: float, run_seconds: float) ->
     with tempfile.TemporaryDirectory(prefix="aiperfopt-overhead-") as tmp:
         measurement = measure_pipeline_overhead(Path(tmp), warmup_seconds=warmup_seconds, run_seconds=run_seconds)
     lines = [
-        "Phase 2/5 — monitor overhead (isolated measurement, not the live collector)",
+        "Monitor overhead (isolated measurement, not the live collector)",
         "=" * 60,
         f"self CPU            : {measurement.cpu_percent:.2f}% (budget < {measurement.cpu_budget_percent}%)",
         f"database growth     : {measurement.db_growth_bytes_per_hour / (1024 * 1024):.2f} MB/hour "
@@ -199,7 +197,7 @@ def write_ablation_report(
     overhead_warmup_seconds: float = 2.0,
     overhead_run_seconds: float = 8.0,
 ) -> list[Path]:
-    """Write every Phase 5 evidence-pack artifact into ``out_dir``.
+    """Write every evidence-pack artifact into ``out_dir``.
 
     ``overhead_warmup_seconds``/``overhead_run_seconds`` control the
     isolated overhead measurement's duration (see

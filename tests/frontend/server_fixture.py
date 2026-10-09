@@ -1,5 +1,5 @@
 """
-Runs a real backend (Phase 9's FastAPI app under real uvicorn, on a real
+Runs a real backend (the FastAPI app under real uvicorn, on a real
 socket) on a background thread for frontend tests to talk to.
 
 Not named ``conftest.py``, matching ``tests/api_conftest.py``'s existing
@@ -7,9 +7,8 @@ precedent -- imported explicitly by the frontend test files that need a
 real server rather than auto-discovered for the whole suite.
 
 This mirrors the project's established "real threads, no mocking"
-testing discipline (PROJECT_HANDOFF.md Section 6: Monitoring/Ingestion
-tests use real background threads, not mocked timers) applied to Phase
-10: ``ApiClient`` is a real synchronous HTTP client and ``QWebSocket`` is
+testing discipline (Monitoring/Ingestion
+tests use real background threads, not mocked timers) applied to the UI: ``ApiClient`` is a real synchronous HTTP client and ``QWebSocket`` is
 a real WebSocket client, so what they need to talk to is a real HTTP/WS
 server, not an ASGI in-process shortcut (httpx's ``ASGITransport`` is
 async-only and can't back a sync ``httpx.Client`` the way

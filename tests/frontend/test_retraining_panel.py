@@ -37,7 +37,7 @@ def test_run_and_confirm_full_round_trip(qtbot, tmp_path: Path):
 
         qtbot.waitUntil(lambda: panel._confirm_button.isEnabled(), timeout=30000)
         assert "v1" in panel._recommendation_label.text()
-        # Phase 6: the quality gate is shown per-target with real numbers,
+        # The quality gate is shown per-target with real numbers,
         # not just a pass/fail label.
         assert panel._gate_label.text() == "PASS"
         assert panel._gate_criteria_list.count() > 0
@@ -48,7 +48,7 @@ def test_run_and_confirm_full_round_trip(qtbot, tmp_path: Path):
         # (confirm, then the follow-up refresh_active_version() it
         # triggers) can occasionally take longer than a lightly-loaded
         # box would suggest -- this is test-environment contention, not
-        # NFR-3.3's <=500ms production latency target, which is measured
+        # the <=500ms production latency target, which is measured
         # against an idle backend.
         qtbot.waitUntil(lambda: "deployed" in panel._status_label.text(), timeout=20000)
         qtbot.waitUntil(lambda: panel._active_version_label.text() == "v1", timeout=20000)

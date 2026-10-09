@@ -1,15 +1,15 @@
 """
-The "distinct informational notification" FR-7.2 requires on significant
+The distinct informational notification on significant
 anomaly detection — separate from any contention prediction, and never
-routed through the Recommendation Engine (Section 12's "Unusual Pattern
-(Anomaly-Flagged)" taxonomy entry, ADL-36).
+routed through the Recommendation Engine (the "Unusual Pattern
+(Anomaly-Flagged)" taxonomy entry).
 
 This is the first real caller of ``app_logs``/``insert_log_event`` —
-Phase 1's schema module docstring flagged that table as existing for
+The schema module docstring flagged that table as existing for
 "significant pipeline events... explicitly persisted... not a
 logging.Handler mirroring every line," and an anomaly notification is
 exactly that: infrequent, meaningful, worth being queryable later
-(Reporting, Phase 11) without parsing log files.
+(Reporting) without parsing log files.
 """
 
 from __future__ import annotations

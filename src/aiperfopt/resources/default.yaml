@@ -1,7 +1,7 @@
 # Default configuration for the AI System Performance Optimizer.
 #
 # This file is the lowest-priority layer in the layered configuration
-# system required by FR-15.1. Priority, highest to lowest:
+# system. Priority, highest to lowest:
 #
 #   1. Environment variables (prefix AIPERFOPT_, nested delimiter "__")
 #   2. .env file
@@ -9,33 +9,32 @@
 #      passed explicitly to load_settings())
 #   4. This file (packaged defaults)
 #
-# Every value here can be overridden without modifying source code
-# (NFR-12.1). See src/aiperfopt/config/settings.py for the schema.
+# Every value here can be overridden without modifying source code.
+# See src/aiperfopt/config/settings.py for the schema.
 
 mode:
-  # "general" or "developer" — Section 4.
+  # "general" or "developer".
   active_mode: general
 
 monitoring:
-  # Default polling interval recommendation from NFR-2.1: 1-2 seconds,
+  # Default polling interval recommendation: 1-2 seconds,
   # balanced against overhead and aligned with the 30-60s short forecast
-  # horizon (Section 10.2).
+  # horizon.
   polling_interval_seconds: 1.5
-  # Process-level enumeration may run coarser than aggregate metrics
-  # (NFR-2.2).
+  # Process-level enumeration may run coarser than aggregate metrics.
   process_polling_interval_seconds: 3.0
-  # Storage bound (Phase 2): top-N by CPU unioned with top-N by memory
+  # Storage bound: top-N by CPU unioned with top-N by memory
   # RSS are individually stored per poll; everything else becomes one
   # aggregate row. ~2N rows/poll instead of the full process table
   # (~180 on a typical desktop), an order-of-magnitude reduction.
   process_capture_top_n: 20
 
 forecasting:
-  # Two horizons read from a single multi-step model per metric
-  # (Section 10.2, ADL-06) — expressed as inclusive [min, max] seconds.
+  # Two horizons read from a single multi-step model per metric,
+  # expressed as inclusive [min, max] seconds.
   short_horizon_seconds: [30, 60]
   medium_horizon_seconds: [120, 300]
-  # Walk-forward validation folds (Section 11, ADL-10).
+  # Walk-forward validation folds.
   walk_forward_splits: 4
   min_training_rows: 30
   models_dir: models
@@ -44,7 +43,7 @@ forecasting:
 
 contention:
   # Conservative, configurable decision threshold favoring precision over
-  # recall (FR-6.3, Section 11).
+  # recall.
   decision_threshold: 0.75
   anomaly_dampening_factor: 0.3
   anomaly_significant_threshold: 0.7
@@ -53,7 +52,7 @@ contention:
 diagnosis:
   # Below this fraction of total contribution, no single resource type
   # (cpu/memory/disk/network) is treated as dominant -> Cross-Resource
-  # Contention (Section 12).
+  # Contention.
   cross_resource_dominance_ratio: 0.6
   # Within a CPU-dominant event, the top process must account for at
   # least this share of the top contributing processes' combined
@@ -63,30 +62,30 @@ diagnosis:
   # Percentage-points/second of mem_percent's rate-of-change feature at
   # or above which a memory event is "Sudden" rather than "Gradual".
   memory_sudden_rate_of_change_threshold: 0.2
-  # Per-forecast SHAP/native-importance attributions retained (FR-8.1).
+  # Per-forecast SHAP/native-importance attributions retained.
   shap_top_n: 5
 
 retraining:
   # Pointer file recording which model_version is currently active
-  # (FR-11.2's "never silently activate" — read by the live pipeline,
+  # (never silently activated — read by the live pipeline,
   # written only by a confirmed deployment decision).
   active_version_file: data/active_model_version.json
   # A retraining candidate's holdout metric must not be worse than the
   # active version's by more than this fraction, or it's recommended
   # against deployment (still a recommendation, not an automatic block —
-  # ADL-23 requires human confirmation either way).
+  # human confirmation is required either way).
   regression_tolerance: 0.10
   # Fraction of accumulated real-usage history reserved as a
   # chronological (most-recent) holdout for the generalization check.
   real_usage_holdout_fraction: 0.2
-  # Phase 6 quality gate: a candidate forecaster's holdout MAE must beat
+  # Quality gate: a candidate forecaster's holdout MAE must beat
   # the persistence baseline's (same holdout) by at least this relative
   # fraction to be deployable at all, confirmation notwithstanding.
   forecasting_mae_margin: 0.05
-  # Phase 6 quality gate: holdout directional accuracy must exceed
+  # Quality gate: holdout directional accuracy must exceed
   # 0.5 + this margin.
   directional_accuracy_margin: 0.05
-  # Phase 6 quality gate: a candidate contention classifier's holdout F1
+  # Quality gate: a candidate contention classifier's holdout F1
   # (same holdout) may trail the threshold-rule baseline's F1 by at most
   # this many absolute F1 points and still pass.
   contention_f1_margin: 0.05
@@ -97,13 +96,13 @@ api:
   # Live-inference cadence: feature -> forecast -> contention -> diagnosis
   # -> recommendation, once per this many seconds. Deliberately coarser
   # than a 1-2s raw polling interval by default -- every step in that
-  # chain (especially a tiered SHAP explanation, Section 10.5) costs more
-  # than a single psutil poll, and NFR-1.1's <2-3% CPU budget applies to
+  # chain (especially a tiered SHAP explanation) costs more
+  # than a single psutil poll, and the <2-3% CPU budget applies to
   # this loop too, not just Monitoring's.
   live_inference_interval_seconds: 5.0
 
 privacy:
-  # No exclusions by default (Section 13, NFR-7.4) — complete monitoring
+  # No exclusions by default — complete monitoring
   # maximizes prediction accuracy; the mechanism exists for user control.
   excluded_processes: []
 
@@ -111,24 +110,23 @@ storage:
   # Relative to the application's data directory unless an absolute path
   # is supplied via override.
   database_path: data/aiperfopt.db
-  # Full-resolution retention window before downsample/rollup (NFR-4.1).
+  # Full-resolution retention window before downsample/rollup.
   full_resolution_retention_hours: 72
   # Process-level rows (raw_process_metrics, process_events,
-  # raw_process_metrics_other) get their own, much shorter retention
-  # (Phase 2, NFR-4.3): process detail is needed for recent attribution
+  # raw_process_metrics_other) get their own, much shorter retention:
+  # process detail is needed for recent attribution
   # and for computing the durable process_feature_summaries series before
   # it's pruned, not for indefinite per-process history.
   process_retention_hours: 6
 
 ingestion:
-  # Samples of a single record type accumulated before a batch flush
-  # (FR-2.1).
+  # Samples of a single record type accumulated before a batch flush.
   batch_size: 200
   # Max time a partial batch sits unflushed, seconds.
   flush_interval_seconds: 5.0
-  # Bound on the shared monitoring->ingestion queue (FR-2.2).
+  # Bound on the shared monitoring->ingestion queue.
   queue_maxsize: 20000
-  # How often the retention/rollup policy (FR-3.2) runs.
+  # How often the retention/rollup policy runs.
   retention_check_interval_seconds: 3600.0
 
 logging:

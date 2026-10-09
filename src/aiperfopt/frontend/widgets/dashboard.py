@@ -1,5 +1,5 @@
 """
-General Mode dashboard (Section 4): the everyday-user view. Emphasizes
+General Mode dashboard: the everyday-user view. Emphasizes
 overall system health, plain-language explanations, and simple
 recommendations -- no raw feature vectors, SHAP output, or model
 versions here (those live in ``developer_panel.py``); this widget and
@@ -40,7 +40,7 @@ _TIER_COLORS = {
     "unknown": "#616161",
 }
 
-# Background/text colors per `GET /readiness` state (Phase 9 F9), keyed by
+# Background/text colors per `GET /readiness` state, keyed by
 # ReadinessState's value. "replay" is deliberately its own distinct color
 # (not a variant of "ready"'s green) -- the plan requires an *unmistakable*
 # indicator that this is replayed, not live, data.
@@ -75,7 +75,7 @@ class DashboardWidget(QWidget):
 
     Call :meth:`update_state` with each decoded WebSocket payload (or a
     REST ``/live/state`` response) -- this widget holds no fetching logic
-    of its own, matching FR-13.2.
+    of its own.
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -177,7 +177,7 @@ class DashboardWidget(QWidget):
         self._update_recommendation(state.get("recommendation"))
 
     def update_readiness(self, readiness: dict[str, Any]) -> None:
-        """Feed one ``GET /readiness`` response (Phase 9 F9).
+        """Feed one ``GET /readiness`` response.
 
         Polled separately from the WebSocket ``LiveStateOut`` stream (see
         ``MainWindow``) since readiness -- can this system predict right

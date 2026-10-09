@@ -3,12 +3,12 @@ Write API for the Data Storage subsystem.
 
 Every insert goes through here rather than raw SQL elsewhere in the
 codebase, keeping Data Storage as the single place that knows how a
-record type maps onto its table (FR-12.4's "only access path" principle
+record type maps onto its table (the "only access path" principle
 applied internally: no other subsystem should import
 :mod:`aiperfopt.storage.schema` directly to build its own INSERT).
 
 Batch functions accept a list and issue one executemany-style statement,
-which is what Data Ingestion (Phase 2, FR-2.1: "write to storage in
+which is what Data Ingestion ("write to storage in
 batches") will call. Row order in the input list is preserved in the
 statement sent to SQLite, though retrieval ordering is always determined
 by the reader module's explicit ``ORDER BY timestamp`` — chronological
@@ -186,14 +186,14 @@ def insert_contention_prediction(engine: Engine, record: ContentionPredictionRec
     return _insert_one(engine, contention_predictions, record)
 
 
-# --- Diagnosis (Phase 6) ----------------------------------------------------------
+# --- Diagnosis ----------------------------------------------------------
 
 
 def insert_diagnosis(engine: Engine, record: DiagnosisRecord) -> int:
     return _insert_one(engine, diagnoses, record)
 
 
-# --- Recommendations (Phase 7) -----------------------------------------------------
+# --- Recommendations -----------------------------------------------------
 
 
 def insert_recommendation(engine: Engine, record: RecommendationRecord) -> int:
@@ -211,7 +211,7 @@ def insert_evaluations_batch(engine: Engine, records: Sequence[EvaluationRecord]
     _insert_many(engine, evaluations, records)
 
 
-# --- Model deployments (Phase 8) ----------------------------------------------------
+# --- Model deployments ----------------------------------------------------
 
 
 def insert_model_deployment(engine: Engine, record: ModelDeploymentRecord) -> int:
@@ -222,7 +222,7 @@ def insert_model_deployment(engine: Engine, record: ModelDeploymentRecord) -> in
 
 
 def insert_log_event(engine: Engine, event: LogEvent) -> int:
-    """Persist a significant pipeline event for later querying (Reporting, Phase 11).
+    """Persist a significant pipeline event for later querying (Reporting).
 
     See the module docstring in :mod:`aiperfopt.storage.schema` for why
     this is a deliberate, explicit call site rather than a

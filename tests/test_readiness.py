@@ -1,4 +1,4 @@
-"""Phase 0: readiness must name the reason the live loop cannot predict.
+"""Readiness must name the reason the live loop cannot predict.
 
 The live loop returns early on two conditions -- not enough trailing
 history, then no deployed model -- and previously did so silently while

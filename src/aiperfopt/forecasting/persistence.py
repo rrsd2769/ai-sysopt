@@ -3,8 +3,8 @@ Model artifact persistence.
 
 Trained models are not database rows — they're files on disk under
 ``AppSettings.forecasting.models_dir``, one subdirectory per
-metric/horizon. This mirrors how Retraining (Phase 8, FR-11.3) is
-expected to "preserve the previous model artifact on retrain" for
+metric/horizon. This mirrors how Retraining
+preserves the previous model artifact on retrain for
 rollback: that's a filesystem operation on these same paths, not a
 database concern.
 

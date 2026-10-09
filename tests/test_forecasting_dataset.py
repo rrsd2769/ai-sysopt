@@ -85,7 +85,7 @@ def test_empty_feature_matrix_returns_empty_dataset():
 
 @pytest.mark.behavioural
 def test_counter_metric_without_is_counter_flag_has_astronomically_large_target():
-    """Regression test for a real Phase 4 bug: a counter metric's raw
+    """Regression test for a real bug: a counter metric's raw
     cumulative value grows unboundedly, while the features available to
     predict it are all small-magnitude rates. Without is_counter=True,
     target and feature scales are wildly mismatched."""

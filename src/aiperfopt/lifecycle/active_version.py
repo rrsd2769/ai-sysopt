@@ -1,17 +1,16 @@
 """
 The active-model-version pointer — a small on-disk fact ("which
 model_version is currently deployed") that the live inference path
-(Phase 9's API layer) will read on every cycle, and that only a confirmed
+(the API layer) will read on every cycle, and that only a confirmed
 deployment decision (:mod:`aiperfopt.lifecycle.deployment`) ever writes.
 
 Deliberately a plain JSON file rather than a database row: it's a single
 fact needed on the hot inference path, not a query. The durable,
 queryable *history* of every deployment decision still lives in the
-``model_deployments`` storage table (FR-11.2's audit trail) — this file
+``model_deployments`` storage table (the audit trail) — this file
 is only ever a cache of "what does that history currently say is
 active", written atomically so a crash mid-write can never leave the
-live pipeline reading a corrupted or half-written pointer (NFR-5.1/5.4
-in spirit: a retraining-side failure must not be able to corrupt what
+live pipeline reading a corrupted or half-written pointer (a retraining-side failure must not be able to corrupt what
 the live pipeline reads).
 """
 
@@ -58,7 +57,7 @@ def write_active_version(path: Path, model_version: str) -> None:
     Writes to a sibling temp file and renames it into place — on POSIX
     filesystems ``Path.replace`` is atomic, so a reader can never observe
     a partially-written file (matching how the Data Ingestion consumer
-    treats write-then-persist as one indivisible step, Phase 2).
+    treats write-then-persist as one indivisible step).
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {_VERSION_KEY: model_version, _UPDATED_AT_KEY: time.time()}

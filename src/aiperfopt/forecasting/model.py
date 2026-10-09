@@ -1,23 +1,22 @@
 """
-The trained forecaster (ADL-13: LightGBM per metric).
+The trained forecaster (LightGBM per metric).
 
 One :class:`MetricForecaster` instance covers exactly one (metric,
 horizon) pair, wrapping exactly one LightGBM booster — this is what
-ADL-06/Section 10.2 mean by "a single multi-step model per metric": one
+"a single multi-step model per metric" means: one
 model object per metric, not a family of hand-tuned separate pipelines
 per horizon (the two horizons are two instances of the same, uniform
 class, not two different architectures).
 
-Confidence (FR-5.2)
+Confidence
 ----------------------
 Confidence is set once per model, from that model's own walk-forward
 validation RMSE relative to the target's historical spread — not
 predicted per-input. This is deliberately the simpler of two reasonable
 designs (the other being per-prediction quantile-regression intervals):
-ADL-11 explicitly frames V1's confidence as "model-derived (uncalibrated)
-... at lower cost," and Section 20's V1.5 roadmap describes statistical
-calibration as a *future* enhancement layered on top of this — confirming
-a simpler, validation-grounded scalar is the intended V1 scope, not a
+V1 confidence is deliberately "model-derived (uncalibrated)"; statistical
+calibration is a *future* enhancement layered on top of this. A simpler,
+validation-grounded scalar is the intended V1 scope, not a
 shortcut around a harder requirement.
 """
 
@@ -72,11 +71,11 @@ class MetricForecaster:
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
         """Train the booster on a feature matrix ``X`` against target ``y``.
 
-        ``X`` may contain NaN values (e.g. lag features across a gap —
-        FR-4.3) — LightGBM natively handles missing values via its split
+        ``X`` may contain NaN values (e.g. lag features across a gap) —
+        LightGBM natively handles missing values via its split
         -finding algorithm rather than requiring imputation, which is
-        exactly why ADL-13 calls out "native interpretability" as part of
-        the model choice; it extends to native NaN handling too, keeping
+        one reason LightGBM was chosen; it extends to native NaN
+        handling too, keeping
         Feature Engineering's explicit "leave it None" gap policy usable
         all the way through to training without a silent imputation step
         in between.
@@ -88,9 +87,8 @@ class MetricForecaster:
         to extrapolate an absolute level it has never seen at training
         time; predicting "how much will this change" instead is a small,
         stationary quantity every input's magnitude is centered near
-        zero for, which is exactly what a tree ensemble can learn
-        (Phase 5). ``X`` is expected to include a ``current_value``
-        column as an ordinary feature (Phase 5 stopped excluding it —
+        zero for, which is exactly what a tree ensemble can learn. ``X`` is expected to include a ``current_value``
+        column as an ordinary feature (it is no longer excluded —
         see :data:`aiperfopt.forecasting.dataset.NON_FEATURE_COLUMNS`).
         """
         if len(X) < self.min_training_rows:

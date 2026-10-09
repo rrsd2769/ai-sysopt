@@ -1,14 +1,13 @@
 """
-Overhead budget measurement (Phase 2's "the monitor must not be a burden
-on a machine it runs on passively for days" requirement, first enforced
+Overhead budget measurement (the monitor must not be a burden
+on a machine it runs on passively for days; first enforced
 only by ``tests/test_overhead.py``).
 
 Extracted into a standalone, importable function so there is exactly one
 implementation of "spin up an isolated pipeline with realistic settings
 and measure its self-CPU and database growth" — the test suite calls it
-to enforce the budget as a regression gate, and Phase 5's
-``aiperfopt evaluate --report`` calls it to produce ``overhead.txt``'s
-numbers for the Review 2 evidence pack. Both need the *same* measurement,
+to enforce the budget as a regression gate, and ``aiperfopt evaluate --report`` calls it to produce ``overhead.txt``'s
+numbers for the evidence pack. Both need the *same* measurement,
 not two copies that could silently drift apart.
 
 Deliberately measured against an isolated, temporary pipeline/database
@@ -43,7 +42,7 @@ from aiperfopt.config.settings import (
 from aiperfopt.monitoring.pipeline import create_monitoring_pipeline
 from aiperfopt.storage import create_all_tables, create_storage_engine
 
-# Documented budgets (Phase 2's "Desired End State", refined against
+# Documented budgets (refined against
 # measured steady-state overhead on real hardware -- see
 # tests/test_overhead.py's original module docstring for the full
 # rationale). Kept here as the single source of truth; the test suite

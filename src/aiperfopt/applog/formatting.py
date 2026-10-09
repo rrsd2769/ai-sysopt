@@ -1,11 +1,10 @@
 """
 JSON log formatter.
 
-Implements FR-16.1 (structured JSON logs per pipeline stage, separable
-from metric/training data storage) using the Python standard library's
-``logging`` module plus a custom ``Formatter`` — per Section 19's
-technology choice of stdlib logging + JSON formatter over structlog
-(marginal benefit over stdlib for this project's scope).
+Structured JSON logs per pipeline stage, separable
+from metric/training data storage, using the Python standard library's
+``logging`` module plus a custom ``Formatter`` (chosen over structlog: marginal benefit over
+stdlib for this project's scope).
 """
 
 from __future__ import annotations
@@ -31,7 +30,7 @@ class JsonFormatter(logging.Formatter):
     """Renders each log record as a single JSON object per line.
 
     Every record includes: timestamp (ISO-8601 UTC), level, logger name
-    (used as the "pipeline stage" per FR-16.1 — e.g. ``aiperfopt.monitoring``),
+    (used as the "pipeline stage" — e.g. ``aiperfopt.monitoring``),
     the message, and, when present, exception info and any structured
     ``extra=`` fields passed at the call site (e.g. ``context`` from an
     :class:`~aiperfopt.common.exceptions.AppError`).

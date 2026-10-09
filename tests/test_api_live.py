@@ -111,7 +111,7 @@ def test_websocket_connects_before_any_state_exists(tmp_path: Path):
 
 @pytest.mark.plumbing
 def test_live_tick_persists_one_forecast_row_per_deployed_metric(tmp_path: Path):
-    """Phase 7 / F5: a live tick with a deployed forecaster must write a
+    """A live tick with a deployed forecaster must write a
     ForecastPredictionRecord, not just compute one and discard it."""
     with build_test_client(tmp_path, with_history=True, auto_start=False) as client:
         r = client.post("/retraining/run", json={
@@ -200,11 +200,11 @@ def _flat_low_cpu_samples_now(n: int = 300, interval: float = 2.0) -> list[Syste
 
 @pytest.mark.behavioural
 def test_live_tick_persists_forecasts_when_no_contention_classifier_trained(tmp_path: Path):
-    """Real, expected scenario per Phase 5/6: accumulated data can be
+    """Real, expected scenario: accumulated data can be
     single-class for contention, so no classifier is ever trained/saved
-    for that model version. Phase 7's forecast persistence must not be
+    for that model version. The forecast persistence must not be
     held hostage to that -- only contention/diagnosis/recommendation
-    should degrade for that cycle (NFR-11.1), and this must not be
+    should degrade for that cycle, and this must not be
     mistaken for a corrupted deployment needing rollback."""
     ctx = build_test_ctx(tmp_path)
     insert_system_metric_samples_batch(ctx.storage_engine, _flat_low_cpu_samples_now())

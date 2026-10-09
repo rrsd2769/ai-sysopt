@@ -2,7 +2,7 @@
 FastAPI dependency providers. Every route handler reaches the rest of
 the application (storage engine, settings, the live-inference loop)
 through these — never by importing a global — so the same route module
-works against a fresh test app with its own isolated context (NFR-14.1)
+works against a fresh test app with its own isolated context
 as it does against the real server process.
 """
 
@@ -16,9 +16,7 @@ from sqlalchemy import Engine
 from aiperfopt.api.connection_manager import ConnectionManager
 from aiperfopt.api.live_state import LiveInferenceLoop
 from aiperfopt.bootstrap import AppContext
-from aiperfopt.config.settings import AppSettings
 from aiperfopt.monitoring.pipeline import MonitoringPipeline
-from aiperfopt.insight.catalog import RecommendationCatalog
 
 
 def get_app_context(request: Request) -> AppContext:
@@ -27,10 +25,6 @@ def get_app_context(request: Request) -> AppContext:
 
 def get_storage_engine(ctx: Annotated[AppContext, Depends(get_app_context)]) -> Engine:
     return ctx.storage_engine
-
-
-def get_settings(ctx: Annotated[AppContext, Depends(get_app_context)]) -> AppSettings:
-    return ctx.settings
 
 
 def get_monitoring_pipeline(request: Request) -> MonitoringPipeline:
@@ -58,7 +52,3 @@ def get_live_loop_ws(websocket: WebSocket) -> LiveInferenceLoop:
 
 def get_connection_manager_ws(websocket: WebSocket) -> ConnectionManager:
     return websocket.app.state.connection_manager
-
-
-def get_recommendation_catalog(request: Request) -> RecommendationCatalog:
-    return request.app.state.catalog

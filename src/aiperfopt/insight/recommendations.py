@@ -1,24 +1,23 @@
 """
-Recommendation Engine orchestrator — the Phase 7 entrypoint (Section 7.1
-item 9, FR-9.1-9.3, ADL-15, ADL-19).
+Recommendation Engine orchestrator — the entrypoint.
 
 :func:`generate_recommendations` is intentionally the thinnest orchestrator
 in this codebase: gate on :attr:`~aiperfopt.storage.records.DiagnosisRecord.is_actionable`,
 look the category up in the :class:`~aiperfopt.insight.catalog.RecommendationCatalog`,
 persist, return. There is no branching logic here beyond that gate — all
 of the actual decision-making (which actions map to which category) lives
-in the externally-editable catalog (NFR-12.1), and all of the upstream
+in the externally-editable catalog, and all of the upstream
 reconciliation work (which category this event even *is*) already
-happened in Phase 6. This is deliberate: FR-9.1 requires the
-Recommendation Engine consume *only* the standardized diagnosis category,
-never raw metrics or ad hoc conditions, and Section 7.3 draws the
+happened in diagnosis. This is deliberate: the
+Recommendation Engine consumes *only* the standardized diagnosis category,
+never raw metrics or ad hoc conditions, and the
 dependency as one-directional (Recommendation depends on Diagnosis'
 output, never reaches past it to Contention Prediction or Forecasting
 directly) — a thin orchestrator is what actually enforces that boundary
 in code, rather than just documenting it.
 
-FR-9.2 ("never take automated action... suggestions only, always
-user-confirmed") is satisfied by what this module does *not* do: nothing
+The rule "never take automated action... suggestions only, always
+user-confirmed" is satisfied by what this module does *not* do: nothing
 here touches a running process, changes a setting, or performs any
 system-level action. It produces and persists data — a ranked list of
 suggested actions — and nothing more. Any future automation would be a
@@ -42,7 +41,7 @@ def generate_recommendations(
     """Look up, persist, and return curated actions for an actionable diagnosis.
 
     Returns ``None`` (persisting nothing) when ``diagnosis.is_actionable``
-    is ``False`` — currently only true for the anomaly category (ADL-36).
+    is ``False`` — currently only true for the anomaly category.
     Checking the boolean field directly, rather than re-deriving
     actionability from ``diagnosis.category`` here, keeps this module
     agnostic to which categories are actionable: that decision was already
@@ -53,7 +52,7 @@ def generate_recommendations(
         return None
     if diagnosis.id is None:
         raise ValueError(
-            "diagnosis.id is required to generate traceable recommendations (FR-9.3) — "
+            "diagnosis.id is required to generate traceable recommendations — "
             "pass a DiagnosisRecord that has already been persisted via insert_diagnosis()."
         )
 

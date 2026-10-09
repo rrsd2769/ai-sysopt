@@ -1,9 +1,9 @@
 """
-Anomaly Detection (Section 7.1, item 7).
+Anomaly Detection.
 
-Isolation Forest on engineered features (Section 10.4): "a proper
+Isolation Forest on engineered features: "a proper
 unsupervised technique requiring no labels, moderate implementation
-cost." Per the Section 7.2 data-flow diagram, this consumes the *same*
+cost." This consumes the *same*
 feature vectors Forecasting does — the full engineered feature matrix
 from :mod:`aiperfopt.features`, not a narrower derived input like
 Contention Prediction's forecast-plus-state vector.
@@ -66,9 +66,9 @@ _UNVERSIONED = 0
 # Same trap, same fix, for a different axis of skew: this detector is fit
 # directly on Feature Engineering's full engineered matrix (see module
 # docstring), so a v1-trained artifact's ``feature_columns`` silently
-# lacks Phase 4's process columns. ``_prepare``'s ``reindex`` would drop
+# lacks the process columns. ``_prepare``'s ``reindex`` would drop
 # any v2-only columns a live v2 matrix offers rather than raising, which
-# is exactly the kind of silent train/serve skew Phase 3 fixed for
+# is exactly the kind of silent train/serve skew already fixed for
 # imputation — ``load_anomaly_detector`` checks this against the current
 # ``FEATURE_SET_VERSION`` the same way it checks ``schema_version``: the
 # field's default is a sentinel distinct from any real version string,
@@ -116,7 +116,7 @@ class AnomalyDetector:
         ``X`` is expected to be Feature Engineering's full engineered
         matrix (or a concatenation of several scenarios' matrices, as
         :mod:`aiperfopt.contention.training_pipeline` does) — NaN values
-        (gaps, per FR-4.3) are filled with each column's own mean before
+        (gaps) are filled with each column's own mean before
         fitting, since scikit-learn's IsolationForest does not natively
         handle missing values the way LightGBM does. This is the one
         place in the codebase that imputes rather than passing NaN

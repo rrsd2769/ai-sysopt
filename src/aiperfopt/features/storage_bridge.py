@@ -3,9 +3,9 @@ Storage-backed Feature Engineering entry points.
 
 :mod:`aiperfopt.features.engine` has no dependency on storage at all —
 it's pure functions over lists of :class:`SystemMetricSample`, which is
-what makes it trivially unit-testable and guarantees FR-4.2 (the same
-function serves both paths). This module is the thin, storage-aware layer
-on top of it that Forecasting (Phase 4) and any live-inference loop will
+what makes it trivially unit-testable and guarantees the same
+function serves both paths. This module is the thin, storage-aware layer
+on top of it that Forecasting and any live-inference loop will
 actually call: read the right window from storage, run the shared
 computation, optionally persist the result.
 """
@@ -52,7 +52,7 @@ def compute_live_feature_vector(
 ) -> FeatureVectorRecord | None:
     """Read the trailing window needed for ``config`` and compute one feature vector.
 
-    This is Section 7.3's "historical window read on every cycle" for
+    This is the "historical window read on every cycle" for
     live inference: Feature Engineering depends on Data Storage even at
     inference time, not just for training. The window size is derived
     from ``config.min_history_seconds`` so every configured lag/rolling
@@ -88,9 +88,8 @@ def backfill_feature_matrix(
     """Compute features over a historical range and optionally persist all rows.
 
     Intended for building a training dataset ahead of Forecasting model
-    training (Phase 4): every row of the resulting matrix is a training
-    example, computed by the exact same formulas the live path uses
-    (FR-4.2). Returns the number of feature vectors computed.
+    training: every row of the resulting matrix is a training
+    example, computed by the exact same formulas the live path uses. Returns the number of feature vectors computed.
     """
     samples = get_system_metrics_range(engine, start=start, end=end)
     process_summary = aligned_process_summary(engine, samples, config.tolerance_seconds)
@@ -119,7 +118,7 @@ def _records_to_frame(records: list, columns: tuple[str, ...]) -> pd.DataFrame:
 def read_process_summary_series(engine: Engine, start: float, end: float) -> pd.DataFrame:
     """Per-poll-timestamp process summary covering ``[start, end]``, from whichever source has it.
 
-    Phase 2's independent process retention window means a long
+    The independent process retention window means a long
     historical range can straddle two different sources: rows older than
     the process-retention cutoff have already been summarized and their
     raw rows pruned (only ``process_feature_summaries`` survives for
@@ -161,7 +160,7 @@ def read_process_summary_series(engine: Engine, start: float, end: float) -> pd.
         return pd.DataFrame(columns=["timestamp", *PROCESS_SUMMARY_COLUMNS])
     combined = pd.concat(non_empty, ignore_index=True)
     # The two sources shouldn't overlap in timestamp by construction
-    # (Phase 2 always summarizes a poll immediately before pruning its raw
+    # (a poll is always summarized immediately before pruning its raw
     # rows) — keep() the raw-computed value on the rare chance both exist
     # for the same poll, since it's the more direct computation.
     return (
@@ -177,7 +176,7 @@ def aligned_process_summary(
     """Process summary aligned onto ``samples``' own timestamps, or ``None`` if there's none.
 
     Shared by the live (:func:`compute_live_feature_vector`), batch
-    (:func:`backfill_feature_matrix`), and Phase 5 ablation
+    (:func:`backfill_feature_matrix`), and ablation
     (:mod:`aiperfopt.evaluation.ablation`) paths so all three feed
     :func:`aiperfopt.features.engine.compute_feature_matrix` through the
     identical alignment call — the guarantee that process columns come

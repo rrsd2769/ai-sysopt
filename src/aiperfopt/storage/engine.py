@@ -1,28 +1,26 @@
 """
-SQLite engine bootstrap via SQLAlchemy Core (ADL-17).
+SQLite engine bootstrap via SQLAlchemy Core.
 
 This module owns only *connection* concerns — creating the engine,
 ensuring the data directory exists, and applying the SQLite pragmas the
 rest of the Data Storage subsystem depends on. Table definitions
-(``raw_metrics``, ``features``, ``predictions``, ``evaluations``, ``logs`` —
-FR-3.1) are deliberately deferred to Phase 1, since that milestone owns the
-actual schema and rollup/retention strategy (FR-3.2, FR-3.3).
+(``raw_metrics``, ``features``, ``predictions``, ``evaluations``, ``logs``) are deliberately left to the schema and rollup modules.
 
 Rationale for SQLite pragmas applied here:
 
 - ``foreign_keys = ON``: SQLite does not enforce foreign keys by default;
-  the schema in Phase 1 will rely on them for referential integrity
+  the schema relies on them for referential integrity
   between raw samples, features, and predictions.
 - ``journal_mode = WAL``: allows concurrent readers (e.g. a REST history
   query) while the Ingestion subsystem is writing, which matters because
-  FR-2.2 requires ingestion writes to never block the Monitoring Engine,
-  and NFR-11.3 allows prediction to proceed against live in-memory data if
+  ingestion writes must never block the Monitoring Engine,
+  and prediction may proceed against live in-memory data if
   storage is briefly locked — WAL substantially reduces how often that
   fallback path is needed.
 - ``synchronous = NORMAL``: the standard, safe pairing with WAL — full
   durability on the WAL file with better write throughput than FULL,
   appropriate for a local single-machine app with no distributed
-  durability requirement (Section 13 threat model).
+  durability requirement.
 """
 
 from __future__ import annotations
@@ -58,7 +56,7 @@ def create_storage_engine(database_path: Path, *, echo: bool = False) -> Engine:
     echo:
         Passed through to SQLAlchemy's ``echo`` — logs every emitted SQL
         statement. Intended for local debugging only; never enabled by
-        default since it would violate NFR-1.1's low-overhead requirement
+        default since it would violate the low-overhead requirement
         under sustained polling-driven writes.
 
     Raises
@@ -97,7 +95,7 @@ def engine_connection(engine: Engine) -> Iterator[Connection]:
     Every direct SQL interaction elsewhere in the Storage subsystem should
     go through this rather than calling ``engine.connect()`` directly, so
     connection-level failures are consistently typed for callers that need
-    to implement graceful degradation (NFR-5.4, NFR-11.3).
+    to implement graceful degradation.
     """
     try:
         with engine.connect() as connection:
@@ -113,7 +111,7 @@ def check_connectivity(engine: Engine) -> bool:
 
     Returns False rather than raising on failure, since this is meant to
     be a cheap probe used in graceful-degradation decision points (e.g.
-    NFR-11.3: fall back to in-memory-only prediction if storage is
+    e.g. fall back to in-memory-only prediction if storage is
     unavailable), not a hard assertion.
     """
     try:

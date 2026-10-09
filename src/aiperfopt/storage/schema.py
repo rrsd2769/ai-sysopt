@@ -1,9 +1,9 @@
 """
-Data Storage schema (FR-3.1, FR-3.3).
+Data Storage schema.
 
 All tables are plain SQLAlchemy Core ``Table`` objects against a shared
-``MetaData`` (ADL-17 — Core, not the ORM). Five persistence categories are
-kept as distinct table groups per FR-3.1 ("raw metric samples, computed
+``MetaData`` (Core, not the ORM). Five persistence categories are
+kept as distinct table groups ("raw metric samples, computed
 features, model predictions, evaluation results, and structured logs in
 separate tables/schemas"):
 
@@ -13,15 +13,15 @@ separate tables/schemas"):
     evaluation results   -> evaluations
     structured logs      -> app_logs
 
-Plus one supporting table not in FR-3.1's list:
+Plus one supporting table not in the list:
 
-    raw_system_metrics_rollup  -> downsampled system metrics (FR-3.2)
+    raw_system_metrics_rollup  -> downsampled system metrics
 
 Design notes
 ------------
 - Every table that participates in chronological queries has an explicit
-  ``Index`` on its timestamp column (FR-3.3: "efficient chronological
-  range queries (indexed on timestamp)").
+  ``Index`` on its timestamp column for efficient chronological
+  range queries.
 - Timestamps are stored as UTC Unix epoch floats (``Float``), not SQLite's
   string-based datetime affinity. This keeps range comparisons a plain
   numeric ``BETWEEN``/``<``/``>`` (fast, index-friendly) and sidesteps
@@ -29,12 +29,11 @@ Design notes
   ``time.time()`` and every consumer compares against the same float
   epoch, so there is exactly one representation to reason about.
 - ``JSON`` columns are used deliberately wherever the payload's shape
-  belongs to a subsystem that hasn't been built yet (feature vectors:
-  Phase 3; contributing-factor breakdowns: Phase 5/6) or is inherently
-  variable-width (evaluation ``extra`` metrics). This avoids coupling the
-  Phase 1 schema to decisions later phases haven't made yet, consistent
-  with NFR-13.1 (new modules addable with minimal modification to
-  existing components).
+  belongs to a subsystem that may evolve (feature vectors, contributing-factor
+  breakdowns) or is inherently variable-width (evaluation ``extra``
+  metrics). This avoids coupling the schema to decisions later work
+  hasn't made yet, so new modules can be added with minimal modification
+  to existing components.
 """
 
 from __future__ import annotations
@@ -54,7 +53,7 @@ from sqlalchemy import (
 
 # A shared naming convention keeps auto-generated constraint/index names
 # predictable, which matters if a future version introduces Alembic
-# migrations (ADL-17 notes SQLAlchemy Core "protects future migration").
+# migrations.
 _NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -64,7 +63,7 @@ _NAMING_CONVENTION = {
 metadata = MetaData(naming_convention=_NAMING_CONVENTION)
 
 # ---------------------------------------------------------------------------
-# Raw metric samples (Section 9 core monitoring metric set)
+# Raw metric samples (core monitoring metric set)
 # ---------------------------------------------------------------------------
 
 raw_system_metrics = Table(
@@ -98,7 +97,7 @@ raw_system_metrics = Table(
     Column("load_avg_5", Float, nullable=True),
     Column("load_avg_15", Float, nullable=True),
     Column("thread_count_total", Integer, nullable=True),
-    # Battery / power (IOKit, user-space per Section 5)
+    # Battery / power (IOKit, user-space)
     Column("battery_percent", Float, nullable=True),
     Column("power_plugged", Boolean, nullable=True),
 )
@@ -117,7 +116,7 @@ raw_process_metrics = Table(
     Column("memory_percent", Float, nullable=True),
     Column("num_threads", Integer, nullable=True),
     # macOS/POSIX "nice" value — the available scheduling information
-    # accessible from user-space (Section 5's kernel-level exclusion note).
+    # accessible from user-space (the kernel-level exclusion note).
     Column("priority", Integer, nullable=True),
     Column("status", String(32), nullable=True),
     Column("create_time", Float, nullable=True),
@@ -132,13 +131,13 @@ process_events = Table(
     Column("timestamp", Float, nullable=False),
     Column("pid", Integer, nullable=False),
     Column("name", String(256), nullable=False),
-    # "launch" | "terminate" — FR-1.3.
+    # "launch" | "terminate".
     Column("event_type", String(16), nullable=False),
 )
 Index("ix_process_events_timestamp", process_events.c.timestamp)
 
 # One row per poll cycle summarising every process *not* individually
-# retained in raw_process_metrics (Phase 2's storage bound: top-N by CPU
+# retained in raw_process_metrics (the storage bound: top-N by CPU
 # union top-N by memory, plus this one row for everything else). Kept as
 # its own table rather than a sentinel pid in raw_process_metrics itself,
 # since "the aggregate of everything outside the top-N" is a materially
@@ -161,7 +160,7 @@ raw_process_metrics_other = Table(
 Index("ix_raw_process_metrics_other_timestamp", raw_process_metrics_other.c.timestamp)
 
 # ---------------------------------------------------------------------------
-# Downsampled / rolled-up system metrics (FR-3.2)
+# Downsampled / rolled-up system metrics
 # ---------------------------------------------------------------------------
 
 raw_system_metrics_rollup = Table(
@@ -178,7 +177,7 @@ raw_system_metrics_rollup = Table(
 Index("ix_raw_system_metrics_rollup_bucket_start", raw_system_metrics_rollup.c.bucket_start)
 
 # ---------------------------------------------------------------------------
-# Computed features (Feature Engineering output, Phase 3)
+# Computed features (Feature Engineering output)
 # ---------------------------------------------------------------------------
 
 features = Table(
@@ -201,7 +200,7 @@ Index("ix_features_timestamp", features.c.timestamp)
 
 # Durable, per-process-poll process summary series (aiperfopt.features.
 # process_features). raw_process_metrics/process_events are pruned after
-# a short retention window (Phase 2, NFR-4.3) because multi-day retention
+# a short retention window because multi-day retention
 # of full per-process detail would defeat the storage bound the truncation
 # above exists to provide -- but multi-day training (the whole point of
 # this project's pivot, see docs/plans/2026-09-12-*) needs the *derived*
@@ -223,7 +222,7 @@ process_feature_summaries = Table(
 Index("ix_process_feature_summaries_timestamp", process_feature_summaries.c.timestamp)
 
 # ---------------------------------------------------------------------------
-# Model predictions (Forecasting: Phase 4, Contention: Phase 5)
+# Model predictions (Forecasting, Contention)
 # ---------------------------------------------------------------------------
 
 forecast_predictions = Table(
@@ -235,12 +234,11 @@ forecast_predictions = Table(
     # The future timestamp this prediction is for.
     Column("target_timestamp", Float, nullable=False),
     Column("metric_name", String(64), nullable=False),
-    # "short" (30-60s) | "medium" (2-5min) — Section 10.2.
+    # "short" (30-60s) | "medium" (2-5min).
     Column("horizon_label", String(16), nullable=False),
     Column("horizon_seconds", Integer, nullable=False),
     Column("predicted_value", Float, nullable=False),
-    # Model-derived confidence (FR-5.2) — not statistically calibrated in V1
-    # (ADL-11).
+    # Model-derived confidence — not statistically calibrated in V1.
     Column("confidence", Float, nullable=True),
     Column("model_version", String(64), nullable=False),
 )
@@ -255,9 +253,9 @@ contention_predictions = Table(
     Column("probability", Float, nullable=False),
     Column("threshold_used", Float, nullable=False),
     Column("triggered", Boolean, nullable=False),
-    # [{"metric": "cpu_percent", "contribution": 0.62}, ...] — FR-6.2.
+    # [{"metric": "cpu_percent", "contribution": 0.62}, ...].
     Column("contributing_metrics", JSON, nullable=True),
-    # [{"pid": 1234, "name": "chrome", "value": 0.41}, ...] — FR-6.2. "value"
+    # [{"pid": 1234, "name": "chrome", "value": 0.41}, ...]. "value"
     # is whichever raw_process_metrics column was ranked on to resolve the
     # dominant contributing metric (e.g. cpu_percent, memory_percent) — see
     # aiperfopt.contention.processes.get_contributing_processes(). Kept
@@ -266,7 +264,7 @@ contention_predictions = Table(
     # a plain observed value, and conflating the two names here previously
     # made the two payload shapes look identical when they are not.
     Column("contributing_processes", JSON, nullable=True),
-    # From Anomaly Detection, modulating confidence (FR-7.2). Nullable
+    # From Anomaly Detection, modulating confidence. Nullable
     # because a contention prediction can occur without a concurrent
     # anomaly-detection run in the same cycle.
     Column("anomaly_score", Float, nullable=True),
@@ -275,7 +273,7 @@ contention_predictions = Table(
 Index("ix_contention_predictions_generated_at", contention_predictions.c.generated_at)
 
 # ---------------------------------------------------------------------------
-# Evaluation results (Model Evaluation & Validation, Phase 4)
+# Evaluation results (Model Evaluation & Validation)
 # ---------------------------------------------------------------------------
 
 evaluations = Table(
@@ -289,36 +287,35 @@ evaluations = Table(
     # cross-metric evaluation summaries).
     Column("metric_name", String(64), nullable=True),
     Column("horizon_label", String(16), nullable=True),
-    # Walk-forward fold index (Section 11) — null for a summary row
+    # Walk-forward fold index — null for a summary row
     # averaged across folds.
     Column("fold_index", Integer, nullable=True),
-    # e.g. "walk_forward", "holdout_scenario_1" (Section 11's mandatory
+    # e.g. "walk_forward", "holdout_scenario_1" (the mandatory
     # held-out scenario).
     Column("dataset_tag", String(64), nullable=False),
     Column("mae", Float, nullable=True),
     Column("rmse", Float, nullable=True),
     Column("directional_accuracy", Float, nullable=True),
     # Null when this row IS the primary model's result; set to e.g.
-    # "naive_persistence" when this row is a baseline comparison result
-    # (FR-10.2).
+    # "naive_persistence" when this row is a baseline comparison result.
     Column("baseline_name", String(64), nullable=True),
     Column("extra", JSON, nullable=True),
 )
 Index("ix_evaluations_evaluated_at", evaluations.c.evaluated_at)
 
 # ---------------------------------------------------------------------------
-# Model deployment decisions (Model Retraining, Phase 8, FR-11.2/11.3, ADL-23)
+# Model deployment decisions (Model Retraining)
 # ---------------------------------------------------------------------------
 #
 # One row per human-confirmed deployment decision (or a system-initiated
 # rollback). This is the "active version" audit trail: which candidate
 # model_version was proposed, what it was compared against, what the
 # comparison recommended, and what a human actually decided — never
-# inferred from "whatever's newest on disk" (FR-11.2's "never silently
-# activate"). ``aiperfopt.lifecycle.active_version`` reads/writes a
+# inferred from "whatever's newest on disk" (never silently
+# activated). ``aiperfopt.lifecycle.active_version`` reads/writes a
 # small pointer file for *fast* "what's active right now" lookups on the
 # live inference path; this table is the durable, queryable history
-# behind that pointer, and is what NFR-5.3's automatic fallback walks
+# behind that pointer, and is what the automatic fallback walks
 # backwards through to find the last known-good deployed version.
 
 model_deployments = Table(
@@ -339,9 +336,8 @@ model_deployments = Table(
     # decided — "deploy" | "reject" | "no_active_baseline". Null for a
     # system-initiated rollback, which isn't comparison-driven.
     Column("recommendation", String(32), nullable=True),
-    # Who/what made the decision — e.g. "human" once Phase 9's API wires
-    # a real confirmation action, or "system" for an automatic rollback
-    # (NFR-5.3).
+    # Who/what made the decision — e.g. "human" once the API wires
+    # a real confirmation action, or "system" for an automatic rollback.
     Column("confirmed_by", String(64), nullable=True),
     # Serialized aiperfopt.lifecycle.comparison.RetrainingComparison (or
     # a rollback reason) — kept for audit/debugging without needing to
@@ -351,18 +347,18 @@ model_deployments = Table(
 Index("ix_model_deployments_decided_at", model_deployments.c.decided_at)
 
 # ---------------------------------------------------------------------------
-# Diagnosis results (Diagnosis / Explainable AI, Phase 6)
+# Diagnosis results (Diagnosis / Explainable AI)
 # ---------------------------------------------------------------------------
 #
-# One row per resolved diagnosis event (FR-8.3: every prediction event
-# that warrants one resolves to exactly one of Section 12's eight
-# taxonomy categories, ADL-24). Deliberately its own table rather than
+# One row per resolved diagnosis event (every prediction event
+# that warrants one resolves to exactly one of the eight
+# taxonomy categories). Deliberately its own table rather than
 # extra columns bolted onto contention_predictions: Diagnosis is a
-# distinct subsystem (Section 7.1, item 8) that *consumes*
-# Contention/Forecasting output (Section 7.3), and giving it its own
+# distinct subsystem that *consumes*
+# Contention/Forecasting output, and giving it its own
 # table keeps that consumer relationship visible in the schema instead of
-# blurring the two subsystems' boundaries the way ADL-19 already warns
-# against for the Recommendation Engine.
+# blurring the two subsystems' boundaries the way the Recommendation Engine
+# must not be blurred with Diagnosis.
 
 diagnoses = Table(
     "diagnoses",
@@ -371,21 +367,21 @@ diagnoses = Table(
     Column("generated_at", Float, nullable=False),
     # One of DiagnosisCategory's eight values (aiperfopt.insight.taxonomy) —
     # stored as the enum's string value, not a foreign-key/int code, since
-    # the taxonomy is a small, spec-fixed set (Section 12) rather than
+    # the taxonomy is a small, spec-fixed set rather than
     # user-editable reference data.
     Column("category", String(64), nullable=False),
-    # False only for "unusual_pattern_anomaly_flagged" (ADL-36): that
+    # False only for "unusual_pattern_anomaly_flagged": that
     # category is informational only and must never reach the
-    # Recommendation Engine (Phase 7 reads this column to enforce that,
+    # Recommendation Engine (the engine reads this column to enforce that,
     # rather than special-casing the category string itself).
     Column("is_actionable", Boolean, nullable=False),
     # Contention probability for the 7 actionable categories; anomaly
-    # score for the anomaly-flagged category (Section 12's row uses a
+    # score for the anomaly-flagged category (the row uses a
     # different underlying signal for that one category — see
     # aiperfopt.insight.diagnosis's module docstring).
     Column("confidence", Float, nullable=False),
     # "lightweight" or "shap" — which tier actually produced
-    # forecast_explanations below (Section 10.5, NFR-1.3).
+    # forecast_explanations below.
     Column("explanation_tier", String(16), nullable=False),
     # Why that tier fired: "high_confidence_contention",
     # "significant_anomaly", "explicit_request", or "routine" — kept
@@ -400,12 +396,12 @@ diagnoses = Table(
     # technical_explanation — [{"metric_name": ..., "forecaster_kind": ...,
     # "tier": ..., "top_features": [{"feature_name":..,"value":..}, ...],
     # "note": ...}, ...]. Retained even though only a short natural-
-    # language summary is user-facing, per FR-8.3's "underlying
-    # multi-resource contribution data is retained internally... exposed
-    # via Explainable AI regardless of which single label is user-facing."
+    # language summary is user-facing; the underlying
+    # multi-resource contribution data is retained internally and exposed
+    # via Explainable AI regardless of which single label is user-facing.
     Column("forecast_explanations", JSON, nullable=True),
     # Passed through unchanged from the triggering ContentionPredictionRecord
-    # (FR-6.2) — Diagnosis reuses these rather than recomputing them, since
+    # — Diagnosis reuses these rather than recomputing them, since
     # a logistic-regression coefficient contribution already *is* the exact
     # SHAP-linear attribution for that model (see
     # aiperfopt.insight.explainer's module docstring for the numerical
@@ -418,21 +414,21 @@ diagnoses = Table(
 Index("ix_diagnoses_generated_at", diagnoses.c.generated_at)
 
 # ---------------------------------------------------------------------------
-# Recommendations (Recommendation Engine, Phase 7)
+# Recommendations (Recommendation Engine)
 # ---------------------------------------------------------------------------
 #
-# One row per generated recommendation set (FR-9.1: consumes only a
-# standardized diagnosis category; FR-9.3: traceable back to the specific
+# One row per generated recommendation set (consumes only a
+# standardized diagnosis category, and is traceable back to the specific
 # diagnosis that produced it). Deliberately rule-based, not a trained
-# model (ADL-15) — there is no "model_version" column here the way
+# model — there is no "model_version" column here the way
 # forecast_predictions/contention_predictions/diagnoses have, because
 # nothing here was fit to data; catalog_version instead identifies which
 # revision of the curated category->actions mapping
 # (aiperfopt/resources/recommendations.yaml) produced these actions, which is the
-# actual thing that can change over time and that FR-9.3 needs traced.
+# actual thing that can change over time and that needs tracing.
 #
 # No SQL FOREIGN KEY constraint on diagnosis_id: nothing else in this
-# schema uses one either (see ADL-17's SQLAlchemy Core choice) — kept
+# schema uses one either — kept
 # consistent with the existing style rather than introducing the first
 # FK constraint in this one table. diagnosis_category is stored
 # alongside diagnosis_id in denormalized form deliberately, mirroring how
@@ -451,7 +447,7 @@ recommendations = Table(
     # the table-level comment above for why.
     Column("diagnosis_category", String(64), nullable=False),
     # [{"title": ..., "description": ..., "rationale": ...}, ...], ranked
-    # highest-priority first — FR-9.1's actions curated by
+    # highest-priority first — the actions curated by
     # aiperfopt.insight.catalog from aiperfopt/resources/recommendations.yaml.
     Column("actions", JSON, nullable=False),
     Column("catalog_version", String(64), nullable=False),
@@ -459,18 +455,18 @@ recommendations = Table(
 Index("ix_recommendations_generated_at", recommendations.c.generated_at)
 
 # ---------------------------------------------------------------------------
-# Structured logs (FR-3.1's "logs" category)
+# Structured logs (the "logs" category)
 # ---------------------------------------------------------------------------
 #
 # This is distinct from the file-based JSON logging configured in
-# aiperfopt.applog (Phase 0). That sink captures every log line for
-# operational tailing/debugging (NFR-8.1) and would violate NFR-1.1's
+# aiperfopt.applog. That sink captures every log line for
+# operational tailing/debugging and would break the
 # overhead budget if every line were also written to SQLite. This table
 # is instead a queryable record of *significant* pipeline events
 # (explicitly persisted by a subsystem via aiperfopt.storage.writer, not
 # a logging.Handler mirroring every line) — e.g. a retraining outcome, a
 # high-confidence contention prediction's supporting log entry, or an
-# error a subsystem wants visible to the Reporting subsystem (Phase 11)
+# error a subsystem wants visible to the Reporting subsystem
 # without it having to parse log files.
 
 app_logs = Table(
@@ -480,7 +476,7 @@ app_logs = Table(
     Column("timestamp", Float, nullable=False),
     Column("level", String(16), nullable=False),
     # Pipeline stage — conventionally the producing module's __name__,
-    # mirroring the logger-name-as-stage-tag convention from Phase 0.
+    # mirroring the logger-name-as-stage-tag convention.
     Column("logger", String(128), nullable=False),
     Column("message", Text, nullable=False),
     Column("context", JSON, nullable=True),

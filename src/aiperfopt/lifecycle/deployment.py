@@ -2,12 +2,11 @@
 The only place a model_version is ever activated or rolled back. Every
 path through this module writes a :class:`ModelDeploymentRecord` to the
 ``model_deployments`` table, whether or not the outcome was "deployed" --
-a rejected candidate is exactly as important to the audit trail (Section
-16, R-8) as an accepted one.
+a rejected candidate is exactly as important to the audit trail as an accepted one.
 
-FR-11.2 ("never silently activate") means there is deliberately no
+"Never silently activate" means there is deliberately no
 function anywhere in this codebase that activates a model_version
-without a caller passing an explicit ``confirmed=True``. Phase 9's API
+without a caller passing an explicit ``confirmed=True``. The API
 layer is expected to gate that argument behind an actual user action
 (a "confirm deployment" button/endpoint), not a config flag or default.
 """
@@ -55,27 +54,27 @@ def confirm_deployment(
     Parameters
     ----------
     skill_gate:
-        Phase 6's absolute quality bar (:func:`aiperfopt.lifecycle.
+        The absolute quality bar (:func:`aiperfopt.lifecycle.
         comparison.evaluate_skill_gate`), computed once alongside
         ``comparison`` when the candidate was produced. Unlike
         ``comparison.recommendation``, this is not advisory: a failing
         gate raises :class:`~aiperfopt.common.exceptions.
         ModelDeploymentError` below even when ``confirmed=True`` --
         human confirmation remains necessary but stops being sufficient
-        (Section 11's precision-favoring, trust-first stance). The audit
-        trail (FR-11.2, R-8) still records the attempt before raising, a
+        (the precision-favoring, trust-first stance). The audit
+        trail still records the attempt before raising, a
         "gate_failed" decision alongside "deployed"/"rejected"/"rollback".
     confirmed:
         The actual decision. This function does not infer a decision
         from ``comparison.recommendation`` -- the recommendation is
-        advisory only (ADL-23); a human may confirm a "reject"
+        advisory only; a human may confirm a "reject"
         recommendation or decline a "deploy" one, and either is recorded
         faithfully either way. Irrelevant to whether the skill gate
         blocks deployment: that check happens regardless of ``confirmed``.
     confirmed_by:
-        Free-text identifying who/what confirmed this. Phase 9's API
+        Free-text identifying who/what confirmed this. The API
         layer should pass a real identifier once authentication exists
-        beyond this single-user, local-only V1 (Section 13); "human" is
+        beyond this single-user, local-only V1; "human" is
         an acceptable placeholder until then.
 
     Returns
@@ -142,14 +141,13 @@ def confirm_deployment(
 def rollback_to_last_known_good(
     engine: Engine, retraining_settings: RetrainingSettings, reason: str
 ) -> ModelDeploymentRecord:
-    """Automatic fallback to the last known-good deployed version (NFR-5.3).
+    """Automatic fallback to the last known-good deployed version.
 
     Walks the deployment history backwards from the current active
     version for the most recent *other* version whose decision was
     "deployed", and activates it. Raises :class:`ModelDeploymentError`
     (non-recoverable) if no earlier deployed version exists -- there is
-    nothing to fall back to, and that is a condition the caller (Phase
-    9's inference path) must surface rather than silently ignore.
+    nothing to fall back to, and that is a condition the caller (the inference path) must surface rather than silently ignore.
     """
     current_version = get_active_model_version(retraining_settings)
     history = get_model_deployments_range(engine)  # chronological ascending
@@ -210,11 +208,9 @@ def resolve_deployed_forecasters(
 
     Skips (with no error) any metric that has no recorded holdout
     evaluation for ``model_version``/``horizon_label`` — e.g. a metric
-    that produced no usable model during that training run (Section
-    10.7's contingency plan producing no candidate at all is rare but
-    possible for a very short/sparse training window). A caller with
+    that produced no usable model during that training run (rare, but possible for a very short/sparse training window). A caller with
     zero usable forecasters back should treat that the same as "no
-    active model" (NFR-11.1's graceful degradation), not raise.
+    active model" (graceful degradation), not raise.
     """
     metrics = target_metrics or list(feature_config.gauge_metrics) + list(feature_config.counter_metrics)
     evaluations = get_evaluations_by_version(engine, model_version)

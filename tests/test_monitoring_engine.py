@@ -68,7 +68,7 @@ def test_engine_produces_process_metric_items():
 
 @pytest.mark.plumbing
 def test_engine_survives_repeated_system_metric_failures(monkeypatch):
-    """FR-1.4 / NFR-5.1: a broken mandatory source must not kill the engine
+    """A broken mandatory source must not kill the engine
     thread — it should log and keep retrying next cycle."""
     call_count = {"n": 0}
     real_cpu_percent = psutil.cpu_percent

@@ -22,13 +22,13 @@ def health() -> dict:
 
 @router.get("/config")
 def get_config(ctx: Annotated[AppContext, Depends(get_app_context)]) -> dict:
-    """Read-only view of the currently active configuration (NFR-12.1).
+    """Read-only view of the currently active configuration.
 
     Returned as a plain dict rather than re-exposing pydantic-settings
     objects directly — this is a read-only diagnostic view, not a config
-    write path (there is no corresponding PUT/PATCH; FR-15.1's layered
+    write path (there is no corresponding PUT/PATCH; the layered
     file/env config remains the only way to change settings, consistent
-    with V1's local-only, no-remote-admin scope, Section 13).
+    with V1's local-only, no-remote-admin scope).
     """
     return ctx.settings.model_dump(mode="json")
 

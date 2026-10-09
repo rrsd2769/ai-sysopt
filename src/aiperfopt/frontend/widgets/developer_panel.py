@@ -1,5 +1,5 @@
 """
-Developer Mode panel (Section 4): technical users, evaluators, the
+Developer Mode panel: technical users, evaluators, the
 developer. Surfaces fields already present in the same ``LiveStateOut``
 payload ``dashboard.py`` renders -- process statistics, contention
 internals, feature-attribution (SHAP/native importance), and model

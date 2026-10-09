@@ -95,7 +95,7 @@ class ContentionTrainingSummary:
     n_training_rows: int = 0
     classifier_artifact_path: str | None = None
     anomaly_artifact_path: str | None = None
-    # Phase 5: honest evaluation under class imbalance (Section 5).
+    # Honest evaluation under class imbalance.
     base_rate: float | None = None
     decision_threshold: float | None = None
     threshold_rule_baseline: dict[str, float] | None = None
@@ -160,7 +160,7 @@ def train_contention_and_anomaly_pipeline(
         raise ValueError("No deployed forecasters available — cannot train Contention Prediction")
 
     # --- Anomaly Detection: trained on the full engineered feature matrix
-    # across all non-held-out scenarios (Section 7.2: same feature
+    # across all non-held-out scenarios (same feature
     # vectors Forecasting consumes). ---
     all_feature_matrices = [
         compute_feature_matrix(samples, feature_config, process_summary=(process_summaries or {}).get(name))
@@ -176,7 +176,7 @@ def train_contention_and_anomaly_pipeline(
     anomaly_artifact_path = save_anomaly_detector(anomaly_detector, forecasting_settings.models_dir, model_version)
 
     # --- Contention Prediction dataset: forecast outputs + current state
-    # + anomaly score, per scenario (FR-6.1). ---
+    # + anomaly score, per scenario. ---
     horizon_seconds = forecasting_settings.short_horizon_target_seconds
     per_scenario_datasets = [
         build_contention_dataset(
@@ -211,8 +211,8 @@ def train_contention_and_anomaly_pipeline(
     final_classifier = ContentionClassifier(min_training_rows=forecasting_settings.min_training_rows)
     final_classifier.fit(combined[feature_cols], combined["label"])
 
-    # --- Held-out generalization check (Section 11), same discipline as
-    # Forecasting -- run *before* saving, since Section 5's PR-curve-fitted
+    # --- Held-out generalization check, same discipline as
+    # Forecasting -- run *before* saving, since the PR-curve-fitted
     # decision threshold is computed against this holdout and must be set
     # on the classifier before the artifact is persisted. ---
     holdout_dataset = build_contention_dataset(

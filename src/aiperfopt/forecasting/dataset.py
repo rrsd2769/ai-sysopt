@@ -22,10 +22,10 @@ is a deliberate defense against that class of bug.
 
 Counter metrics label the future *rate*, not the future raw counter value
 -----------------------------------------------------------------------------
-This was a real bug, found and fixed while building Phase 5: for a
+This was a real bug, found and fixed while building the ablation: for a
 counter metric (e.g. ``disk_read_bytes``, a cumulative OS counter that
 can reach into the millions), the *feature* columns available to the
-model are all small-magnitude, rate-transformed values (FR-4.1's
+model are all small-magnitude, rate-transformed values (the
 counter-rate transform — see :mod:`aiperfopt.features.engine`). But the
 original version of this function set ``target`` to the raw future
 counter value directly. A model with no feature carrying the current
@@ -55,14 +55,14 @@ from aiperfopt.storage.records import SystemMetricSample
 # The only columns in a supervised dataset that are never model features:
 # ``timestamp`` (bookkeeping) and ``target`` (the label itself). Unlike an
 # earlier version of this constant, ``current_value`` is *not* excluded —
-# Phase 5 gives the model direct access to the metric's own present value
+# the model now gets direct access to the metric's own present value
 # (see :mod:`aiperfopt.forecasting.model`'s delta-target rationale for why
 # this matters), and it needs to appear in every ``X`` a forecaster is
 # fit/predicted on for that to work. Exported so
 # :mod:`aiperfopt.forecasting.evaluation` and
 # :mod:`aiperfopt.forecasting.training_pipeline` share one definition
 # instead of maintaining independent copies that could silently drift
-# apart (a real duplicate, found while building Phase 5).
+# apart (a real duplicate, found while building the ablation).
 NON_FEATURE_COLUMNS = ("timestamp", "target")
 
 
@@ -117,8 +117,8 @@ def build_supervised_dataset(
     Rows with no valid target within ``tolerance_seconds`` (inevitably
     the tail of the series, where "the future" hasn't happened yet in the
     input data) are dropped — training or evaluating against a fabricated
-    label would be exactly the kind of silent corruption FR-4.3 is about,
-    even though FR-4.3 itself is scoped to feature computation rather
+    label would be exactly the kind of silent corruption the feature code also guards against,
+    even though that guard is scoped to feature computation rather
     than label construction.
 
     Parameters

@@ -17,7 +17,7 @@ from aiperfopt.forecasting.training_pipeline import TrainingRunSummary
 logger = get_logger(__name__)
 
 
-# --- Phase 6: the quality gate ------------------------------------------------
+# --- the quality gate ------------------------------------------------
 #
 # Deliberately a *different* comparison from everything above. The
 # regression check above answers "is this candidate at least as good as
@@ -28,12 +28,12 @@ logger = get_logger(__name__)
 # currently deployed: "does this candidate clear the minimum quality bar
 # any deployed model must clear at all" -- beating the threshold-rule
 # baseline (contention) or persistence (forecasting), the same baselines
-# introduced in Phase 5 to make an honest evaluation possible in the
+# introduced to make an honest evaluation possible in the
 # first place. Unlike the regression check, this one really does block:
 # see :mod:`aiperfopt.lifecycle.deployment`, where it overrides even an
-# explicit human ``confirmed=True`` (Section 11's precision-favoring,
-# trust-first stance, ADL-8 -- "nothing can fail" was the defect this
-# phase exists to fix).
+# explicit human ``confirmed=True`` (the precision-favoring,
+# trust-first stance -- "nothing can fail" was the defect this
+# gate exists to fix).
 
 
 @dataclass
@@ -114,27 +114,26 @@ def evaluate_skill_gate(
     walk-forward CV folds, which are a different data slice): forecasting
     outcomes need ``holdout_mae``/``holdout_persistence_mae`` and
     contention needs ``holdout_metrics``/``threshold_rule_baseline``, all
-    already computed by Phase 5/6's training pipelines. The gate is on
+    already computed by the training pipelines. The gate is on
     the *deployed* model, whichever it is -- if a classical baseline
     genuinely won the walk-forward contingency-plan comparison, it faces
     the exact same "beats persistence" bar here as LightGBM would.
 
     A target with no holdout evaluation available (too little data, or a
-    single-class holdout that never produced a trained classifier -- see
-    Phase 5's honest single-class real-data result) is *not* a failure:
+    single-class holdout that never produced a trained classifier -- the
+    honest single-class real-data result) is *not* a failure:
     there's nothing to measure, so it's silently excluded rather than
     forced to a pass or fail it can't earn. If that leaves nothing at all
     evaluable, the gate passes (nothing failed) but says so explicitly --
     it does not become an argument for blocking a deployment that
-    Section 11's separate held-out-generalization check and human
+    the separate held-out-generalization check and human
     confirmation already govern.
 
     Only ``horizon_label == "short"`` forecast outcomes are gated. This
     mirrors :mod:`aiperfopt.contention.training_pipeline`'s own
     pre-existing scope decision (only short-horizon forecasts feed
-    Contention Prediction, the headline deliverable per Phase 5's
-    reframing -- medium-horizon forecasting is trained and reported but
-    explicitly "retained as secondary") -- the quality gate blocks
+    Contention Prediction, the headline deliverable; medium-horizon forecasting is trained and
+    reported but retained as secondary) -- the quality gate blocks
     deployment of the bundle actually driving the product's headline
     behavior, not every auxiliary forecast trained alongside it.
     """
@@ -194,7 +193,7 @@ def evaluate_skill_gate(
             # flat series): there, "beat an already-excellent
             # baseline by a margin" is not a quality signal, it's a
             # mathematical impossibility. The gate's actual job (Overview:
-            # "gives the Phase 5 numbers integrity -- currently nothing
+            # "gives the numbers integrity -- currently nothing
             # can fail") is catching a genuinely bad classifier, not
             # requiring the trained model to strictly dominate a simple
             # deterministic rule it may legitimately only tie. So this is

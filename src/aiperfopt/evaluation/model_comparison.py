@@ -4,8 +4,7 @@ Candidates (all regress the same delta target -- ``target - current_value``
 -- on the same feature matrix, exactly as the deployed forecaster does; see
 :class:`aiperfopt.forecasting.model.MetricForecaster`'s ``fit`` docstring):
 
-* **LightGBM** -- gradient-boosted trees, the project's production model
-  (ADL-13), with its production hyperparameters unchanged.
+* **LightGBM** -- gradient-boosted trees, the project's production model, with its production hyperparameters unchanged.
 * **Random Forest** -- bagged trees; the classic non-boosted ensemble.
 * **Ridge regression** -- a regularised linear model. Needs imputation +
   scaling (trees handle NaN lag features natively, a linear model can't).

@@ -54,7 +54,7 @@ def test_no_processes_in_window_returns_empty_list(storage_engine: Engine):
 
 def test_rate_suffixed_metric_name_falls_back_to_cpu(storage_engine: Engine):
     """dominant_metric like 'disk_read_bytes_rate' has no direct
-    per-process column (Section 9's process-level metric set doesn't
+    per-process column (the process-level metric set doesn't
     include per-process I/O) — falls back to cpu_percent as the broadest
     available "which processes are busy" proxy."""
     insert_process_metric_samples_batch(storage_engine, [

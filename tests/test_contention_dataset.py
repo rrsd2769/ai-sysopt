@@ -43,7 +43,7 @@ def test_dataset_has_expected_columns():
     assert "anomaly_score" in ds.columns
     assert "label" in ds.columns
     # The raw engineered feature matrix's own columns must NOT leak
-    # through directly — FR-6.1's "not raw metrics directly" boundary.
+    # through directly — the "not raw metrics directly" boundary.
     assert "cpu_percent_roll_mean_10s" not in ds.columns
 
 

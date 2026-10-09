@@ -9,7 +9,7 @@ from aiperfopt.forecasting.model import MetricForecaster
 
 def _synthetic_training_frame(n: int = 60):
     # Simple learnable relationship: target = 2*feature_a + feature_b.
-    # current_value is fixed at 0.0 so predict()'s Phase 5 reconstruction
+    # current_value is fixed at 0.0 so predict()'s reconstruction
     # (predicted_delta + current_value) is a no-op here -- these tests are
     # about the model learning a relationship / round-tripping correctly,
     # not about the delta-reconstruction contract itself (see
@@ -40,7 +40,7 @@ def test_fit_and_predict_learns_a_simple_relationship():
 @pytest.mark.behavioural
 def test_predict_reconstructs_absolute_value_from_a_delta_target():
     """fit() is given a delta (target - current_value); predict() must add
-    current_value back so callers always see an absolute value (Phase 5)."""
+    current_value back so callers always see an absolute value."""
     import numpy as np
 
     rng = np.random.default_rng(1)

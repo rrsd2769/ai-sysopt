@@ -1,22 +1,22 @@
 """
-Recommendation catalog loading (Section 7.1 item 9, ADL-15, FR-9.1, NFR-12.1).
+Recommendation catalog loading.
 
 The catalog is the *entire* decision surface of the Recommendation
 Engine: a pure ``category -> ranked actions`` mapping loaded from
 ``aiperfopt/resources/recommendations.yaml``. Deliberately not a Python dict literal
-in source — NFR-12.1 requires operational parameters be externally
+in source — operational parameters are externally
 configurable without touching application source, and recommendation
 wording is exactly the kind of thing that legitimately needs editing
 without a code change (unlike, say, the taxonomy categories themselves,
-which are a fixed Section 12 set this module treats as a closed
+which are a fixed set this module treats as a closed
 :class:`~aiperfopt.insight.taxonomy.DiagnosisCategory` enum, not a
 free-form string key).
 
 Validated eagerly at load time, not lazily at lookup time
 --------------------------------------------------------------
 :func:`load_recommendation_catalog` checks the file covers every
-*actionable* category (all of Section 12's eight except
-``unusual_pattern_anomaly_flagged``, per ADL-36) and rejects an entry for
+*actionable* category (all of the eight except
+``unusual_pattern_anomaly_flagged``) and rejects an entry for
 the anomaly category outright. A catalog that's missing a category or
 mistakenly includes the anomaly one is a misconfiguration that should
 fail loudly at startup, not surface as a confusing ``None``/exception the
@@ -41,8 +41,8 @@ from aiperfopt.insight.taxonomy import DiagnosisCategory
 
 _DEFAULT_CATALOG_PATH = resource_path(RECOMMENDATION_CATALOG_FILENAME)
 
-# Every category the catalog must cover — all of Section 12 except the
-# anomaly category, which must never appear (ADL-36; see module docstring).
+# Every category the catalog must cover — every category except the
+# anomaly one, which must never appear (see module docstring).
 _REQUIRED_CATEGORIES = frozenset(
     category.value for category in DiagnosisCategory if category != DiagnosisCategory.UNUSUAL_PATTERN_ANOMALY
 )
@@ -71,7 +71,7 @@ class RecommendationCatalog:
             # this, but a catalog lookup for the anomaly category should
             # still refuse outright rather than trust the caller checked.
             raise RecommendationError(
-                f"'{_FORBIDDEN_CATEGORY}' is informational-only (ADL-36) and must never "
+                f"'{_FORBIDDEN_CATEGORY}' is informational-only and must never "
                 "receive a recommendation lookup.",
                 recoverable=False,
                 context={"category": category},
@@ -128,7 +128,7 @@ def load_recommendation_catalog(path: Path | str | None = None) -> Recommendatio
     if _FORBIDDEN_CATEGORY in categories:
         raise RecommendationError(
             f"Recommendation catalog must not contain an entry for '{_FORBIDDEN_CATEGORY}' "
-            "(ADL-36: informational-only, never actionable).",
+            "(informational-only, never actionable).",
             recoverable=False,
             context={"path": str(catalog_path)},
         )
@@ -144,7 +144,7 @@ def load_recommendation_catalog(path: Path | str | None = None) -> Recommendatio
     unknown = set(categories.keys()) - _REQUIRED_CATEGORIES
     if unknown:
         raise RecommendationError(
-            f"Recommendation catalog contains unrecognized categories not in Section 12's "
+            f"Recommendation catalog contains unrecognized categories not in the "
             f"taxonomy: {sorted(unknown)}",
             recoverable=False,
             context={"path": str(catalog_path), "unknown": sorted(unknown)},

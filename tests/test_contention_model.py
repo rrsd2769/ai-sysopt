@@ -100,7 +100,7 @@ def test_predict_proba_handles_missing_feature_gracefully():
 
 @pytest.mark.plumbing
 def test_decision_threshold_defaults_to_none_and_is_settable():
-    """Phase 5: unset means "never fitted" -- callers fall back to the
+    """Unset means "never fitted" -- callers fall back to the
     configured constant in that case (see aiperfopt.api.live_state)."""
     classifier = ContentionClassifier()
     assert classifier.decision_threshold is None

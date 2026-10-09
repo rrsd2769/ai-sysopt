@@ -1,16 +1,16 @@
 """
-The Contention Prediction classifier (Section 10.4, FR-6.1-6.3).
+The Contention Prediction classifier.
 
 Logistic regression, not a small GBM
 ----------------------------------------
-Section 10.4 explicitly permits either "logistic regression or small
-GBM." Logistic regression is used here deliberately: its coefficients
-give a natural, free per-feature attribution — exactly what FR-6.2's
+Either logistic regression or a small GBM would do. Logistic regression
+is used here deliberately: its coefficients
+give a natural, free per-feature attribution — exactly what the
 "list of contributing metrics" needs — without reaching for SHAP, which
-is properly Diagnosis/XAI's tool (Phase 6, FR-8.1) and would blur the
+is properly Diagnosis/XAI's tool and would blur the
 boundary between these two subsystems if used here too. This is the same
-"if a simpler model performs comparably, prefer the simpler model,
-documented transparently" principle (Section 3) already applied to the
+"if a simpler model performs comparably, prefer the simpler model"
+principle already applied to the
 classical-statistics baseline choice in Forecasting.
 
 Standardization
@@ -60,12 +60,12 @@ class ContentionClassifier:
     model: LogisticRegression | None = field(default=None, repr=False)
     scaler: StandardScaler | None = field(default=None, repr=False)
     feature_columns: list[str] = field(default_factory=list)
-    # The Phase 5 PR-curve-fitted decision threshold (see
+    # The PR-curve-fitted decision threshold (see
     # aiperfopt.contention.evaluation.fit_decision_threshold), set by the
     # training pipeline after holdout evaluation -- not by fit() itself,
     # since fitting it needs held-out predictions this object doesn't have
     # access to. None means "never fitted" (an artifact trained before
-    # Phase 5, or a classifier used outside the training pipeline);
+    # the threshold was introduced, or a classifier used outside the training pipeline);
     # callers fall back to the configured constant in that case.
     decision_threshold: float | None = None
 
@@ -91,7 +91,7 @@ class ContentionClassifier:
         self.model.fit(scaled, y)
 
     def predict_proba(self, row: pd.Series) -> float:
-        """Raw model probability, before anomaly-score dampening (FR-6.2)."""
+        """Raw model probability, before anomaly-score dampening."""
         if self.model is None or self.scaler is None:
             raise ContentionPredictionError("predict_proba() called before fit()", recoverable=False)
 
@@ -110,7 +110,7 @@ class ContentionClassifier:
 
     def contributing_metrics(self, row: pd.Series, top_n: int = 5) -> list[ContributingMetric]:
         """Rank features by their (coefficient x standardized value) contribution
-        to this specific prediction — FR-6.2's "list of contributing metrics."
+        to this specific prediction — the "list of contributing metrics."
 
         Ranked by absolute contribution so the top entries are whichever
         features moved *this* prediction most, in either direction, not

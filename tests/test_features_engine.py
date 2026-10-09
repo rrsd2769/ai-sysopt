@@ -115,7 +115,7 @@ def test_counter_reset_produces_nan_rate_not_negative_value():
 
 @pytest.mark.behavioural
 def test_lag_beyond_tolerance_after_gap_is_none():
-    """FR-4.3: a lag lookup with no sample nearby must be None, not a stale value."""
+    """A lag lookup with no sample nearby must be None, not a stale value."""
     config = FeatureEngineeringConfig(lookback_windows_seconds=(30, 120), tolerance_seconds=3.0)
     base = time.time() - 300
     samples = []
@@ -167,7 +167,7 @@ def test_compute_latest_feature_vector_returns_none_for_empty_input():
 
 @pytest.mark.behavioural
 def test_compute_latest_feature_vector_matches_last_row_of_batch_matrix():
-    """FR-4.2: identical live/train computation, not just similar."""
+    """Identical live/train computation, not just similar."""
     config = FeatureEngineeringConfig()
     samples = _regular_samples(150, interval=2.0)
 
@@ -192,7 +192,7 @@ def test_compute_latest_feature_vector_matches_last_row_of_batch_matrix():
 
 @pytest.mark.behavioural
 def test_process_summary_columns_get_the_same_gauge_treatment():
-    """Phase 4: an aligned process_summary frame's columns must be
+    """An aligned process_summary frame's columns must be
     treated exactly like any other configured gauge metric — lag/
     rolling/rate features come for free, no separate formula path."""
     config = FeatureEngineeringConfig(lookback_windows_seconds=(30,), tolerance_seconds=2.0)

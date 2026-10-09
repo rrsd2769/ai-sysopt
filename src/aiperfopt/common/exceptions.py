@@ -4,19 +4,19 @@ Shared exception hierarchy for the AI System Performance Optimizer.
 Every subsystem raises exceptions from this module (or a subsystem-specific
 subclass defined here) rather than letting arbitrary built-in exceptions
 propagate. This gives calling code — particularly the Monitoring Engine's
-per-source degradation logic (FR-1.4) and the API layer's error responses —
+per-source degradation logic and the API layer's error responses —
 a single, predictable set of types to catch and handle.
 
 Design notes
 ------------
 - `AppError` is the root of the hierarchy. Nothing in this codebase should
   raise a bare `Exception`.
-- Each subsystem in Section 7.1 of PROJECT_SPEC.md gets its own subclass so
+- Subsystems that need it get their own subclass so
   that error handling can be scoped precisely (e.g. "catch any monitoring
   error and continue in degraded mode" without accidentally swallowing a
   storage error that should propagate).
 - `is_recoverable` lets a caller decide, generically, whether a failure is
-  the kind that should trigger graceful degradation (NFR-5.1, NFR-5.4) or
+  the kind that should trigger graceful degradation or
   whether it represents a programming/configuration error that should stop
   the affected subsystem outright. Subsystems may override this per raise
   site by passing `recoverable=False` explicitly.
@@ -69,7 +69,7 @@ class LoggingSetupError(AppError):
 
 
 class StorageError(AppError):
-    """Data Storage subsystem failure (Section 7.1, item 3)."""
+    """Data Storage subsystem failure."""
 
 
 class StorageConnectionError(StorageError):
@@ -81,76 +81,44 @@ class StorageSchemaError(StorageError):
 
 
 class MonitoringError(AppError):
-    """Monitoring Engine failure (Section 7.1, item 1).
+    """Monitoring Engine failure.
 
-    Per FR-1.4, individual metric-source failures must not halt the whole
+    Individual metric-source failures must not halt the whole
     engine. Raise sites for a single source's collection failure should use
     `recoverable=True` (the default) so the engine can log and skip.
     """
 
 
-class MetricSourceUnavailableError(MonitoringError):
-    """A specific metric source (e.g. IOKit power stats) is unavailable."""
-
-
-class IngestionError(AppError):
-    """Data Ingestion / Collector failure (Section 7.1, item 2)."""
-
-
-class FeatureEngineeringError(AppError):
-    """Feature Engineering failure (Section 7.1, item 4)."""
-
-
 class ForecastingError(AppError):
-    """Forecasting Models failure (Section 7.1, item 5)."""
+    """Forecasting Models failure."""
 
 
 class ContentionPredictionError(AppError):
-    """Contention Prediction failure (Section 7.1, item 6)."""
+    """Contention Prediction failure."""
 
 
 class AnomalyDetectionError(AppError):
-    """Anomaly Detection failure (Section 7.1, item 7)."""
-
-
-class DiagnosisError(AppError):
-    """Diagnosis / Explainable AI failure (Section 7.1, item 8)."""
+    """Anomaly Detection failure."""
 
 
 class RecommendationError(AppError):
-    """Recommendation Engine failure (Section 7.1, item 9)."""
-
-
-class EvaluationError(AppError):
-    """Model Evaluation & Validation failure (Section 7.1, item 10)."""
+    """Recommendation Engine failure."""
 
 
 class RetrainingError(AppError):
-    """Model Retraining failure (Section 7.1, item 11)."""
+    """Model Retraining failure."""
 
 
 class ModelDeploymentError(RetrainingError):
     """A retrained model failed validation or deployment could not proceed.
 
     Deployment failures are never silently retried automatically beyond the
-    documented fallback-to-last-known-good behavior (FR-11.3, NFR-5.3).
+    documented fallback-to-last-known-good behavior.
     """
 
 
-class APIError(AppError):
-    """API Layer failure (Section 7.1, item 12)."""
-
-
-class FrontendError(AppError):
-    """Frontend failure (Section 7.1, item 13)."""
-
-
-class ReportingError(AppError):
-    """Reporting / Analytics failure (Section 7.1, item 14)."""
-
-
 class ReplayError(AppError):
-    """Replay mode failure (Phase 8 of the presentable-predictive-monitor plan).
+    """Replay mode failure.
 
     Covers both "refused to start" (monitoring pipeline appears active, or
     a session has nothing to replay) and "nothing recorded" cases.

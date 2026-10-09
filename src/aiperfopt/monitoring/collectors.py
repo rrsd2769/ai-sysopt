@@ -1,6 +1,5 @@
 """
-System-wide metric collection (FR-1.1) with per-source graceful degradation
-(FR-1.4, NFR-5.1).
+System-wide metric collection with per-source graceful degradation.
 
 Each individual metric source (CPU, memory, disk I/O, network I/O, load
 average, battery) is collected behind :func:`_safe_source`, which catches
@@ -46,7 +45,7 @@ def prime_cpu_percent_counters() -> None:
 def _safe_source(source_name: str, fn: Callable[[], T]) -> T | None:
     """Run a single metric-source call, returning None and logging on failure.
 
-    Implements FR-1.4's "continue operating in a degraded mode (log +
+    Implements the "continue operating in a degraded mode (log +
     skip)" requirement at the level of an individual metric source, so a
     caller building a full sample can simply skip the failed field.
     """
@@ -64,7 +63,7 @@ def collect_system_metrics() -> SystemMetricSample:
     """Collect one aggregate system-metrics sample.
 
     Never raises: any individual source that fails is left as ``None`` on
-    the resulting sample (FR-1.4). The only mandatory fields are
+    the resulting sample. The only mandatory fields are
     ``timestamp``, ``cpu_percent``, and ``mem_percent`` — if even the
     lightweight ``cpu_percent()``/``virtual_memory()`` calls fail, that
     indicates a fundamentally broken environment, and the exception is
@@ -110,7 +109,7 @@ def collect_system_metrics() -> SystemMetricSample:
         # Aggregate thread count is deliberately left unset here: no
         # lightweight system-wide primitive provides it without a full
         # process enumeration, which runs on a coarser interval
-        # (NFR-2.2). Section 9's "thread counts" requirement is satisfied
+        #. The "thread counts" requirement is satisfied
         # via per-process num_threads in raw_process_metrics instead; this
         # column remains available if a cheap system-wide source is added
         # later.

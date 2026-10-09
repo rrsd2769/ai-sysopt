@@ -1,10 +1,10 @@
 """
-Feature Engineering computation (Section 7.1, item 4).
+Feature Engineering computation.
 
 Single source of truth
 ------------------------
 :func:`compute_feature_matrix` is the *only* place feature formulas are
-defined. Both consumers use it identically (FR-4.2):
+defined. Both consumers use it identically:
 
 - **Live inference** (:func:`compute_latest_feature_vector`): call it on a
   short trailing window read from storage, take the last row.
@@ -15,7 +15,7 @@ There is no second, hand-optimized "streaming" implementation of these
 formulas to drift out of sync with the batch one — the live path is
 simply the batch path applied to a smaller input.
 
-Gauges vs. counters (FR-4.1)
+Gauges vs. counters
 ------------------------------
 ``cpu_percent``, ``mem_percent``, ``swap_percent``, and ``load_avg_1`` are
 instantaneous gauges: lag/rolling statistics are computed directly on
@@ -31,18 +31,18 @@ computed on *that* derived rate series instead. A negative delta (the
 counter went down — e.g. after a reboot resets it) is treated as a gap,
 not a real negative rate.
 
-Gap handling (FR-4.3)
+Gap handling
 ------------------------
 Every window in this module is time-based (seconds), not row-count-based,
 because the polling interval is configurable and individual cycles can
-be skipped (FR-1.4 degradation, dropped samples under backpressure).
+be skipped (source degradation, dropped samples under backpressure).
 Two gap-handling rules follow from that:
 
 - A lag lookup ("value ~30s ago") uses ``pandas.merge_asof`` with an
   explicit time tolerance. If no sample exists within that tolerance of
   the target time, the feature is ``None`` — never a stale, far-away
   sample silently presented as if it were recent (this is precisely what
-  FR-4.3 prohibits).
+  must not happen).
 - A counter's per-second rate is only computed between two samples less
   than ``max_gap_seconds`` apart; across a larger gap the "rate" would
   silently average over an unknown amount of missed activity.
@@ -71,7 +71,7 @@ def _samples_to_frame(samples: Sequence[SystemMetricSample]) -> pd.DataFrame:
     # Later samples win on a duplicate timestamp (shouldn't normally
     # happen given the polling interval, but is possible under clock
     # skew / test scenarios — silently ignoring the duplicate rather than
-    # erroring keeps this function robust for FR-4.3's spirit).
+    # erroring keeps this function robust).
     df = df.drop_duplicates(subset="timestamp", keep="last").sort_values("timestamp")
     df["_dt"] = epoch_seconds_to_utc_datetime(df["timestamp"])
     return df.set_index("_dt")
@@ -117,7 +117,7 @@ def _feature_bundle(
 
     Applied identically whether ``series`` is a raw gauge or an already
     rate-transformed counter — this is what keeps gauge and counter
-    handling consistent (FR-4.1) despite counters needing a
+    handling consistent despite counters needing a
     differencing step first.
     """
     out: dict[str, pd.Series] = {}
@@ -151,9 +151,9 @@ def compute_feature_matrix(
     config: FeatureEngineeringConfig,
     process_summary: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Compute one feature row per input raw sample. The single source of truth (FR-4.2).
+    """Compute one feature row per input raw sample. The single source of truth.
 
-    ``process_summary`` (Phase 4), if given, is a process-summary frame
+    ``process_summary``, if given, is a process-summary frame
     already aligned one-to-one onto these samples' own timestamps (see
     :func:`aiperfopt.features.process_features.align_process_summary_to_timestamps`)
     — its columns are joined onto the raw sample frame *before* the
@@ -244,7 +244,7 @@ def feature_matrix_to_records(
     """Convert every row of a batch-computed feature matrix into storable records.
 
     Used for backfilling the ``features`` table over historical data
-    (e.g. ahead of Forecasting model training in Phase 4).
+    (e.g. ahead of Forecasting model training).
     """
     if matrix.empty:
         return []

@@ -1,14 +1,13 @@
 """
 Predicted-vs-actual join: pairs each forecast with the actual value
-nearest its ``target_timestamp`` -- and, for FR-14.2's accuracy
+nearest its ``target_timestamp`` -- and, for the accuracy
 reporting, also the actual value nearest its ``generated_at`` (the
 "current value" a directional-accuracy check needs a reference point
 for, the same way ``forecasting.evaluation.compute_directional_accuracy``
 needs one during walk-forward validation).
 
-Originally built directly inside ``api/routers/reporting.py`` during
-Phase 10 for the FR-13.3 comparison view; moved here during Phase 11
-once a second consumer (``summary.py``'s prediction-accuracy report)
+Originally built directly inside ``api/routers/reporting.py`` for the
+comparison view; moved here once a second consumer (``summary.py``'s prediction-accuracy report)
 needed the same join, per that router module's own docstring flagging
 this as the intended landing spot.
 """
@@ -38,7 +37,7 @@ VALID_METRIC_NAMES = {
 # many seconds of its target timestamp -- otherwise a forecast targeting
 # a moment with no nearby actual sample (e.g. monitoring was stopped)
 # would silently pair with a stale, unrelated reading. 5x a typical 1-2s
-# polling interval (NFR-2.1) comfortably covers normal jitter/gaps
+# polling interval comfortably covers normal jitter/gaps
 # without matching across a real outage.
 MAX_MATCH_DISTANCE_SECONDS = 10.0
 

@@ -1,15 +1,15 @@
-"""Contention Prediction (Section 7.1, item 6): a genuinely trained
-classifier (Section 10.4) consuming forecast outputs + current state +
-anomaly score (FR-6.1), not raw metrics directly.
+"""Contention Prediction: a genuinely trained
+classifier consuming forecast outputs + current state +
+anomaly score, not raw metrics directly.
 
 - ``config``           -> ContentionLabelingConfig (training-label thresholds)
-- ``dataset``            -> build_contention_dataset() — forecast+state+anomaly join (FR-6.1)
+- ``dataset``            -> build_contention_dataset() — forecast+state+anomaly join
 - ``model``               -> ContentionClassifier — logistic regression + coefficient attribution
-- ``processes``            -> contributing-processes lookup (FR-6.2)
+- ``processes``            -> contributing-processes lookup
 - ``prediction``             -> live inference: anomaly dampening + full record assembly
 - ``persistence``             -> save/load classifier artifacts
 - ``evaluation``               -> walk-forward precision/recall/F1
-- ``training_pipeline``          -> the Phase 5 entrypoint
+- ``training_pipeline`` -> the entrypoint
 """
 
 from aiperfopt.contention.config import ContentionLabelingConfig

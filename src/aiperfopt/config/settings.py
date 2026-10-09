@@ -1,10 +1,10 @@
 """
 Layered configuration for the AI System Performance Optimizer.
 
-Implements FR-15.1 (layered configuration: defaults + user override, for
-polling interval, contention threshold, forecast horizons, mode selection,
-and process exclusions) and NFR-12.1 (all operational parameters externally
-configurable without modifying application source code).
+Layered configuration: defaults + user override, for polling interval,
+contention threshold, forecast horizons, mode selection, and process
+exclusions. All operational parameters are configurable without modifying
+application source code.
 
 Priority order, highest to lowest:
 
@@ -70,7 +70,7 @@ def _absolute_under_app_home(value: Path) -> Path:
 
 
 class InterfaceMode(str, Enum):
-    """The two Version 1 interface modes (Section 4)."""
+    """The two Version 1 interface modes."""
 
     GENERAL = "general"
     DEVELOPER = "developer"
@@ -83,7 +83,7 @@ class ModeSettings(BaseModel):
 class MonitoringSettings(BaseModel):
     polling_interval_seconds: float = Field(gt=0)
     process_polling_interval_seconds: float = Field(gt=0)
-    # Phase 2's storage bound: only the top-N processes by CPU, unioned
+    # The storage bound: only the top-N processes by CPU, unioned
     # with the top-N by memory RSS, are individually stored per poll --
     # everything else is folded into one aggregate row (see
     # aiperfopt.monitoring.process_tracker). Launch/terminate events are
@@ -101,8 +101,7 @@ class MonitoringSettings(BaseModel):
 class ForecastingSettings(BaseModel):
     short_horizon_seconds: tuple[int, int]
     medium_horizon_seconds: tuple[int, int]
-    # Number of chronological folds for walk-forward validation (Section 11,
-    # ADL-10). sklearn's TimeSeriesSplit is the chronological-fold
+    # Number of chronological folds for walk-forward validation. sklearn's TimeSeriesSplit is the chronological-fold
     # primitive; this is its n_splits.
     walk_forward_splits: int = Field(gt=1)
     # A metric/horizon combination with fewer training rows than this
@@ -114,10 +113,10 @@ class ForecastingSettings(BaseModel):
     models_dir: Path
     # A candidate metric/horizon change is only counted as "stable" (not
     # rising/falling) if the relative change is below this fraction —
-    # used for directional-accuracy scoring (Section 11: "correctly
-    # predicting whether a metric is rising, falling, or stable").
+    # used for directional-accuracy scoring (correctly
+    # predicting whether a metric is rising, falling, or stable).
     directional_stability_threshold: float = Field(gt=0, lt=1)
-    # Section 10.7's contingency plan: LightGBM must beat every baseline's
+    # The contingency plan: LightGBM must beat every baseline's
     # mean MAE by at least this fraction to be selected over the best
     # baseline, preventing deployment flip-flopping on noise-level
     # differences.
@@ -142,7 +141,7 @@ class ForecastingSettings(BaseModel):
         The spec defines horizons as ranges (30-60s), not single points.
         Forecasting needs one concrete number of seconds ahead to train
         against; the range's midpoint is used as that representative
-        point (documented design choice — see ADL-06's rationale for why
+        point (documented design choice — see the rationale for why
         this is one model, not one per exact second).
         """
         lo, hi = self.short_horizon_seconds
@@ -155,28 +154,28 @@ class ForecastingSettings(BaseModel):
 
 
 class ContentionSettings(BaseModel):
-    # Conservative threshold favoring precision over recall (FR-6.3).
+    # Conservative threshold favoring precision over recall.
     decision_threshold: float = Field(ge=0.0, le=1.0)
     # How strongly Anomaly Detection's score reduces the reported
-    # contention probability (FR-7.2: anomaly output "modulates
+    # contention probability (anomaly output "modulates
     # contention-prediction confidence"). 0 = no effect; 1 = a maximally
     # anomalous reading can zero out the reported probability entirely.
     anomaly_dampening_factor: float = Field(ge=0.0, le=1.0)
     # Anomaly score above which a distinct informational notification is
-    # surfaced (FR-7.2), independent of any contention prediction.
+    # surfaced, independent of any contention prediction.
     anomaly_significant_threshold: float = Field(ge=0.0, le=1.0)
     # How many top resource-consuming processes to report as "contributing
-    # processes" (FR-6.2) once the dominant contributing metric is known.
+    # processes" once the dominant contributing metric is known.
     contributing_processes_top_n: int = Field(gt=0)
 
 
 class DiagnosisSettings(BaseModel):
-    """Rule parameters for taxonomy resolution (Section 12, ADL-24).
+    """Rule parameters for taxonomy resolution.
 
     These govern the *rule-based refinement* Diagnosis applies on top of
     Contention Prediction's already-learned output — e.g. "is this
     CPU-dominant event one runaway process or several" — not a trained
-    model of their own, consistent with Section 3's preference for the
+    model of their own, consistent with the preference for the
     simplest mechanism that does the job (the taxonomy itself is a fixed,
     spec-defined set, not something worth training a classifier for).
     Reuses ``ContentionSettings.anomaly_significant_threshold`` for the
@@ -198,14 +197,14 @@ class DiagnosisSettings(BaseModel):
     # than the default "Gradual".
     memory_sudden_rate_of_change_threshold: float = Field(gt=0.0)
     # How many per-feature SHAP/native-importance attributions to retain
-    # per forecast explanation (FR-8.1).
+    # per forecast explanation.
     shap_top_n: int = Field(gt=0)
 
 
 class RetrainingSettings(BaseModel):
-    """Model Retraining tunables (Section 7.1 item 11, FR-11.1-11.3, ADL-23).
+    """Model Retraining tunables.
 
-    Retraining reuses Phase 4/5's existing training pipelines verbatim
+    Retraining reuses the existing training pipelines verbatim
     (see ``aiperfopt.lifecycle.retraining``'s module docstring) — nothing
     here configures *how* a model is trained, only how a freshly-trained
     candidate is compared against whatever is currently deployed, and
@@ -214,11 +213,11 @@ class RetrainingSettings(BaseModel):
 
     # Where the small active-model-version pointer file lives
     # (``aiperfopt.lifecycle.active_version``). Deliberately a plain
-    # file, not a database row: the live inference path (Phase 9) needs
+    # file, not a database row: the live inference path needs
     # to answer "what's active right now" on every cycle, and a file
     # read is simpler and faster than a query for that single fact. The
     # durable, queryable *history* of deployment decisions still lives in
-    # the ``model_deployments`` storage table (FR-11.2's audit trail).
+    # the ``model_deployments`` storage table (the audit trail).
     active_version_file: Path
     # A candidate's holdout metric is only considered "regressed" versus
     # the currently active version if it's worse by more than this
@@ -230,7 +229,7 @@ class RetrainingSettings(BaseModel):
     # reserved as a held-out generalization check: the most recent slice,
     # never an earlier one, to avoid future-to-past leakage.
     real_usage_holdout_fraction: float = Field(gt=0.0, lt=1.0)
-    # Phase 6's quality gate (Section 11's precision-favoring stance,
+    # The quality gate (the precision-favoring stance,
     # extended from "don't regress vs. the active version" to "clear the
     # absolute bar every deployed model must meet"): a candidate forecaster
     # must beat the *persistence* baseline's holdout MAE by at least this
@@ -256,10 +255,9 @@ class RetrainingSettings(BaseModel):
 
 
 class ApiSettings(BaseModel):
-    """API Layer tunables (Section 7.1 item 12, FR-12.1-12.4).
+    """API Layer tunables.
 
-    Not among FR-15.1's explicitly named fields, but NFR-12.1 requires
-    all operational parameters to be externally configurable, so the
+    All operational parameters are externally configurable, so the
     server bind address/port and the live-inference cadence get the same
     layered-config treatment as everything else rather than being
     hardcoded in ``api/app.py`` or a CLI flag default.
@@ -272,13 +270,13 @@ class ApiSettings(BaseModel):
     # MonitoringSettings.polling_interval_seconds, which controls raw
     # sample collection — live inference reads whatever's accumulated in
     # storage since its last tick, so it can run less frequently than raw
-    # polling without losing samples (Ingestion, Phase 2, already
+    # polling without losing samples (Ingestion already
     # guarantees no sample is dropped on the write side).
     live_inference_interval_seconds: float = Field(gt=0)
 
 
 class PrivacySettings(BaseModel):
-    # Section 13 / FR-9.7 / NFR-7.4: user-controlled process exclusions,
+    # User-controlled process exclusions,
     # empty by default.
     excluded_processes: list[str] = Field(default_factory=list)
 
@@ -286,12 +284,11 @@ class PrivacySettings(BaseModel):
 class StorageSettings(BaseModel):
     database_path: Path
     full_resolution_retention_hours: int = Field(gt=0)
-    # Independent, much shorter retention for process-level rows (Phase 2,
-    # NFR-4.3) -- see aiperfopt.storage.rollup.apply_retention_policy for
+    # Independent, much shorter retention for process-level rows -- see aiperfopt.storage.rollup.apply_retention_policy for
     # why this is split from full_resolution_retention_hours rather than
     # sharing one cutoff.
     process_retention_hours: float = Field(gt=0)
-    # Phase 9 F9: explicit, operator-set flag (AIPERFOPT_STORAGE__IS_REPLAY)
+    # Explicit, operator-set flag (AIPERFOPT_STORAGE__IS_REPLAY)
     # for pointing a running API server at a replay database for a demo.
     # Not auto-detected from database_path's filename -- `aiperfopt replay
     # --replay-db` accepts an arbitrary path, so sniffing the name would
@@ -305,11 +302,10 @@ class StorageSettings(BaseModel):
 
 
 class IngestionSettings(BaseModel):
-    """Tunables for the Data Ingestion consumer (Phase 2).
-    contention threshold, forecast horizons, mode, process exclusions),
-    but NFR-12.1 requires *all* operational parameters to be externally
-    configurable, so these get the same layered-config treatment rather
-    than being hardcoded constants in ``ingestion/consumer.py``.
+    """Tunables for the Data Ingestion consumer.
+
+    Kept in configuration, like every other operational parameter, rather
+    than hardcoded in ``monitoring/ingestion.py``.
     """
 
     # Max samples of a single record type accumulated before a batch is
@@ -318,11 +314,11 @@ class IngestionSettings(BaseModel):
     # Max time a partial batch sits unflushed — bounds staleness of data
     # visible to the API/reporting layers when the sample rate is low.
     flush_interval_seconds: float = Field(gt=0)
-    # Bound on the shared monitoring->ingestion queue (FR-2.2: Monitoring
+    # Bound on the shared monitoring->ingestion queue (Monitoring
     # must never block on Ingestion; a bounded queue with non-blocking
     # producer puts is how that's enforced under sustained backpressure).
     queue_maxsize: int = Field(gt=0)
-    # How often the retention/rollup policy (FR-3.2) is applied.
+    # How often the retention/rollup policy is applied.
     retention_check_interval_seconds: float = Field(gt=0)
 
 
@@ -347,8 +343,8 @@ class _YamlLayerSource(PydanticBaseSettingsSource):
     """A pydantic-settings source that reads a single YAML file.
 
     Missing files resolve to an empty layer rather than an error, since the
-    user-override layer is optional by design (FR-15.1 only requires that
-    overrides be *possible*, not present).
+    user-override layer is optional by design (overrides must be *possible*,
+    not present).
     """
 
     def __init__(self, settings_cls: type[BaseSettings], yaml_path: Path | None) -> None:
