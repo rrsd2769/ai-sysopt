@@ -60,7 +60,7 @@ class MonitoringEngine:
         The monitoring section of :class:`~aiperfopt.config.settings.AppSettings`.
     output_queue:
         The shared queue this engine produces onto. Constructed by the
-        caller (see :mod:`aiperfopt.pipeline`) so Monitoring and Ingestion
+        caller (see :mod:`aiperfopt.monitoring.pipeline`) so Monitoring and Ingestion
         share the same queue instance without either owning the other's
         lifecycle.
     excluded_process_names:

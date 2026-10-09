@@ -116,7 +116,7 @@ def _cmd_collect(args: argparse.Namespace) -> int:
     """
     import signal
 
-    from aiperfopt.pipeline import create_monitoring_pipeline
+    from aiperfopt.monitoring.pipeline import create_monitoring_pipeline
     from aiperfopt.storage.reader import get_recent_system_metrics
 
     ctx = _bootstrap(args)

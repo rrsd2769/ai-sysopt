@@ -17,7 +17,7 @@ from aiperfopt.config.settings import (
     PrivacySettings,
     StorageSettings,
 )
-from aiperfopt.pipeline import create_monitoring_pipeline
+from aiperfopt.monitoring.pipeline import create_monitoring_pipeline
 from aiperfopt.storage import (
     create_all_tables,
     create_storage_engine,

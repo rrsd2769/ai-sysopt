@@ -18,8 +18,8 @@ from dataclasses import dataclass
 
 from aiperfopt.applog import get_logger
 from aiperfopt.bootstrap import AppContext
-from aiperfopt.ingestion import IngestionConsumer
-from aiperfopt.monitoring import MonitoringEngine
+from aiperfopt.monitoring.engine import MonitoringEngine
+from aiperfopt.monitoring.ingestion import IngestionConsumer
 from aiperfopt.monitoring.queue_items import QueueItem
 
 logger = get_logger(__name__)

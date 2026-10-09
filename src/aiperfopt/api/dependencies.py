@@ -17,7 +17,7 @@ from aiperfopt.api.connection_manager import ConnectionManager
 from aiperfopt.api.live_state import LiveInferenceLoop
 from aiperfopt.bootstrap import AppContext
 from aiperfopt.config.settings import AppSettings
-from aiperfopt.pipeline import MonitoringPipeline
+from aiperfopt.monitoring.pipeline import MonitoringPipeline
 from aiperfopt.insight.catalog import RecommendationCatalog
 
 

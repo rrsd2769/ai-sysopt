@@ -9,7 +9,7 @@ loop around it, and mount the REST/WebSocket routers.
 Nothing starts automatically on app creation
 ----------------------------------------------
 Consistent with :func:`aiperfopt.bootstrap.bootstrap` and
-:func:`aiperfopt.pipeline.create_monitoring_pipeline` (neither of which
+:func:`aiperfopt.monitoring.pipeline.create_monitoring_pipeline` (neither of which
 spawns a thread as a side effect of being called), :func:`create_app`
 builds the Monitoring pipeline and live-inference loop but does not
 start either — creating the FastAPI app (e.g. for a test client) must
@@ -35,7 +35,7 @@ from aiperfopt.api.routers import history, live, reporting, retraining, system
 from aiperfopt.applog import get_logger
 from aiperfopt.bootstrap import AppContext, bootstrap
 from aiperfopt.features.config import FeatureEngineeringConfig
-from aiperfopt.pipeline import create_monitoring_pipeline
+from aiperfopt.monitoring.pipeline import create_monitoring_pipeline
 from aiperfopt.insight.catalog import load_recommendation_catalog
 
 logger = get_logger(__name__)

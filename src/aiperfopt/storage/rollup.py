@@ -193,7 +193,7 @@ def apply_retention_policy(
     """Apply the full retention policy: roll up old system metrics, prune old process data.
 
     This is the single function a scheduler (the ingestion consumer, see
-    ``aiperfopt.ingestion.consumer``) calls periodically. The two
+    ``aiperfopt.monitoring.ingestion``) calls periodically. The two
     retention windows are independent by design (Phase 2): process-level
     detail needs to be pruned much sooner than system metrics to keep
     multi-day passive collection bounded (NFR-4.3), while system-level

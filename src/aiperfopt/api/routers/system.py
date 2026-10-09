@@ -9,7 +9,7 @@ from aiperfopt.bootstrap import AppContext
 from aiperfopt.api.live_state import LiveInferenceLoop
 from aiperfopt.api.schemas import ReadinessOut
 from aiperfopt.features.config import FeatureEngineeringConfig
-from aiperfopt.pipeline import MonitoringPipeline
+from aiperfopt.monitoring.pipeline import MonitoringPipeline
 from aiperfopt.readiness import assess_readiness
 
 router = APIRouter(tags=["system"])

@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.config.settings import IngestionSettings
-from aiperfopt.ingestion.consumer import IngestionConsumer
+from aiperfopt.monitoring.ingestion import IngestionConsumer
 from aiperfopt.monitoring.queue_items import QueueItem, QueueItemKind
 from aiperfopt.storage import (
     ProcessEvent,
@@ -160,7 +160,7 @@ def test_consumer_flushes_remaining_items_on_stop(storage_engine: Engine):
 
 @pytest.mark.plumbing
 def test_consumer_survives_storage_failure_and_keeps_running(storage_engine: Engine, monkeypatch):
-    import aiperfopt.ingestion.consumer as consumer_module
+    import aiperfopt.monitoring.ingestion as consumer_module
     from aiperfopt.common.exceptions import StorageError
 
     def _always_fail(*args, **kwargs):
@@ -187,7 +187,7 @@ def test_consumer_survives_storage_failure_and_keeps_running(storage_engine: Eng
 
 @pytest.mark.plumbing
 def test_consumer_runs_retention_check_on_schedule(storage_engine: Engine, monkeypatch):
-    import aiperfopt.ingestion.consumer as consumer_module
+    import aiperfopt.monitoring.ingestion as consumer_module
 
     calls = []
 

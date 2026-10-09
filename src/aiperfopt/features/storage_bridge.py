@@ -199,7 +199,7 @@ def summarize_and_persist_process_features(engine: Engine, cutoff: float) -> int
 
     Must be called with the same ``cutoff`` immediately *before*
     :func:`aiperfopt.storage.rollup.prune_process_level_data` (see
-    ``aiperfopt.ingestion.consumer``'s retention check, which does exactly
+    ``aiperfopt.monitoring.ingestion``'s retention check, which does exactly
     this) — the raw ``raw_process_metrics``/``process_events``/
     ``raw_process_metrics_other`` rows this reads are exactly the ones
     about to be deleted.
