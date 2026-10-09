@@ -6,7 +6,7 @@ import pytest
 import shap
 
 from aiperfopt.contention.model import ContentionClassifier
-from aiperfopt.diagnosis.explainer import (
+from aiperfopt.insight.explainer import (
     EXPLANATION_TIER_LIGHTWEIGHT,
     EXPLANATION_TIER_NOT_APPLICABLE,
     EXPLANATION_TIER_SHAP,
@@ -151,7 +151,7 @@ def test_baseline_forecaster_explanation_is_not_applicable_with_honest_note():
 
 
 def test_contention_coefficient_attribution_equals_real_shap_linear_explainer():
-    """Numerically verifies the claim in aiperfopt.diagnosis.explainer's module
+    """Numerically verifies the claim in aiperfopt.insight.explainer's module
     docstring: ContentionClassifier.contributing_metrics() already *is* the
     exact SHAP-linear decomposition, which is why Diagnosis never recomputes
     it through a second SHAP call. If a future refactor of either

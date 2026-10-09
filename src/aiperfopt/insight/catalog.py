@@ -9,7 +9,7 @@ configurable without touching application source, and recommendation
 wording is exactly the kind of thing that legitimately needs editing
 without a code change (unlike, say, the taxonomy categories themselves,
 which are a fixed Section 12 set this module treats as a closed
-:class:`~aiperfopt.diagnosis.taxonomy.DiagnosisCategory` enum, not a
+:class:`~aiperfopt.insight.taxonomy.DiagnosisCategory` enum, not a
 free-form string key).
 
 Validated eagerly at load time, not lazily at lookup time
@@ -37,7 +37,7 @@ from typing import Any
 import yaml
 
 from aiperfopt.common.exceptions import RecommendationError
-from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
+from aiperfopt.insight.taxonomy import DiagnosisCategory
 
 _DEFAULT_CATALOG_PATH = resource_path(RECOMMENDATION_CATALOG_FILENAME)
 
@@ -66,7 +66,7 @@ class RecommendationCatalog:
 
     def actions_for(self, category: str) -> list[RecommendedAction]:
         if category == _FORBIDDEN_CATEGORY:
-            # Defense in depth: aiperfopt.recommendation.service already
+            # Defense in depth: aiperfopt.insight.recommendations already
             # gates on DiagnosisRecord.is_actionable before ever calling
             # this, but a catalog lookup for the anomaly category should
             # still refuse outright rather than trust the caller checked.

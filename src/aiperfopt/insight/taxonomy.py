@@ -47,7 +47,7 @@ Resolution order
    dominance. A memory-dominant event is split into **Gradual** vs.
    **Sudden** using the engineered ``mem_percent_rate_of_change`` feature
    (not available from the contention record alone — see
-   :mod:`aiperfopt.diagnosis.service`). Disk and network map directly to
+   :mod:`aiperfopt.insight.diagnosis`). Disk and network map directly to
    their single Section 12 categories (no further split is defined).
 
 Why the anomaly-significance threshold isn't duplicated here
@@ -217,7 +217,7 @@ def resolve_diagnosis_category(
     memory_rate_of_change:
         The current ``mem_percent_rate_of_change`` engineered feature
         value, if available — only consulted when memory is the dominant
-        contending resource. See :mod:`aiperfopt.diagnosis.service` for
+        contending resource. See :mod:`aiperfopt.insight.diagnosis` for
         where this is read from the live feature vector.
     anomaly_significant_threshold:
         ``ContentionSettings.anomaly_significant_threshold`` — see the

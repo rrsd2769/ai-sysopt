@@ -4,7 +4,7 @@ item 9, FR-9.1-9.3, ADL-15, ADL-19).
 
 :func:`generate_recommendations` is intentionally the thinnest orchestrator
 in this codebase: gate on :attr:`~aiperfopt.storage.records.DiagnosisRecord.is_actionable`,
-look the category up in the :class:`~aiperfopt.recommendation.catalog.RecommendationCatalog`,
+look the category up in the :class:`~aiperfopt.insight.catalog.RecommendationCatalog`,
 persist, return. There is no branching logic here beyond that gate — all
 of the actual decision-making (which actions map to which category) lives
 in the externally-editable catalog (NFR-12.1), and all of the upstream
@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from sqlalchemy import Engine
 
-from aiperfopt.recommendation.catalog import RecommendationCatalog
+from aiperfopt.insight.catalog import RecommendationCatalog
 from aiperfopt.storage.records import DiagnosisRecord, RecommendationRecord
 from aiperfopt.storage.writer import insert_recommendation
 
@@ -46,7 +46,7 @@ def generate_recommendations(
     Checking the boolean field directly, rather than re-deriving
     actionability from ``diagnosis.category`` here, keeps this module
     agnostic to which categories are actionable: that decision was already
-    made once, in :mod:`aiperfopt.diagnosis.taxonomy`, and shouldn't be
+    made once, in :mod:`aiperfopt.insight.taxonomy`, and shouldn't be
     made a second, potentially-inconsistent way here.
     """
     if not diagnosis.is_actionable:

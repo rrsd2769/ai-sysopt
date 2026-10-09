@@ -369,7 +369,7 @@ diagnoses = Table(
     metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("generated_at", Float, nullable=False),
-    # One of DiagnosisCategory's eight values (aiperfopt.diagnosis.taxonomy) —
+    # One of DiagnosisCategory's eight values (aiperfopt.insight.taxonomy) —
     # stored as the enum's string value, not a foreign-key/int code, since
     # the taxonomy is a small, spec-fixed set (Section 12) rather than
     # user-editable reference data.
@@ -382,7 +382,7 @@ diagnoses = Table(
     # Contention probability for the 7 actionable categories; anomaly
     # score for the anomaly-flagged category (Section 12's row uses a
     # different underlying signal for that one category — see
-    # aiperfopt.diagnosis.service's module docstring).
+    # aiperfopt.insight.diagnosis's module docstring).
     Column("confidence", Float, nullable=False),
     # "lightweight" or "shap" — which tier actually produced
     # forecast_explanations below (Section 10.5, NFR-1.3).
@@ -408,7 +408,7 @@ diagnoses = Table(
     # (FR-6.2) — Diagnosis reuses these rather than recomputing them, since
     # a logistic-regression coefficient contribution already *is* the exact
     # SHAP-linear attribution for that model (see
-    # aiperfopt.diagnosis.explainer's module docstring for the numerical
+    # aiperfopt.insight.explainer's module docstring for the numerical
     # proof this claim is checked against, not just asserted).
     Column("contributing_metrics", JSON, nullable=True),
     Column("contributing_processes", JSON, nullable=True),
@@ -452,7 +452,7 @@ recommendations = Table(
     Column("diagnosis_category", String(64), nullable=False),
     # [{"title": ..., "description": ..., "rationale": ...}, ...], ranked
     # highest-priority first — FR-9.1's actions curated by
-    # aiperfopt.recommendation.catalog from aiperfopt/resources/recommendations.yaml.
+    # aiperfopt.insight.catalog from aiperfopt/resources/recommendations.yaml.
     Column("actions", JSON, nullable=False),
     Column("catalog_version", String(64), nullable=False),
 )

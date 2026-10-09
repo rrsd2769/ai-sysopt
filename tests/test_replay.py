@@ -15,7 +15,7 @@ from aiperfopt.contention.persistence import load_contention_classifier
 from aiperfopt.contention.prediction import predict_contention
 from aiperfopt.contention.training_pipeline import train_contention_and_anomaly_pipeline
 from aiperfopt.anomaly.persistence import load_anomaly_detector
-from aiperfopt.diagnosis.service import diagnose_contention_event
+from aiperfopt.insight.diagnosis import diagnose_contention_event
 from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.features.storage_bridge import compute_live_feature_vector
 from aiperfopt.lifecycle.deployment import resolve_deployed_forecasters

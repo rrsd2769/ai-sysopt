@@ -18,7 +18,7 @@ from aiperfopt.api.live_state import LiveInferenceLoop
 from aiperfopt.bootstrap import AppContext
 from aiperfopt.config.settings import AppSettings
 from aiperfopt.pipeline import MonitoringPipeline
-from aiperfopt.recommendation.catalog import RecommendationCatalog
+from aiperfopt.insight.catalog import RecommendationCatalog
 
 
 def get_app_context(request: Request) -> AppContext:

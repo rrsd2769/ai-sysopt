@@ -46,7 +46,7 @@ would fail a test, not just a stale docstring claim (see
 :mod:`aiperfopt.storage.schema`'s ``contention_predictions`` column
 comment for a cautionary example of exactly that kind of drift).
 Consequently, Diagnosis never recomputes contention attribution here —
-:mod:`aiperfopt.diagnosis.service` reuses
+:mod:`aiperfopt.insight.diagnosis` reuses
 ``ContentionPredictionRecord.contributing_metrics`` directly, tier or no
 tier, and this module has no ``explain_contention`` function to avoid
 implying a second, redundant code path exists.

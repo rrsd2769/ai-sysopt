@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from aiperfopt.recommendation.catalog import load_recommendation_catalog
+from aiperfopt.insight.catalog import load_recommendation_catalog
 from aiperfopt.resources import (
     DEFAULT_CONFIG_FILENAME,
     RECOMMENDATION_CATALOG_FILENAME,

@@ -5,7 +5,7 @@ import time
 import pytest
 from sqlalchemy import Engine
 
-from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
+from aiperfopt.insight.taxonomy import DiagnosisCategory
 from aiperfopt.reporting.summary import (
     ContentionSummary,
     build_contention_summary,

@@ -50,12 +50,12 @@ from aiperfopt.config.settings import ContentionSettings, DiagnosisSettings, For
 from aiperfopt.contention.dataset import build_live_contention_input_row
 from aiperfopt.contention.persistence import contention_artifact_exists, load_contention_classifier
 from aiperfopt.contention.prediction import predict_contention
-from aiperfopt.diagnosis.service import diagnose_contention_event
+from aiperfopt.insight.diagnosis import diagnose_contention_event
 from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.features.storage_bridge import compute_and_store_live_feature_vector
 from aiperfopt.lifecycle.deployment import resolve_deployed_forecasters
-from aiperfopt.recommendation.catalog import RecommendationCatalog
-from aiperfopt.recommendation.service import generate_recommendations
+from aiperfopt.insight.catalog import RecommendationCatalog
+from aiperfopt.insight.recommendations import generate_recommendations
 from aiperfopt.lifecycle.deployment import get_active_model_version, rollback_to_last_known_good
 from aiperfopt.storage.reader import get_recent_system_metrics
 from aiperfopt.storage.records import (

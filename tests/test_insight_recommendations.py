@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import Engine
 
-from aiperfopt.recommendation import generate_recommendations, load_recommendation_catalog
+from aiperfopt.insight import generate_recommendations, load_recommendation_catalog
 from aiperfopt.storage import DiagnosisRecord, get_recommendations_range, insert_diagnosis
 
 _CATALOG = load_recommendation_catalog()

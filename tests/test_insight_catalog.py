@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from aiperfopt.common.exceptions import RecommendationError
-from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
-from aiperfopt.recommendation.catalog import load_recommendation_catalog
+from aiperfopt.insight.taxonomy import DiagnosisCategory
+from aiperfopt.insight.catalog import load_recommendation_catalog
 
 
 @pytest.mark.behavioural

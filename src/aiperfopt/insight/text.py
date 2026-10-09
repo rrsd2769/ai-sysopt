@@ -4,7 +4,7 @@ Technical and plain-language explanation text (FR-8.1, FR-8.2).
 FR-8.1 requires Developer Mode attribution; FR-8.2 requires the same
 underlying diagnosis translated into plain language for General Mode.
 Both are produced from the *same* resolved
-:class:`~aiperfopt.diagnosis.taxonomy.DiagnosisCategory` and the same
+:class:`~aiperfopt.insight.taxonomy.DiagnosisCategory` and the same
 underlying contributing-metrics/processes data — General Mode is not a
 separately-computed, potentially-inconsistent narrative, it is a
 plain-language rendering of the identical diagnosis (FR-8.3's "single
@@ -22,8 +22,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from aiperfopt.diagnosis.explainer import ForecastExplanation
-from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
+from aiperfopt.insight.explainer import ForecastExplanation
+from aiperfopt.insight.taxonomy import DiagnosisCategory
 from aiperfopt.storage.records import ContentionPredictionRecord
 
 _CATEGORY_DISPLAY_NAME: dict[DiagnosisCategory, str] = {
@@ -176,7 +176,7 @@ def build_technical_explanation(
         f"Anomaly score: {(contention_record.anomaly_score or 0.0):.3f}",
         f"Explanation tier: {explanation_tier} (trigger: {trigger_reason})",
         f"Contributing metrics (contention classifier coefficients, SHAP-equivalent — "
-        f"see aiperfopt.diagnosis.explainer): {metrics_line}",
+        f"see aiperfopt.insight.explainer): {metrics_line}",
         f"Contributing processes: {processes_line}",
     ]
     forecast_lines = _forecast_technical_lines(forecast_explanations)

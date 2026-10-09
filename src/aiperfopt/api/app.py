@@ -36,7 +36,7 @@ from aiperfopt.applog import get_logger
 from aiperfopt.bootstrap import AppContext, bootstrap
 from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.pipeline import create_monitoring_pipeline
-from aiperfopt.recommendation.catalog import load_recommendation_catalog
+from aiperfopt.insight.catalog import load_recommendation_catalog
 
 logger = get_logger(__name__)
 

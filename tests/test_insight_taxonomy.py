@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from aiperfopt.config.settings import DiagnosisSettings
-from aiperfopt.diagnosis.taxonomy import DiagnosisCategory, is_actionable, resolve_diagnosis_category
+from aiperfopt.insight.taxonomy import DiagnosisCategory, is_actionable, resolve_diagnosis_category
 from aiperfopt.storage.records import ContentionPredictionRecord
 
 pytestmark = pytest.mark.behavioural

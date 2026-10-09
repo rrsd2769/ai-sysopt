@@ -8,8 +8,8 @@ from sqlalchemy import Engine
 from aiperfopt.config.settings import ContentionSettings, DiagnosisSettings
 from aiperfopt.contention.model import ContentionClassifier
 from aiperfopt.contention.prediction import predict_contention
-from aiperfopt.diagnosis.service import diagnose_contention_event
-from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
+from aiperfopt.insight.diagnosis import diagnose_contention_event
+from aiperfopt.insight.taxonomy import DiagnosisCategory
 from aiperfopt.forecasting.model import MetricForecaster
 from aiperfopt.storage import (
     ProcessMetricSample,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
+from aiperfopt.insight.taxonomy import DiagnosisCategory
 from aiperfopt.frontend.formatting import (
     confidence_tier,
     format_confidence,

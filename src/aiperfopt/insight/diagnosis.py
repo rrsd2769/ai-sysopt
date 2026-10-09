@@ -11,7 +11,7 @@ as an argument: everything Diagnosis needs from Contention Prediction is
 already present on the triggering
 :class:`~aiperfopt.storage.records.ContentionPredictionRecord`
 (``contributing_metrics`` already *is* the SHAP-linear-equivalent
-attribution — see :mod:`aiperfopt.diagnosis.explainer`'s module
+attribution — see :mod:`aiperfopt.insight.explainer`'s module
 docstring), which keeps Diagnosis a true downstream consumer of
 Contention Prediction's *output* rather than reaching back into its
 internals — the same boundary FR-6.1 already draws between Contention
@@ -35,9 +35,9 @@ What Diagnosis *does* need beyond the contention record:
 
 Scope: only the events worth explaining
 -------------------------------------------
-Consistent with :mod:`aiperfopt.diagnosis.taxonomy`'s resolution-order
+Consistent with :mod:`aiperfopt.insight.taxonomy`'s resolution-order
 documentation, this function returns ``None`` (and persists nothing)
-whenever :func:`~aiperfopt.diagnosis.taxonomy.resolve_diagnosis_category`
+whenever :func:`~aiperfopt.insight.taxonomy.resolve_diagnosis_category`
 does — i.e. contention wasn't triggered and there is no significant
 anomaly. The overwhelming majority of monitoring cycles are exactly this
 "system is healthy" case; manufacturing a diagnosis record for each one
@@ -50,13 +50,13 @@ import pandas as pd
 from sqlalchemy import Engine
 
 from aiperfopt.config.settings import ContentionSettings, DiagnosisSettings
-from aiperfopt.diagnosis.explainer import explain_forecast, should_use_shap_tier
-from aiperfopt.diagnosis.taxonomy import (
+from aiperfopt.insight.explainer import explain_forecast, should_use_shap_tier
+from aiperfopt.insight.taxonomy import (
     DiagnosisCategory,
     is_actionable,
     resolve_diagnosis_category,
 )
-from aiperfopt.diagnosis.text import build_plain_language_explanation, build_technical_explanation
+from aiperfopt.insight.text import build_plain_language_explanation, build_technical_explanation
 from aiperfopt.forecasting.baselines import Forecaster
 from aiperfopt.storage.records import ContentionPredictionRecord, DiagnosisRecord
 from aiperfopt.storage.writer import insert_diagnosis

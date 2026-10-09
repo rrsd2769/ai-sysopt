@@ -181,7 +181,7 @@ class DiagnosisSettings(BaseModel):
     spec-defined set, not something worth training a classifier for).
     Reuses ``ContentionSettings.anomaly_significant_threshold`` for the
     "Unusual Pattern (Anomaly-Flagged)" trigger rather than duplicating
-    that threshold here — see ``aiperfopt.diagnosis.taxonomy``'s module
+    that threshold here — see ``aiperfopt.insight.taxonomy``'s module
     docstring for why a second copy of that number would be a real
     config-drift risk.
     """

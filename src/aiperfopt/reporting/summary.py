@@ -29,7 +29,7 @@ from statistics import mean
 import numpy as np
 from sqlalchemy import Engine
 
-from aiperfopt.diagnosis.taxonomy import DiagnosisCategory
+from aiperfopt.insight.taxonomy import DiagnosisCategory
 from aiperfopt.forecasting.evaluation import compute_directional_accuracy, compute_mae_rmse
 from aiperfopt.reporting.predicted_vs_actual import join_predicted_vs_actual
 from aiperfopt.storage.reader import (
