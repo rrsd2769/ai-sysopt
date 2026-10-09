@@ -77,7 +77,7 @@ from aiperfopt.forecasting.evaluation import (  # noqa: E402
     feature_columns_of,
 )
 from aiperfopt.forecasting.model import MetricForecaster  # noqa: E402
-from aiperfopt.retraining.real_usage_data import (  # noqa: E402
+from aiperfopt.lifecycle.training_data import (  # noqa: E402
     REAL_USAGE_SCENARIO_NAME,
     build_real_usage_training_data,
 )

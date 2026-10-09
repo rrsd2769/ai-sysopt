@@ -295,8 +295,8 @@ def _cmd_train(args: argparse.Namespace) -> int:
     from aiperfopt.common.exceptions import ModelDeploymentError, RetrainingError
     from aiperfopt.contention.config import ContentionLabelingConfig
     from aiperfopt.features.config import FeatureEngineeringConfig
-    from aiperfopt.retraining.deployment import confirm_deployment
-    from aiperfopt.retraining.pipeline import run_retraining_on_real_usage_data
+    from aiperfopt.lifecycle.deployment import confirm_deployment
+    from aiperfopt.lifecycle.retraining import run_retraining_on_real_usage_data
 
     ctx = _bootstrap(args)
     feature_config = FeatureEngineeringConfig()

@@ -15,5 +15,5 @@ Like every other subsystem, this one contains the actual computation;
 is the only access path" is about frontends reaching into storage
 directly, not about where business logic lives -- the API layer itself
 still delegates to subsystem code, the same way ``retraining.py``'s
-router delegates to ``aiperfopt.retraining``).
+router delegates to ``aiperfopt.lifecycle``).
 """

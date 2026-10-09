@@ -15,7 +15,7 @@ Threads a process summary into the training pipelines via their Phase 5
 :mod:`aiperfopt.contention.training_pipeline`. This resolves, for the
 ablation specifically, the open question Phase 4's handoff left about
 whether real-usage training should ever see process features; it does
-**not** change what a real retraining run (:mod:`aiperfopt.retraining.
+**not** change what a real retraining run (:mod:`aiperfopt.lifecycle.
 pipeline`) deploys by default -- that stays v1-shaped pending this
 ablation's actual result.
 """
@@ -38,7 +38,7 @@ from aiperfopt.contention.training_pipeline import (
 from aiperfopt.features.config import SYSTEM_GAUGE_METRICS, FeatureEngineeringConfig
 from aiperfopt.features.storage_bridge import aligned_process_summary
 from aiperfopt.forecasting.training_pipeline import TrainingRunSummary, train_and_evaluate_all
-from aiperfopt.retraining.real_usage_data import REAL_USAGE_SCENARIO_NAME, build_real_usage_training_data
+from aiperfopt.lifecycle.training_data import REAL_USAGE_SCENARIO_NAME, build_real_usage_training_data
 
 logger = get_logger(__name__)
 
@@ -70,7 +70,7 @@ class AblationReport:
 
 
 def _short_horizon_outcomes(forecast_summary: TrainingRunSummary) -> dict:
-    """Mirrors aiperfopt.retraining.pipeline's identically-named helper:
+    """Mirrors aiperfopt.lifecycle.retraining's identically-named helper:
     only short-horizon, successfully-selected forecasters feed Contention
     Prediction."""
     return {
@@ -147,7 +147,7 @@ def run_ablation(
     real-usage data and an identical chronological split.
 
     Raises :class:`aiperfopt.common.exceptions.RetrainingError` (via
-    :func:`aiperfopt.retraining.real_usage_data.build_real_usage_training_data`)
+    :func:`aiperfopt.lifecycle.training_data.build_real_usage_training_data`)
     if there isn't yet enough accumulated real-usage data -- surfaced to
     the caller.
     """

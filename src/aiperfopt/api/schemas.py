@@ -235,7 +235,7 @@ class ContentionGateCriterionOut(BaseModel):
 
 
 class SkillGateOut(BaseModel):
-    """Phase 6's absolute quality bar -- see :func:`aiperfopt.retraining.
+    """Phase 6's absolute quality bar -- see :func:`aiperfopt.lifecycle.
     comparison.evaluate_skill_gate`. Unlike ``RetrainingComparisonOut``'s
     ``recommendation`` (advisory), ``passed=False`` here blocks
     ``/retraining/confirm`` even with ``confirmed=True``."""

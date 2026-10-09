@@ -21,7 +21,7 @@ from sqlalchemy import Engine
 
 from aiperfopt.config.settings import RetrainingSettings
 from aiperfopt.features.config import FeatureEngineeringConfig
-from aiperfopt.retraining.deployment import get_active_model_version
+from aiperfopt.lifecycle.deployment import get_active_model_version
 from aiperfopt.storage.reader import get_recent_system_metrics
 
 

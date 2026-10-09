@@ -50,7 +50,7 @@ from aiperfopt.features import FeatureEngineeringConfig, compute_feature_matrix 
 from aiperfopt.features.storage_bridge import aligned_process_summary  # noqa: E402
 from aiperfopt.forecasting.dataset import build_supervised_dataset  # noqa: E402
 from aiperfopt.forecasting.evaluation import feature_columns_of  # noqa: E402
-from aiperfopt.retraining.real_usage_data import (  # noqa: E402
+from aiperfopt.lifecycle.training_data import (  # noqa: E402
     REAL_USAGE_SCENARIO_NAME,
     build_real_usage_training_data,
 )

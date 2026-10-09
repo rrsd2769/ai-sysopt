@@ -1,9 +1,9 @@
 """
 Exposes Phase 8's Model Retraining subsystem over REST. This module adds
 no retraining logic of its own — it validates a request, calls straight
-into :mod:`aiperfopt.retraining`, and maps the result onto a response
+into :mod:`aiperfopt.lifecycle`, and maps the result onto a response
 schema. FR-11.2's "never silently activate" is enforced by
-:func:`aiperfopt.retraining.deployment.confirm_deployment` itself
+:func:`aiperfopt.lifecycle.deployment.confirm_deployment` itself
 (``confirmed`` has no default there either); this router does not add or
 relax that requirement, only exposes it.
 """
@@ -32,20 +32,18 @@ from aiperfopt.bootstrap import AppContext
 from aiperfopt.common.exceptions import ModelDeploymentError, RetrainingError
 from aiperfopt.contention.config import ContentionLabelingConfig
 from aiperfopt.features.config import FeatureEngineeringConfig
-from aiperfopt.retraining.comparison import (
+from aiperfopt.lifecycle.comparison import (
     ContentionComparison,
-    ContentionGateCriterion,
-    ForecastGateCriterion,
     MetricComparison,
     RetrainingComparison,
-    SkillGateResult,
 )
-from aiperfopt.retraining.deployment import (
+from aiperfopt.lifecycle.deployment import (
     confirm_deployment,
     get_active_model_version,
     rollback_to_last_known_good,
 )
-from aiperfopt.retraining.pipeline import run_retraining_on_real_usage_data
+from aiperfopt.lifecycle.gate import ContentionGateCriterion, ForecastGateCriterion, SkillGateResult
+from aiperfopt.lifecycle.retraining import run_retraining_on_real_usage_data
 
 router = APIRouter(prefix="/retraining", tags=["retraining"])
 

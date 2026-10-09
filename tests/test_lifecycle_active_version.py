@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from aiperfopt.common.exceptions import RetrainingError
-from aiperfopt.retraining.active_version import read_active_version, write_active_version
+from aiperfopt.lifecycle.active_version import read_active_version, write_active_version
 
 pytestmark = pytest.mark.plumbing
 

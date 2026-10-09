@@ -7,8 +7,9 @@ from sqlalchemy import Engine
 
 from aiperfopt.common.exceptions import ModelDeploymentError
 from aiperfopt.config.settings import RetrainingSettings
-from aiperfopt.retraining.comparison import RetrainingComparison, SkillGateResult
-from aiperfopt.retraining.deployment import (
+from aiperfopt.lifecycle.comparison import RetrainingComparison
+from aiperfopt.lifecycle.gate import SkillGateResult
+from aiperfopt.lifecycle.deployment import (
     confirm_deployment,
     get_active_model_version,
     rollback_to_last_known_good,

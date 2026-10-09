@@ -15,7 +15,7 @@ from aiperfopt.contention.training_pipeline import train_contention_and_anomaly_
 from aiperfopt.anomaly.persistence import load_anomaly_detector
 from aiperfopt.features import FeatureEngineeringConfig
 from aiperfopt.features.storage_bridge import compute_live_feature_vector
-from aiperfopt.forecasting.deployment import resolve_deployed_forecasters
+from aiperfopt.lifecycle.deployment import resolve_deployed_forecasters
 from aiperfopt.forecasting.training_pipeline import train_and_evaluate_all
 from aiperfopt.storage import insert_system_metric_samples_batch
 from aiperfopt.storage.reader import get_recent_system_metrics

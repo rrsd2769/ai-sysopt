@@ -2,7 +2,7 @@
 The active-model-version pointer — a small on-disk fact ("which
 model_version is currently deployed") that the live inference path
 (Phase 9's API layer) will read on every cycle, and that only a confirmed
-deployment decision (:mod:`aiperfopt.retraining.deployment`) ever writes.
+deployment decision (:mod:`aiperfopt.lifecycle.deployment`) ever writes.
 
 Deliberately a plain JSON file rather than a database row: it's a single
 fact needed on the hot inference path, not a query. The durable,

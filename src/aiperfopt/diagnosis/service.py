@@ -31,7 +31,7 @@ What Diagnosis *does* need beyond the contention record:
   plan) — the same ``deployed_forecasters`` mapping
   :func:`aiperfopt.contention.dataset.build_contention_dataset` and
   :func:`aiperfopt.contention.prediction.predict_contention`'s caller
-  already assemble via :func:`aiperfopt.forecasting.deployment.load_deployed_forecaster`.
+  already assemble via :func:`aiperfopt.lifecycle.deployment.load_deployed_forecaster`.
 
 Scope: only the events worth explaining
 -------------------------------------------

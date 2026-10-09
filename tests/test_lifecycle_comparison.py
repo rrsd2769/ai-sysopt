@@ -5,7 +5,7 @@ from sqlalchemy import Engine
 
 from aiperfopt.contention.training_pipeline import ContentionTrainingSummary
 from aiperfopt.forecasting.training_pipeline import MetricHorizonOutcome, TrainingRunSummary
-from aiperfopt.retraining.comparison import compare_candidate_to_active
+from aiperfopt.lifecycle.comparison import compare_candidate_to_active
 from aiperfopt.storage import insert_evaluation
 from aiperfopt.storage.records import EvaluationRecord
 

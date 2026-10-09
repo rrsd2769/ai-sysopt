@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import Engine
 
 from aiperfopt.common.exceptions import RetrainingError
-from aiperfopt.retraining.real_usage_data import (
+from aiperfopt.lifecycle.training_data import (
     REAL_USAGE_SCENARIO_NAME,
     build_real_usage_training_data,
 )

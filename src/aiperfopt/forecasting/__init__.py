@@ -16,7 +16,6 @@ from aiperfopt.forecasting.baselines import (
     NaivePersistenceForecaster,
 )
 from aiperfopt.forecasting.dataset import build_supervised_dataset
-from aiperfopt.forecasting.deployment import load_deployed_forecaster
 from aiperfopt.forecasting.evaluation import (
     FoldMetrics,
     build_history_lookup,
@@ -44,7 +43,6 @@ __all__ = [
     "MovingAverageForecaster",
     "NaivePersistenceForecaster",
     "build_supervised_dataset",
-    "load_deployed_forecaster",
     "FoldMetrics",
     "build_history_lookup",
     "compute_directional_accuracy",

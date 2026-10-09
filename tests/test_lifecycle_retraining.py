@@ -9,8 +9,8 @@ from sqlalchemy import Engine
 from aiperfopt.config.settings import ContentionSettings, ForecastingSettings, RetrainingSettings
 from aiperfopt.contention.config import ContentionLabelingConfig
 from aiperfopt.features import FeatureEngineeringConfig
-from aiperfopt.retraining.deployment import confirm_deployment, get_active_model_version
-from aiperfopt.retraining.pipeline import (
+from aiperfopt.lifecycle.deployment import confirm_deployment, get_active_model_version
+from aiperfopt.lifecycle.retraining import (
     run_retraining_on_real_usage_data,
 )
 from aiperfopt.storage import get_evaluations_by_version, insert_system_metric_samples_batch

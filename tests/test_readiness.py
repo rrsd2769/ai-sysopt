@@ -18,7 +18,7 @@ from sqlalchemy import Engine
 from aiperfopt.config import load_settings
 from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.readiness import ReadinessState, assess_readiness
-from aiperfopt.retraining.active_version import write_active_version
+from aiperfopt.lifecycle.active_version import write_active_version
 from aiperfopt.storage import insert_system_metric_samples_batch
 from aiperfopt.storage.records import SystemMetricSample
 

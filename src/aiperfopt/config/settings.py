@@ -206,14 +206,14 @@ class RetrainingSettings(BaseModel):
     """Model Retraining tunables (Section 7.1 item 11, FR-11.1-11.3, ADL-23).
 
     Retraining reuses Phase 4/5's existing training pipelines verbatim
-    (see ``aiperfopt.retraining.pipeline``'s module docstring) — nothing
+    (see ``aiperfopt.lifecycle.retraining``'s module docstring) — nothing
     here configures *how* a model is trained, only how a freshly-trained
     candidate is compared against whatever is currently deployed, and
     where the "which version is currently active" pointer lives.
     """
 
     # Where the small active-model-version pointer file lives
-    # (``aiperfopt.retraining.active_version``). Deliberately a plain
+    # (``aiperfopt.lifecycle.active_version``). Deliberately a plain
     # file, not a database row: the live inference path (Phase 9) needs
     # to answer "what's active right now" on every cycle, and a file
     # read is simpler and faster than a query for that single fact. The
@@ -249,7 +249,7 @@ class RetrainingSettings(BaseModel):
     # required margin of superiority, since F1's [0, 1] ceiling means an
     # already-excellent (even perfect) baseline on an easy holdout can be
     # legitimately impossible to "beat by a margin" (see
-    # aiperfopt.retraining.comparison.evaluate_skill_gate).
+    # aiperfopt.lifecycle.comparison.evaluate_skill_gate).
     contention_f1_margin: float = Field(default=0.05, ge=0.0, lt=1.0)
 
     _abs_active_version_file = field_validator("active_version_file")(_absolute_under_app_home)

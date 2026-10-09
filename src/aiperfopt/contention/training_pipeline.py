@@ -39,7 +39,6 @@ from aiperfopt.contention.persistence import save_contention_classifier
 from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.features.engine import compute_feature_matrix
 from aiperfopt.forecasting.baselines import Forecaster
-from aiperfopt.forecasting.deployment import load_deployed_forecaster
 from aiperfopt.forecasting.training_pipeline import MetricHorizonOutcome
 from aiperfopt.storage.records import EvaluationRecord, SystemMetricSample
 from aiperfopt.storage.writer import insert_evaluations_batch
@@ -110,6 +109,9 @@ class ContentionTrainingSummary:
 def _load_deployed_forecasters(
     forecast_outcomes: dict[str, MetricHorizonOutcome], models_dir: Path, model_version: str
 ) -> dict[str, Forecaster]:
+    # Deferred: aiperfopt.lifecycle imports this module at package-import time.
+    from aiperfopt.lifecycle.deployment import load_deployed_forecaster
+
     forecasters: dict[str, Forecaster] = {}
     for metric_name, outcome in forecast_outcomes.items():
         try:

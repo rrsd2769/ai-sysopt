@@ -105,7 +105,7 @@ def _combined_raw_history(scenarios: dict[str, list[SystemMetricSample]], metric
 def baseline_factories_for(
     metric_name: str, horizon_seconds: int, is_counter: bool = False
 ) -> dict[str, "Forecaster"]:
-    """Public: also used by :mod:`aiperfopt.forecasting.deployment` to
+    """Public: also used by :mod:`aiperfopt.lifecycle.deployment` to
     reconstruct a deployed baseline forecaster outside a training run.
 
     ``is_counter`` matters only for :class:`MovingAverageForecaster`: a

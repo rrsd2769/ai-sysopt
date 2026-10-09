@@ -9,7 +9,7 @@ A single ``model_version`` spans forecasting + contention + anomaly
 -------------------------------------------------------------------
 One retraining run trains and saves every forecasting model, the
 contention classifier, and the anomaly detector under the *same*
-``model_version`` string. Deployment (:mod:`aiperfopt.retraining.deployment`)
+``model_version`` string. Deployment (:mod:`aiperfopt.lifecycle.deployment`)
 therefore also activates or rolls back all three together, never
 independently: a new forecaster paired with an old contention classifier
 trained against a different forecaster's output distribution is not a
@@ -31,14 +31,10 @@ from aiperfopt.contention.training_pipeline import (
 )
 from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.forecasting.training_pipeline import TrainingRunSummary, train_and_evaluate_all
-from aiperfopt.retraining.comparison import (
-    RetrainingComparison,
-    SkillGateResult,
-    compare_candidate_to_active,
-    evaluate_skill_gate,
-)
-from aiperfopt.retraining.deployment import get_active_model_version
-from aiperfopt.retraining.real_usage_data import REAL_USAGE_SCENARIO_NAME, build_real_usage_training_data
+from aiperfopt.lifecycle.comparison import RetrainingComparison, compare_candidate_to_active
+from aiperfopt.lifecycle.deployment import get_active_model_version
+from aiperfopt.lifecycle.gate import SkillGateResult, evaluate_skill_gate
+from aiperfopt.lifecycle.training_data import REAL_USAGE_SCENARIO_NAME, build_real_usage_training_data
 from aiperfopt.storage.records import SystemMetricSample
 
 logger = get_logger(__name__)
@@ -139,7 +135,7 @@ def run_retraining_on_real_usage_data(
 
     Raises
     :class:`aiperfopt.common.exceptions.RetrainingError` (via
-    :func:`aiperfopt.retraining.real_usage_data.build_real_usage_training_data`)
+    :func:`aiperfopt.lifecycle.training_data.build_real_usage_training_data`)
     if there isn't yet.
     """
     scenarios, holdout_samples = build_real_usage_training_data(

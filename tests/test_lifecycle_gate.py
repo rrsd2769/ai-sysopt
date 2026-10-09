@@ -1,6 +1,6 @@
 """Phase 6's quality gate (Section 11's precision-favoring stance, extended
 from "don't regress vs. active" to "clear an absolute bar"). See
-:mod:`aiperfopt.retraining.comparison`'s module-level docstring for how
+:mod:`aiperfopt.lifecycle.comparison`'s module-level docstring for how
 this differs from ``compare_candidate_to_active``.
 """
 
@@ -19,8 +19,8 @@ from aiperfopt.contention.config import ContentionLabelingConfig
 from aiperfopt.contention.training_pipeline import ContentionTrainingSummary
 from aiperfopt.features import FeatureEngineeringConfig
 from aiperfopt.forecasting.training_pipeline import MetricHorizonOutcome, TrainingRunSummary
-from aiperfopt.retraining.comparison import evaluate_skill_gate
-from aiperfopt.retraining.pipeline import run_retraining_on_real_usage_data
+from aiperfopt.lifecycle.gate import evaluate_skill_gate
+from aiperfopt.lifecycle.retraining import run_retraining_on_real_usage_data
 from aiperfopt.storage import insert_system_metric_samples_batch
 from tests.factories import make_training_data
 
@@ -122,7 +122,7 @@ def test_gate_treats_a_candidate_that_only_ties_a_perfect_baseline_as_passing():
     margin, and requiring one would fail every classifier that ties it.
     The gate's F1 criterion is a tolerance on how far the candidate may
     trail the baseline, not a required margin of superiority (see
-    aiperfopt.retraining.comparison.evaluate_skill_gate), so tying --
+    aiperfopt.lifecycle.comparison.evaluate_skill_gate), so tying --
     or even trailing by a little -- still passes."""
     forecast_summary = TrainingRunSummary(model_version="v1", outcomes=[_outcome()])
     gate = evaluate_skill_gate(

@@ -18,7 +18,7 @@ from aiperfopt.anomaly.persistence import load_anomaly_detector
 from aiperfopt.diagnosis.service import diagnose_contention_event
 from aiperfopt.features.config import FeatureEngineeringConfig
 from aiperfopt.features.storage_bridge import compute_live_feature_vector
-from aiperfopt.forecasting.deployment import resolve_deployed_forecasters
+from aiperfopt.lifecycle.deployment import resolve_deployed_forecasters
 from aiperfopt.forecasting.training_pipeline import train_and_evaluate_all
 from aiperfopt.replay import player as player_module
 from aiperfopt.replay.player import is_monitoring_active, replay_session

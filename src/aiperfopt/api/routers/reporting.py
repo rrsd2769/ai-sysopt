@@ -3,7 +3,7 @@ Reporting endpoints (Section 7.1 item 14, FR-14.1/FR-14.2).
 
 Thin wrapper over :mod:`aiperfopt.reporting` -- matching the pattern
 every other subsystem's router already follows (e.g.
-``routers/retraining.py`` over ``aiperfopt.retraining``): the actual
+``routers/retraining.py`` over ``aiperfopt.lifecycle``): the actual
 join/aggregation logic lives in the subsystem package, not here.
 
 - ``GET /reporting/predicted-vs-actual`` -- FR-13.3's per-metric

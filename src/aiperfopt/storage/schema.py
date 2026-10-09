@@ -315,7 +315,7 @@ Index("ix_evaluations_evaluated_at", evaluations.c.evaluated_at)
 # model_version was proposed, what it was compared against, what the
 # comparison recommended, and what a human actually decided — never
 # inferred from "whatever's newest on disk" (FR-11.2's "never silently
-# activate"). ``aiperfopt.retraining.active_version`` reads/writes a
+# activate"). ``aiperfopt.lifecycle.active_version`` reads/writes a
 # small pointer file for *fast* "what's active right now" lookups on the
 # live inference path; this table is the durable, queryable history
 # behind that pointer, and is what NFR-5.3's automatic fallback walks
@@ -329,13 +329,13 @@ model_deployments = Table(
     # The model_version a retraining run produced and proposed for
     # deployment (shared across forecasting/contention/anomaly artifacts
     # trained together in one retraining run — see
-    # aiperfopt.retraining.pipeline's module docstring).
+    # aiperfopt.lifecycle.retraining's module docstring).
     Column("candidate_version", String(64), nullable=False),
     # The active version immediately before this decision, if any.
     Column("previous_version", String(64), nullable=True),
     # "deployed" | "rejected" | "rollback".
     Column("decision", String(16), nullable=False),
-    # What aiperfopt.retraining.comparison recommended before a human
+    # What aiperfopt.lifecycle.comparison recommended before a human
     # decided — "deploy" | "reject" | "no_active_baseline". Null for a
     # system-initiated rollback, which isn't comparison-driven.
     Column("recommendation", String(32), nullable=True),
@@ -343,7 +343,7 @@ model_deployments = Table(
     # a real confirmation action, or "system" for an automatic rollback
     # (NFR-5.3).
     Column("confirmed_by", String(64), nullable=True),
-    # Serialized aiperfopt.retraining.comparison.RetrainingComparison (or
+    # Serialized aiperfopt.lifecycle.comparison.RetrainingComparison (or
     # a rollback reason) — kept for audit/debugging without needing to
     # re-derive the comparison from raw evaluations rows later.
     Column("comparison_summary", JSON, nullable=True),

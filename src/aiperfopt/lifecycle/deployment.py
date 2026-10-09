@@ -15,15 +15,21 @@ layer is expected to gate that argument behind an actual user action
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 from sqlalchemy import Engine
 
 from aiperfopt.applog import get_logger
 from aiperfopt.common.exceptions import ModelDeploymentError
-from aiperfopt.config.settings import RetrainingSettings
-from aiperfopt.retraining.active_version import read_active_version, write_active_version
-from aiperfopt.retraining.comparison import RetrainingComparison, SkillGateResult
-from aiperfopt.storage.reader import get_model_deployments_range
+from aiperfopt.config.settings import ForecastingSettings, RetrainingSettings
+from aiperfopt.features.config import FeatureEngineeringConfig
+from aiperfopt.forecasting.baselines import Forecaster
+from aiperfopt.forecasting.persistence import load_forecaster
+from aiperfopt.forecasting.training_pipeline import MetricHorizonOutcome, baseline_factories_for
+from aiperfopt.lifecycle.active_version import read_active_version, write_active_version
+from aiperfopt.lifecycle.comparison import RetrainingComparison
+from aiperfopt.lifecycle.gate import SkillGateResult
+from aiperfopt.storage.reader import get_evaluations_by_version, get_model_deployments_range
 from aiperfopt.storage.records import ModelDeploymentRecord
 from aiperfopt.storage.writer import insert_model_deployment
 
@@ -49,7 +55,7 @@ def confirm_deployment(
     Parameters
     ----------
     skill_gate:
-        Phase 6's absolute quality bar (:func:`aiperfopt.retraining.
+        Phase 6's absolute quality bar (:func:`aiperfopt.lifecycle.
         comparison.evaluate_skill_gate`), computed once alongside
         ``comparison`` when the candidate was produced. Unlike
         ``comparison.recommendation``, this is not advisory: a failing
@@ -177,3 +183,73 @@ def rollback_to_last_known_good(
         extra={"from_version": current_version, "to_version": target_version, "reason": reason},
     )
     return record
+
+
+def load_deployed_forecaster(
+    outcome: MetricHorizonOutcome, models_dir: Path, model_version: str
+) -> Forecaster:
+    """Return a ready-to-use forecaster matching what a training run selected."""
+    if outcome.selected_forecaster == "lightgbm":
+        return load_forecaster(models_dir, outcome.metric_name, outcome.horizon_label, model_version)
+
+    factories = baseline_factories_for(outcome.metric_name, outcome.horizon_seconds, is_counter=outcome.is_counter)
+    if outcome.selected_forecaster not in factories:
+        raise ValueError(f"Unknown selected forecaster: {outcome.selected_forecaster!r}")
+    return factories[outcome.selected_forecaster]()
+
+
+def resolve_deployed_forecasters(
+    engine: Engine,
+    feature_config: FeatureEngineeringConfig,
+    forecasting_settings: ForecastingSettings,
+    model_version: str,
+    horizon_label: str = "short",
+    target_metrics: list[str] | None = None,
+) -> dict[str, Forecaster]:
+    """Reconstruct every deployed forecaster for ``model_version`` from persisted evaluation history.
+
+    Skips (with no error) any metric that has no recorded holdout
+    evaluation for ``model_version``/``horizon_label`` — e.g. a metric
+    that produced no usable model during that training run (Section
+    10.7's contingency plan producing no candidate at all is rare but
+    possible for a very short/sparse training window). A caller with
+    zero usable forecasters back should treat that the same as "no
+    active model" (NFR-11.1's graceful degradation), not raise.
+    """
+    metrics = target_metrics or list(feature_config.gauge_metrics) + list(feature_config.counter_metrics)
+    evaluations = get_evaluations_by_version(engine, model_version)
+
+    forecasters: dict[str, Forecaster] = {}
+    horizon_seconds = (
+        forecasting_settings.short_horizon_target_seconds
+        if horizon_label == "short"
+        else forecasting_settings.medium_horizon_target_seconds
+    )
+
+    for metric_name in metrics:
+        matches = [
+            e
+            for e in evaluations
+            if e.metric_name == metric_name
+            and e.horizon_label == horizon_label
+            and e.dataset_tag is not None
+            and e.dataset_tag.startswith("holdout_")
+        ]
+        if not matches:
+            continue
+
+        latest = max(matches, key=lambda e: e.evaluated_at)
+        selected_forecaster = latest.model_name
+        is_counter = metric_name in feature_config.counter_metrics
+
+        outcome = MetricHorizonOutcome(
+            metric_name=metric_name, horizon_label=horizon_label, horizon_seconds=int(horizon_seconds),
+            walk_forward_summary={}, selected_forecaster=selected_forecaster,
+            holdout_mae=latest.mae, holdout_rmse=latest.rmse,
+            holdout_directional_accuracy=latest.directional_accuracy, is_counter=is_counter,
+        )
+        forecasters[metric_name] = load_deployed_forecaster(
+            outcome, forecasting_settings.models_dir, model_version
+        )
+
+    return forecasters
