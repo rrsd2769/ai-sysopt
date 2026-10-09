@@ -1,6 +1,6 @@
 """Deeper analysis of the three-model comparison, for the IEEE paper.
 
-Refits the three candidates from ``compare_models.py`` on the same chronological
+Refits the three candidates from ``aiperfopt compare`` on the same chronological
 80/20 split (no CV -- that is already in ``results/model_comparison_cv.csv``)
 and keeps every per-sample holdout prediction, which the comparison script
 throws away. From those it computes:
@@ -13,7 +13,7 @@ throws away. From those it computes:
 * LightGBM gain importance, per feature and per feature group.
 * Data characterisation: utilisation distribution and the full time series.
 
-Uses the same preprocessing as ``compare_models.py`` (``--raw`` to skip it).
+Uses the same preprocessing as ``aiperfopt compare`` (``--raw`` to skip it).
 Run against a pinned snapshot so the numbers match the published tables:
 
     AIPERFOPT_HOME=paper_snapshot python scripts/paper_analysis.py
@@ -24,7 +24,6 @@ Writes ``results/paper/*`` (``results/paper_raw/*`` with ``--raw``).
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import sqlite3
 import sys
@@ -40,12 +39,8 @@ import pandas as pd  # noqa: E402
 from scipy import stats  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-_spec = importlib.util.spec_from_file_location("compare_models", REPO_ROOT / "scripts" / "compare_models.py")
-cm = importlib.util.module_from_spec(_spec)
-sys.modules["compare_models"] = cm
-_spec.loader.exec_module(cm)
-
 from aiperfopt.bootstrap import bootstrap  # noqa: E402
+from aiperfopt.evaluation import model_comparison as cm  # noqa: E402
 from aiperfopt.features import FeatureEngineeringConfig, compute_feature_matrix  # noqa: E402
 from aiperfopt.features.storage_bridge import aligned_process_summary  # noqa: E402
 from aiperfopt.forecasting.dataset import build_supervised_dataset  # noqa: E402

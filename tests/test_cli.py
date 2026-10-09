@@ -48,6 +48,8 @@ def clean_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         ["evaluate", "--ablation"],
         ["evaluate", "--ablation", "--report"],
         ["evaluate", "--report", "--out-dir", "/tmp/results", "--metrics", "cpu_percent"],
+        ["compare"],
+        ["compare", "--raw", "--out-dir", "/tmp/results"],
         ["serve"],
         ["ui"],
         ["run"],

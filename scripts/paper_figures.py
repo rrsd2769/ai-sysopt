@@ -1,6 +1,6 @@
 """Draw every results figure used in the paper and the deck.
 
-Reads the CSVs written by ``compare_models.py`` (with and without ``--raw``)
+Reads the CSVs written by ``aiperfopt compare`` (with and without ``--raw``)
 and ``paper_analysis.py``; writes PDFs to ``paper/figures/`` for LaTeX and
 PNGs to ``paper/figures/png/`` for slides.
 

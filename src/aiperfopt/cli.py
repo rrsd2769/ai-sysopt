@@ -420,6 +420,23 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------
 
 
+def _cmd_compare(args: argparse.Namespace) -> int:
+    """Compare LightGBM, Random Forest and Ridge on recorded usage and print the winner."""
+    from aiperfopt.common.exceptions import RetrainingError
+    from aiperfopt.evaluation.model_comparison import run_model_comparison
+
+    ctx = _bootstrap(args)
+    try:
+        result = run_model_comparison(ctx, args.out_dir, preprocess=not args.raw)
+    except RetrainingError as exc:
+        print(f"Comparison failed: {exc}")
+        return 1
+    print(f"\nResults written to {args.out_dir}:")
+    for path in result.files:
+        print(f"  {path}")
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     from aiperfopt.api.server import main as serve_main
 
@@ -570,6 +587,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Unix epoch seconds; only use accumulated data from here to now.",
     )
     p_evaluate.set_defaults(func=_cmd_evaluate, default_log_level="WARNING")
+
+    p_compare = sub.add_parser(
+        "compare", help="Compare LightGBM, Random Forest and Ridge on recorded usage and pick one.",
+    )
+    p_compare.add_argument("--out-dir", type=Path, default=Path("results"), dest="out_dir")
+    p_compare.add_argument("--raw", action="store_true", help="Skip feature preprocessing.")
+    p_compare.set_defaults(func=_cmd_compare, default_log_level="WARNING")
 
     p_serve = sub.add_parser("serve", help="Run the API server with monitoring and live inference.")
     p_serve.add_argument(

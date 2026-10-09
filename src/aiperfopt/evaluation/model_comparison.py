@@ -36,8 +36,8 @@ fitted to the numbers):
     wins (the forecaster runs every tick, so cost matters when accuracy
     doesn't separate them).
 
-    python scripts/compare_models.py          # with preprocessing
-    python scripts/compare_models.py --raw    # without
+    aiperfopt compare          # with preprocessing
+    aiperfopt compare --raw    # without
 
 Writes ``results/model_comparison{,_raw}.csv``, ``..._cv.csv``, ``.txt`` and
 ``.png``.
@@ -45,45 +45,37 @@ Writes ``results/model_comparison{,_raw}.csv``, ``..._cv.csv``, ``.txt`` and
 
 from __future__ import annotations
 
-import argparse
 import csv
 import pickle
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-import matplotlib
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import Ridge
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-from sklearn.ensemble import RandomForestRegressor  # noqa: E402
-from sklearn.impute import SimpleImputer  # noqa: E402
-from sklearn.linear_model import Ridge  # noqa: E402
-from sklearn.model_selection import TimeSeriesSplit  # noqa: E402
-from sklearn.pipeline import make_pipeline  # noqa: E402
-from sklearn.preprocessing import StandardScaler  # noqa: E402
-
-from aiperfopt.bootstrap import bootstrap  # noqa: E402
-from aiperfopt.features import FeatureEngineeringConfig, compute_feature_matrix  # noqa: E402
-from aiperfopt.features.preprocessing import FeaturePreprocessor, clean_supervised_rows  # noqa: E402
-from aiperfopt.features.storage_bridge import aligned_process_summary  # noqa: E402
-from aiperfopt.forecasting.dataset import build_supervised_dataset  # noqa: E402
-from aiperfopt.forecasting.evaluation import (  # noqa: E402
+from aiperfopt.bootstrap import AppContext
+from aiperfopt.features import FeatureEngineeringConfig, compute_feature_matrix
+from aiperfopt.features.preprocessing import FeaturePreprocessor, clean_supervised_rows
+from aiperfopt.features.storage_bridge import aligned_process_summary
+from aiperfopt.forecasting.dataset import build_supervised_dataset
+from aiperfopt.forecasting.evaluation import (
     compute_directional_accuracy,
     compute_mae_rmse,
     feature_columns_of,
 )
-from aiperfopt.forecasting.model import MetricForecaster  # noqa: E402
-from aiperfopt.lifecycle.training_data import (  # noqa: E402
+from aiperfopt.forecasting.model import MetricForecaster
+from aiperfopt.lifecycle.training_data import (
     REAL_USAGE_SCENARIO_NAME,
     build_real_usage_training_data,
 )
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-OUT_DIR = REPO_ROOT / "results"
 METRICS = ("cpu_percent", "mem_percent")
 TIE_MARGIN = 0.02
 LATENCY_SAMPLE_ROWS = 200
@@ -249,13 +241,20 @@ def choose_winner(scores: list[Score]) -> tuple[str, dict[str, float], dict[str,
     return best, skill, latency, reason
 
 
-def _write_outputs(scores: list[Score], cv_rows: list[dict], dataset_info: dict, stem: str) -> None:
-    OUT_DIR.mkdir(exist_ok=True)
-    with (OUT_DIR / f"{stem}.csv").open("w", newline="", encoding="utf-8") as fh:
+def _write_outputs(
+    scores: list[Score], cv_rows: list[dict], dataset_info: dict, stem: str, out_dir: Path
+) -> list[Path]:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with (out_dir / f"{stem}.csv").open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=list(Score.__dataclass_fields__))
         writer.writeheader()
         writer.writerows(s.__dict__ for s in scores)
-    with (OUT_DIR / f"{stem}_cv.csv").open("w", newline="", encoding="utf-8") as fh:
+    with (out_dir / f"{stem}_cv.csv").open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=list(cv_rows[0]))
         writer.writeheader()
         writer.writerows(cv_rows)
@@ -276,7 +275,7 @@ def _write_outputs(scores: list[Score], cv_rows: list[dict], dataset_info: dict,
     lines += ["", "Mean skill vs persistence (1 - MAE/persistence MAE; higher is better)"]
     lines += [f"  {n:<18} {skill[n]:+.3f}   latency {latency[n]:.2f} ms/prediction" for n in CANDIDATE_NAMES]
     lines += ["", f"SELECTED: {winner}", f"reason  : {reason}"]
-    (OUT_DIR / f"{stem}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (out_dir / f"{stem}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 
     targets = list(dict.fromkeys(s.target for s in scores))
@@ -293,8 +292,9 @@ def _write_outputs(scores: list[Score], cv_rows: list[dict], dataset_info: dict,
     ax.legend(frameon=False)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    fig.savefig(OUT_DIR / f"{stem}.png", dpi=150)
+    fig.savefig(out_dir / f"{stem}.png", dpi=150)
     plt.close(fig)
+    return [out_dir / f"{stem}{suffix}" for suffix in (".csv", "_cv.csv", ".txt", ".png")]
 
 
 def clean_rows(dataset: pd.DataFrame, feature_config: FeatureEngineeringConfig):
@@ -305,15 +305,26 @@ def clean_rows(dataset: pd.DataFrame, feature_config: FeatureEngineeringConfig):
     )
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--raw", action="store_true", help="skip preprocessing (original comparison)")
-    preprocess = not parser.parse_args().raw
-    stem = "model_comparison" if preprocess else "model_comparison_raw"
+@dataclass
+class ModelComparisonResult:
+    winner: str
+    reason: str
+    skill: dict[str, float]
+    scores: list[Score] = field(default_factory=list)
+    files: list[Path] = field(default_factory=list)
 
-    ctx = bootstrap(None)
+
+def run_model_comparison(
+    ctx: AppContext,
+    out_dir: Path,
+    *,
+    preprocess: bool = True,
+    feature_config: FeatureEngineeringConfig | None = None,
+) -> ModelComparisonResult:
+    """Run the comparison on the recorded usage in ``ctx`` and write the result files to ``out_dir``."""
+    stem = "model_comparison" if preprocess else "model_comparison_raw"
     settings = ctx.settings.forecasting
-    feature_config = FeatureEngineeringConfig()
+    feature_config = feature_config or FeatureEngineeringConfig()
 
     print("Loading real usage data ...")
     scenarios, holdout_samples = build_real_usage_training_data(ctx.storage_engine, holdout_fraction=0.2)
@@ -366,9 +377,6 @@ def main() -> int:
     }
     for target, summary in cleaning.items():
         dataset_info[f"preprocessing {target}"] = summary
-    _write_outputs(scores, cv_rows, dataset_info, stem)
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    files = _write_outputs(scores, cv_rows, dataset_info, stem, out_dir)
+    winner, skill, _latency, reason = choose_winner(scores)
+    return ModelComparisonResult(winner=winner, reason=reason, skill=skill, scores=scores, files=files)
