@@ -28,6 +28,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from aiperfopt.api.connection_manager import ConnectionManager
 from aiperfopt.api.live_state import LiveInferenceLoop, LiveState
@@ -39,6 +41,8 @@ from aiperfopt.monitoring.pipeline import create_monitoring_pipeline
 from aiperfopt.insight.catalog import load_recommendation_catalog
 
 logger = get_logger(__name__)
+
+_WEB_DIR = Path(__file__).resolve().parent.parent / "web" / "static"
 
 
 def create_app(
@@ -136,6 +140,14 @@ def create_app(
     app.include_router(retraining.router)
     app.include_router(live.router)
     app.include_router(reporting.router)
+
+    # The web dashboard. Mounted after the routers so no static path can
+    # shadow an API route.
+    app.mount("/static", StaticFiles(directory=_WEB_DIR), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def index() -> FileResponse:
+        return FileResponse(_WEB_DIR / "index.html")
 
     return app
 

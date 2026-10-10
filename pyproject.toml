@@ -73,7 +73,7 @@ where = ["src"]
 # in a top-level config/ directory that no distribution ever included --
 # every non-editable install died at load_settings().
 [tool.setuptools.package-data]
-aiperfopt = ["resources/*.yaml"]
+aiperfopt = ["resources/*.yaml", "web/static/*", "web/static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

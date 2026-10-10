@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>PRISM</title>
+  <link rel="stylesheet" href="/static/vendor/uPlot.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/uPlot.iife.min.js"></script>
+  <script type="module" src="/static/js/app.js"></script>
+</head>
+<body>
+  <div id="app">
+    <nav class="sidebar">
+      <div class="brand">PRISM</div>
+      <a href="#/live" data-route="live">Live</a>
+      <a href="#/accuracy" data-route="accuracy">Accuracy</a>
+      <a href="#/reports" data-route="reports">Reports</a>
+      <a href="#/model" data-route="model">Model</a>
+    </nav>
+    <div class="main">
+      <header class="statusbar">
+        <span class="conn" id="conn" title="Live connection">
+          <span class="dot"></span><span class="conn-label">Connecting</span>
+        </span>
+        <span class="pill" id="readiness" data-state="unknown">Checking…</span>
+        <span class="spacer"></span>
+        <button type="button" class="switch" id="toggle-monitoring" aria-pressed="false" disabled>
+          Monitoring <span class="knob"></span>
+        </button>
+        <button type="button" class="switch" id="toggle-live" aria-pressed="false" disabled>
+          Predictions <span class="knob"></span>
+        </button>
+      </header>
+      <main id="view" tabindex="-1"></main>
+    </div>
+  </div>
+</body>
+</html>
