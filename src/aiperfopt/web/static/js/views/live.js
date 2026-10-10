@@ -5,6 +5,7 @@ import { getJSON } from "../api.js";
 import { Chart, alpha, axes, nowMarker, sparkline, theme } from "../charts.js";
 import {
   confidenceTier,
+  escapeHtml,
   formatConfidence,
   formatHorizon,
   formatPercent,
@@ -80,10 +81,6 @@ function chartCard(key, label, forecast) {
       <div class="chart"></div>
       <div class="chart-empty" hidden>Waiting for data…</div>
     </section>`;
-}
-
-function escapeHtml(text) {
-  return String(text ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
 // Concatenate, sort by `t`, drop duplicates, keep the trailing window.

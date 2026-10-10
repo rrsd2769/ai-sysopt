@@ -7,9 +7,14 @@ import { test } from "node:test";
 import {
   CATEGORY_LABELS,
   confidenceTier,
+  contributorLabel,
   formatConfidence,
   formatDurationShort,
+  escapeHtml,
+  formatDateTime,
   formatHorizon,
+  formatHorizonRange,
+  formatMetricValue,
   formatPercent,
   formatProbability,
   formatTimestamp,
@@ -95,4 +100,35 @@ test("metricLabel", () => {
   assert.equal(metricLabel("cpu_percent"), "CPU");
   assert.equal(metricLabel("mem_percent"), "Memory");
   assert.equal(metricLabel("disk_read_bytes_rate"), "Disk read bytes rate");
+});
+
+test("formatHorizonRange", () => {
+  assert.equal(formatHorizonRange([30, 60]), "in 30–60 s");
+  assert.equal(formatHorizonRange([120, 300]), "in 2–5 min");
+  assert.equal(formatHorizonRange([90, 150]), "in 1.5–2.5 min");
+  assert.equal(formatHorizonRange(null), "--");
+});
+
+test("formatMetricValue picks a unit from the metric name", () => {
+  assert.equal(formatMetricValue("cpu_percent", 42.26), "42.3%");
+  assert.equal(formatMetricValue("disk_read_bytes", 2048), "2.0 KB");
+  assert.equal(formatMetricValue("load_avg_1", 3.456), "3.5");
+  assert.equal(formatMetricValue("cpu_percent", null), "--");
+});
+
+test("formatDateTime is local and zero-padded", () => {
+  const t = new Date(2026, 0, 5, 7, 3).getTime() / 1000;
+  assert.equal(formatDateTime(t), "2026-01-05 07:03");
+  assert.equal(formatDateTime(null), "--");
+});
+
+test("escapeHtml", () => {
+  assert.equal(escapeHtml(`<a href="x">'&'</a>`), "&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;");
+  assert.equal(escapeHtml(null), "");
+});
+
+test("contributorLabel", () => {
+  assert.equal(contributorLabel("current_mem_percent"), "Memory now");
+  assert.equal(contributorLabel("forecast_cpu_percent"), "CPU forecast");
+  assert.equal(contributorLabel("anomaly_score"), "Anomaly score");
 });

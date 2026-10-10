@@ -47,7 +47,8 @@ def test_index_served_at_root(tmp_path: Path):
 def test_every_referenced_asset_resolves(tmp_path: Path):
     urls = _index_asset_urls() + _js_import_urls()
     assert any(u.endswith("/js/app.js") for u in urls)
-    assert any(u.endswith("/js/views/live.js") for u in urls)
+    for view in ("live", "accuracy", "reports", "model"):
+        assert any(u.endswith(f"/js/views/{view}.js") for u in urls), view
     with build_test_client(tmp_path) as client:
         for url in urls:
             assert client.get(url).status_code == 200, url

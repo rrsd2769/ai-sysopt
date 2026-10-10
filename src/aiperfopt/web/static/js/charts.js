@@ -32,8 +32,9 @@ export function alpha(hex, a) {
 }
 
 // A y axis fixed to 0-100 %, and an x axis whose tick labels can be
-// hidden (stacked charts share the bottom chart's labels).
-export function axes(t, { xLabels = true, ySplits = [0, 25, 50, 75, 100] } = {}) {
+// hidden (stacked charts share the bottom chart's labels). Pass
+// `ySplits: null` and a `yFormat` for an auto-scaled, non-percent y axis.
+export function axes(t, { xLabels = true, ySplits = [0, 25, 50, 75, 100], yFormat = (v) => `${v}%` } = {}) {
   return [
     {
       stroke: t.muted,
@@ -48,9 +49,9 @@ export function axes(t, { xLabels = true, ySplits = [0, 25, 50, 75, 100] } = {})
       font: FONT,
       grid: { stroke: t.grid, width: 1 },
       ticks: { show: false },
-      size: 40,
-      splits: () => ySplits,
-      values: (u, splits) => splits.map((v) => `${v}%`),
+      size: ySplits ? 40 : 56,
+      ...(ySplits ? { splits: () => ySplits } : {}),
+      values: (u, splits) => splits.map(yFormat),
     },
   ];
 }
@@ -120,6 +121,13 @@ export class Chart {
 
   redraw() {
     this.plot?.redraw(false);
+  }
+
+  // Drop the plot so the next setData rebuilds it from `build` (for when
+  // the options themselves depend on view state, e.g. the chosen metric).
+  reset() {
+    this.plot?.destroy();
+    this.plot = null;
   }
 
   destroy() {

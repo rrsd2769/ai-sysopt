@@ -16,9 +16,11 @@ pytestmark = pytest.mark.behavioural
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
-def test_node_format_tests():
+def test_node_tests():
+    files = sorted(str(p) for p in JS_DIR.glob("*.test.mjs"))
+    assert len(files) >= 2
     result = subprocess.run(
-        ["node", "--test", str(JS_DIR / "format.test.mjs")],
+        ["node", "--test", *files],
         capture_output=True, text=True, timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr

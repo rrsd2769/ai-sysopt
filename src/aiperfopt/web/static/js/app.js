@@ -2,7 +2,10 @@
 
 import { LiveSocket, getJSON, postJSON } from "./api.js";
 import { readinessBannerText } from "./format.js";
+import * as accuracy from "./views/accuracy.js";
 import * as live from "./views/live.js";
+import * as model from "./views/model.js";
+import * as reports from "./views/reports.js";
 
 const READINESS_POLL_MS = 3000;
 
@@ -13,21 +16,7 @@ const CONN_LABELS = {
   down: "Server unreachable",
 };
 
-function placeholder(title) {
-  return {
-    mount(root) {
-      root.innerHTML = `<div class="card"><h2>${title}</h2><p class="placeholder">This view is not built yet.</p></div>`;
-      return () => {};
-    },
-  };
-}
-
-const VIEWS = {
-  live,
-  accuracy: placeholder("Accuracy"),
-  reports: placeholder("Reports"),
-  model: placeholder("Model"),
-};
+const VIEWS = { live, accuracy, reports, model };
 
 // A tiny event bus the views subscribe to: "state" (each live snapshot)
 // and "open" (the socket reconnected after a drop).

@@ -103,3 +103,53 @@ const METRIC_LABELS = {
 export function metricLabel(name) {
   return METRIC_LABELS[name] ?? humanizeCategory(name);
 }
+
+// [30, 60] -> "in 30–60 s", [120, 300] -> "in 2–5 min".
+export function formatHorizonRange(range) {
+  if (!Array.isArray(range) || range.length !== 2) return "--";
+  const [lo, hi] = range;
+  if (hi < 90) return `in ${Math.round(lo)}–${Math.round(hi)} s`;
+  const min = (s) => {
+    const m = s / 60;
+    return Number.isInteger(m) ? String(m) : m.toFixed(1);
+  };
+  return `in ${min(lo)}–${min(hi)} min`;
+}
+
+export function isPercentMetric(name) {
+  return String(name).endsWith("_percent");
+}
+
+// A metric value in its own unit: percentages get "%", byte counters
+// read as sizes, everything else is a plain number.
+export function formatMetricValue(name, value, decimals = 1) {
+  if (value == null) return "--";
+  if (isPercentMetric(name)) return formatPercent(value, decimals);
+  if (String(name).endsWith("_bytes")) return humanizeBytes(value);
+  return formatNumber(value, decimals);
+}
+
+export function formatNumber(value, decimals = 2) {
+  if (value == null || Number.isNaN(Number(value))) return "--";
+  return Number(value).toFixed(decimals);
+}
+
+// "2026-10-10 14:05", local time.
+export function formatDateTime(epochSeconds) {
+  if (epochSeconds == null) return "--";
+  const d = new Date(epochSeconds * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function escapeHtml(text) {
+  return String(text ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+// Contention contributor names: "current_mem_percent" -> "Memory now",
+// "forecast_cpu_percent" -> "CPU forecast", "anomaly_score" -> "Anomaly score".
+export function contributorLabel(name) {
+  const m = /^(current|forecast)_(.+)$/.exec(String(name));
+  if (!m) return metricLabel(name);
+  return `${metricLabel(m[2])} ${m[1] === "current" ? "now" : "forecast"}`;
+}
