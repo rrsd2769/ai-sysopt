@@ -9,6 +9,7 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{array}
+\usepackage{makecell}
 \usepackage{xcolor}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
@@ -24,19 +25,10 @@
 
 \author{
 \IEEEauthorblockN{Sahil Dhanuka}
-\IEEEauthorblockA{Reg.\ No.\ 24BDS0456\\
-{[Department], [University]}\\
-{[City]}, India}
 \and
 \IEEEauthorblockN{Shambhav Ghosh}
-\IEEEauthorblockA{Reg.\ No.\ 24BCB0013\\
-{[Department], [University]}\\
-{[City]}, India}
 \and
 \IEEEauthorblockN{Naresh Kumar Bishnoi}
-\IEEEauthorblockA{Reg.\ No.\ 24BDS0336\\
-{[Department], [University]}\\
-{[City]}, India}
 }
 
 \maketitle
@@ -46,8 +38,8 @@ Desktop operating systems report resource usage only after a slowdown has
 already happened. We present PRISM, a monitor for a personal computer that runs
 entirely on the device. It forecasts CPU and memory utilisation 45\,s and
 210\,s ahead, estimates the probability of resource contention, explains the
-likely cause, and recommends an action. PRISM has eleven modules, 568
-automated tests and a measured overhead of 2.26\,\% CPU. To choose its
+likely cause, and recommends an action. PRISM has 592 automated tests, a browser dashboard and a measured overhead
+of 2.26\,\% CPU. To choose its
 forecasting model, we compared three machine-learning regressors, LightGBM,
 Random Forest and Ridge regression, on 113{,}876 samples (about 48\,h) of real
 usage from one macOS machine. We first added a preprocessing stage fitted on
@@ -66,7 +58,9 @@ cross-validation record. A regime analysis explains the negative average
 skill. On the 25\,\% of samples where CPU load actually changes, the learned
 models cut error by 29--34\,\% against persistence. On the 75\,\% where
 nothing changes, persistence is almost unbeatable, and those samples dominate
-this idle-heavy machine.
+this idle-heavy machine. Expressed as accuracy (100\,\% minus mean absolute
+error), LightGBM's forecasts are 97.9\,\% accurate on average, 96--97\,\% for
+CPU and 99\,\% for memory.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -114,8 +108,8 @@ decision in the system. We study it through three research questions.
 
 This paper makes four contributions:
 \begin{itemize}
-  \item \textbf{A complete on-device pipeline} of eleven modules, from
-        threaded metric collection to a desktop UI. The same
+  \item \textbf{A complete on-device pipeline}, from threaded metric
+        collection to a browser dashboard. The same
         feature-engineering code is used for training and live inference.
         The pipeline has an explicit deployment gate and human-confirmed
         retraining (Section~\ref{sec:system}).
@@ -146,7 +140,29 @@ see aggregated, fairly smooth demand from many users. PRISM differs in two
 ways. First, it targets a single interactive personal computer, where load is
 dominated by long idle periods broken by short, user-driven bursts. Second, it
 runs both training and inference on that same machine under a strict overhead
-budget, so model cost is a first-class concern.
+budget, so model cost is a first-class concern. Table~\ref{tab:related}
+summarises the differences, including from the built-in tools PRISM aims to
+improve on.
+
+\begin{table}[t]
+\centering
+\caption{PRISM compared with existing tools and work}
+\label{tab:related}
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}p{2.2cm}cccc@{}}
+\toprule
+& \makecell{Activity\\Monitor /\\Task Mgr.} & \makecell{PRESS\\\cite{gong2010press}} & \makecell{ARIMA\\\cite{roy2011autoscaling,calheiros2015arima}} & \makecell{\textbf{PRISM}} \\
+\midrule
+Target        & PC & cloud & cloud & \textbf{PC} \\
+Predicts load & no & yes & yes & \textbf{yes} \\
+Method        & -- & FFT + Markov & ARIMA & \textbf{LightGBM} \\
+Explains cause & no & no & no & \textbf{SHAP} \\
+Advises user  & no & auto-scales & auto-scales & \textbf{3 actions} \\
+Flags anomalies & no & no & no & \textbf{Isol.\ Forest} \\
+Trains on device & -- & no & no & \textbf{yes, gated} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Model families for tabular forecasting}
 Gradient boosting~\cite{friedman2001gbm} builds an additive model of shallow
@@ -254,7 +270,7 @@ persistence.
 \node[box, below=of ct] (dg) {Diagnosis / XAI\\(taxonomy + SHAP)};
 \node[box, below=of dg] (rc) {Recommendation\\engine};
 \node[box, below=of rc] (api) {API layer\\(FastAPI REST + WS)};
-\node[box, below=of api] (ui) {Desktop UI\\(PySide6)};
+\node[box, below=of api] (ui) {Web dashboard\\(browser)};
 \node[side, left=of sto, xshift=-2mm] (rt) {Model retraining\\(gate + confirm)};
 \node[side, right=of dg, xshift=9mm] (rep) {Reporting /\\analytics};
 \draw[arr] (mon) -- (ing); \draw[arr] (ing) -- (sto); \draw[arr] (sto) -- (feat);
@@ -265,7 +281,7 @@ persistence.
 \draw[dsh] (sto) -- (rt); \draw[dsh] (rt) |- (fc);
 \draw[dsh] (sto.east) -| (rep); \draw[dsh] (rep) |- (api);
 \end{tikzpicture}
-\caption{PRISM's eleven-module pipeline. Solid arrows show the live inference
+\caption{PRISM's pipeline. Solid arrows show the live inference
 cycle, which runs every 5\,s. Dashed arrows show loops that run on their own
 cadence: retraining on accumulated real usage, and reporting.}
 \label{fig:arch}
@@ -273,8 +289,9 @@ cadence: retraining on accumulated real usage, and reporting.}
 
 Fig.~\ref{fig:arch} shows the pipeline. It is implemented in Python~3.12. The
 main libraries are \texttt{psutil}~7.2 for metrics, SQLAlchemy~2.0 over
-SQLite, LightGBM~4.7, scikit-learn~1.9, SHAP~0.52, FastAPI~0.141 and
-PySide6~6.11.
+SQLite, LightGBM~4.7, scikit-learn~1.9, statsmodels~0.14, SHAP~0.52 and
+FastAPI~0.141. The dashboard is plain JavaScript with uPlot charts and needs no
+build step.
 
 \subsection{Data collection and storage}
 Background threads poll system metrics every 1.5\,s. They poll the process
@@ -330,7 +347,7 @@ budget covers inference as well as collection.
 \EndFor
 \State $a_t \gets$ IsolationForest score of $\mathbf{x}_t$ in $[0,1]$
 \State $p_t \gets P(c_t{=}1\mid\mathbf{x}_t,\hat{\mathbf{y}})\cdot(1-0.3\,a_t)$
-\If{$p_t \ge 0.75$}
+\If{$p_t \ge \tau$}
   \State category $\gets$ \Call{Diagnose}{SHAP top-5, top processes}
   \State actions $\gets$ \Call{Catalog}{category}
 \EndIf
@@ -343,9 +360,12 @@ is 1 for a perfect validation fit and 0 when the validation RMSE is as large as
 the target's own standard deviation. It is not a calibrated interval. Line~7
 \emph{damps} the contention probability when the current state looks
 anomalous. The classifier was trained on normal patterns, so its output is
-less trustworthy on unusual inputs. The 0.75 threshold favours precision over
-recall: a false alarm costs user trust, while a missed alarm costs only a
-warning that the user would not have had anyway.
+less trustworthy on unusual inputs. The decision threshold $\tau$ is fitted
+on held-out data as the point of the precision--recall curve with the highest
+F1 score; for the deployed classifier it is 0.50. When the held-out labels
+contain only one class, the curve is unusable and $\tau$ falls back to 0.75,
+which favours precision over recall: a false alarm costs user trust, while a
+missed alarm costs only a warning that the user would not have had anyway.
 
 \subsection{Diagnosis and recommendation}
 When contention is predicted, the top five attributed features are mapped to
@@ -387,33 +407,46 @@ at least 5\,\% (relative). Otherwise the best baseline serves predictions. A
 retraining candidate must also beat persistence by 5\,\% on the chronological
 holdout and exceed 55\,\% directional accuracy. The gate's decision and its
 evidence are always stored. Retraining never deploys automatically: an
-operator must confirm through the CLI, the API or the Retraining tab, and any
+operator must confirm through the CLI, the API or the dashboard's Model view, and any
 deployment can be rolled back. This rule is why a weak model cannot silently
-reach the live UI.
+reach the live dashboard.
 
 \subsection{API and user interface}
-A FastAPI server exposes 27 REST routes (health, readiness, live state,
-history, reporting, retraining, confirm and rollback) and one WebSocket that
-pushes each cycle's state. A PySide6 desktop app
-(Fig.~\ref{fig:dashboard}) shows current usage and contention risk, a live
-chart of actual versus forecast values with a confidence band, a contention
-probability strip, the diagnosis in plain language and the recommended
-actions. Further tabs show predicted-versus-actual history, reports and
-retraining. A record/replay tool plays back a real recorded pressure event
-into a separate database at any speed, for reproducible demonstrations.
+A FastAPI server exposes 28 REST routes (health, readiness, live state,
+history, reporting, model comparison, retraining, confirm and rollback) and one
+WebSocket, \texttt{/ws/live}, that pushes each cycle's state. The same server
+serves a browser dashboard with five views. \emph{Live}
+(Fig.~\ref{fig:dashboard}) shows current usage and contention risk, live
+charts of actual versus forecast values with a confidence band, the contention
+probability against its threshold, the diagnosis in plain language, the
+recommended actions and the top contributing processes. \emph{Accuracy} plots
+predicted against actual values over a chosen window. \emph{Reports} gives a
+daily or weekly summary. \emph{Compare} draws the saved results of the model
+comparison in Section~\ref{sec:results} on demand: accuracy, error, error
+relative to persistence and directional accuracy per target, the
+stable-versus-moving split, the cross-validation folds and running cost.
+\emph{Model} shows the active version and is where an operator confirms or
+rolls back a retrained model. An earlier PySide6 desktop client is still
+included but is no longer the main interface. A record/replay tool plays back a real recorded
+pressure event into a separate database at any speed, for reproducible
+demonstrations.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{figures/live_dashboard.png}
-\caption{PRISM's Live tab: current CPU, memory and contention risk; live
-actual-versus-forecast chart; contention probability strip against the 0.75
-threshold; a plain-language diagnosis (``Memory usage is climbing
-steadily'') and its recommended action.}
+\includegraphics[width=\columnwidth]{figures/live_dashboard_web.png}
+\caption{The dashboard's Live view during a real memory-pressure event on the
+test machine. Contention risk has risen to 70\,\% against the fitted 50\,\%
+threshold, and the anomaly detector has flagged the workload as unusual, so
+prediction confidence is reduced. Below the charts (not shown) the diagnosis
+reads ``Memory usage is climbing steadily'' and the first recommended action
+is to close unused browser tabs. After the tabs were closed, memory fell from
+82\,\% to 63\,\% and the risk returned to 0\,\%.}
 \label{fig:dashboard}
 \end{figure}
 
 \subsection{Engineering quality}
-The system has 568 automated tests (Table~\ref{tab:modules}), including 9 for the new preprocessing module. Each test is
+The system has 592 automated tests: 568 Python tests (Table~\ref{tab:modules})
+and 24 JavaScript unit tests for the dashboard's numeric helpers. Each Python test is
 tagged either \emph{behavioural}, meaning it asserts that a computed value is
 correct, or \emph{plumbing}, meaning it only asserts that code ran. The tag is
 enforced by the test runner, so a large test count cannot hide a module that
@@ -423,28 +456,30 @@ test. Monitoring overhead was measured in isolation at 2.26\,\% CPU against a
 
 \begin{table}[t]
 \centering
-\caption{Tests per module (B = behavioural, P = plumbing)}
+\caption{Python tests per module (B = behavioural, P = plumbing). The
+dashboard's 24 JavaScript tests run separately under Node.}
 \label{tab:modules}
 \begin{tabular}{@{}lrrr@{}}
 \toprule
 Module & Tests & B & P \\
 \midrule
 Data storage & 31 & 14 & 17 \\
-Monitoring + ingestion & 31 & 15 & 16 \\
+Monitoring + ingestion & 35 & 17 & 18 \\
 Feature engineering & 45 & 29 & 16 \\
-Forecasting + evaluation & 54 & 39 & 15 \\
-Contention + anomaly & 74 & 46 & 28 \\
+Preprocessing & 9 & 8 & 1 \\
+Forecasting & 54 & 39 & 15 \\
+Contention + anomaly & 76 & 48 & 28 \\
 Diagnosis / XAI & 40 & 40 & 0 \\
 Recommendation & 14 & 7 & 7 \\
-Model retraining & 28 & 18 & 10 \\
-API layer & 50 & 13 & 37 \\
-Frontend & 67 & 31 & 36 \\
+Model lifecycle (gate, deploy) & 37 & 27 & 10 \\
+Model comparison + evaluation & 8 & 3 & 5 \\
+API layer & 63 & 16 & 47 \\
 Reporting / analytics & 26 & 23 & 3 \\
+Web dashboard & 6 & 2 & 4 \\
+Desktop client (legacy) & 54 & 28 & 26 \\
+Cross-cutting (CLI, config, replay, \dots) & 70 & 40 & 30 \\
 \midrule
-Eleven modules & 460 & 275 & 185 \\
-Cross-cutting (CLI, config, replay, \dots) & 99 & & \\
-Preprocessing (new) & 9 & 8 & 1 \\
-\textbf{Total} & \textbf{568} & & \\
+\textbf{Total} & \textbf{568} & \textbf{341} & \textbf{227} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -710,6 +745,35 @@ Directional accuracy on CPU is about 0.55 for all three models, against 0.10
 for persistence. Persistence never predicts a change, so it is scored wrong
 whenever CPU moves by more than 2\,\%. On memory, which rarely moves that much,
 persistence's directional accuracy is naturally high.
+
+\begin{table}[t]
+\centering
+\caption{Holdout accuracy in percent, $100 - \mathrm{MAE}$ (the targets are
+themselves 0--100\,\%). Persistence scores as well as the models on this
+idle-heavy test period.}
+\label{tab:accpct}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Target & LightGBM & Rand.\ Forest & Ridge & \textit{Persist.} \\
+\midrule
+CPU, 45\,s   & 97.0 & 96.9 & \textbf{97.3} & \textit{97.0} \\
+CPU, 210\,s  & 96.3 & \textbf{96.7} & 96.6 & \textit{96.5} \\
+Mem, 45\,s   & 99.4 & \textbf{99.4} & 99.0 & \textit{99.5} \\
+Mem, 210\,s  & \textbf{99.1} & 98.6 & 97.9 & \textit{99.2} \\
+\midrule
+Mean         & \textbf{97.9} & 97.9 & 97.7 & \textit{98.0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For readers who expect a single percentage, Table~\ref{tab:accpct} restates the
+holdout MAE as accuracy, $100 - \mathrm{MAE}$, which is one minus the MAE
+normalised by the 0--100\,\% range. LightGBM's forecasts are 97.9\,\%
+accurate on average: about 97\,\% for CPU and 99\,\% for memory. The measure
+is generous on this data, because persistence reaches 98.0\,\% simply by
+repeating the current value. It is reported for readability only; the skill
+score of Section~\ref{sec:problem}, which compares each model with
+persistence directly, remains the basis for model selection.
 
 \subsection{Walk-forward stability}
 
