@@ -44,21 +44,16 @@ dependencies = [
     "uvicorn[standard]>=0.29",
     "websockets>=12.0",
 
-    # --- Frontend (Phase 10) ---
-    "pyside6>=6.6,<7",
-    # httpx is the frontend's REST client (api_client.py) at runtime, not
-    # just a FastAPI TestClient dependency -- promoted out of [dev] now
-    # that Phase 10 actually ships code that imports it outside tests.
-    "httpx>=0.27",
+    # The web dashboard is static HTML/JS served by the API: no extra deps.
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
-    "pytest-qt>=4.4",  # PySide6 widget testing (Phase 10), offscreen-capable
+    "httpx>=0.27",  # FastAPI's TestClient
     "pyinstaller>=6.5", # packaging, per Section 19
-    # Without this a hung Qt test blocks the whole run instead of failing.
+    # Without this a hung test blocks the whole run instead of failing.
     "pytest-timeout>=2.3",
 ]
 
@@ -78,8 +73,8 @@ aiperfopt = ["resources/*.yaml", "web/static/*", "web/static/**/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-# A single hung test must not stall the whole suite (the Qt suite is the
-# usual offender). Generous enough not to fire on real ML fitting.
+# A single hung test must not stall the whole suite. Generous enough not
+# to fire on real ML fitting.
 timeout = 300
 addopts = "--strict-markers"
 markers = [

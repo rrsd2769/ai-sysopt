@@ -415,7 +415,7 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
 
 
 # --------------------------------------------------------------------------
-# serve / ui / run
+# serve / run
 # --------------------------------------------------------------------------
 
 
@@ -443,56 +443,35 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_ui(args: argparse.Namespace) -> int:
-    from aiperfopt.frontend.main import main as ui_main
-
-    ui_main()
-    return 0
-
-
 def _cmd_run(args: argparse.Namespace) -> int:
-    """Start the backend, wait for it to answer, then open the UI.
+    """Start the server with monitoring and live inference, and open the dashboard.
 
-    The backend runs in a child process rather than a thread: the Qt event
-    loop wants the main thread, and a crashing UI must not take the
-    monitoring pipeline down with it.
+    A helper thread waits for ``/health`` to answer, then opens the browser;
+    the server itself runs in this process until Ctrl-C.
     """
-    import subprocess
+    import urllib.request
+    import webbrowser
 
-    import httpx
+    from aiperfopt.api.server import main as serve_main
 
     ctx = _bootstrap(args)
     base_url = f"http://{ctx.settings.api.host}:{ctx.settings.api.port}"
 
-    print(f"Starting backend on {base_url} ...")
-    backend = subprocess.Popen([sys.executable, "-m", "aiperfopt.api.server"])
-    try:
+    def open_when_ready() -> None:
         deadline = time.time() + 30.0
         while time.time() < deadline:
-            if backend.poll() is not None:
-                print("Backend exited before becoming ready.")
-                return 1
             try:
-                httpx.get(f"{base_url}/health", timeout=0.5)
-                break
-            except httpx.TransportError:
+                urllib.request.urlopen(f"{base_url}/health", timeout=0.5)
+            except OSError:
                 time.sleep(0.2)
-        else:
-            print("Backend did not become ready within 30s.")
-            return 1
+                continue
+            print(f"PRISM dashboard: {base_url}/  (Ctrl-C to stop)")
+            webbrowser.open(f"{base_url}/")
+            return
+        print(f"Server did not answer within 30s; open {base_url}/ yourself once it is up.")
 
-        print("Backend ready. Opening the UI ...")
-        from aiperfopt.frontend.main import main as ui_main
-
-        ui_main()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        backend.terminate()
-        try:
-            backend.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            backend.kill()
+    threading.Thread(target=open_when_ready, daemon=True).start()
+    serve_main()
     return 0
 
 
@@ -604,10 +583,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_serve.set_defaults(func=_cmd_serve)
 
-    p_ui = sub.add_parser("ui", help="Open the desktop UI against a running backend.")
-    p_ui.set_defaults(func=_cmd_ui)
-
-    p_run = sub.add_parser("run", help="Start the backend and open the UI (the one command).")
+    p_run = sub.add_parser("run", help="Start the server and open the dashboard in a browser (the one command).")
     p_run.set_defaults(func=_cmd_run)
 
     return parser

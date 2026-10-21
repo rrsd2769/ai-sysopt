@@ -1,4 +1,3 @@
-// Mirrors the Qt UI's tests/frontend/test_formatting.py cases.
 // Run: node --test src/aiperfopt/web/static/js/
 
 import assert from "node:assert/strict";

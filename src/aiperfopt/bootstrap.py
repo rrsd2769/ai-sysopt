@@ -1,7 +1,7 @@
 """
 Application bootstrap.
 
-Every entrypoint (future API server, future PySide6 app, CLI tools, test
+Every entrypoint (API server, CLI tools, test
 fixtures) should call :func:`bootstrap` exactly once at startup rather than
 constructing config/logging/storage independently. This guarantees the
 initialization order that later subsystems depend on:

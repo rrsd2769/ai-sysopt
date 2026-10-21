@@ -51,7 +51,6 @@ def clean_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         ["compare"],
         ["compare", "--raw", "--out-dir", "/tmp/results"],
         ["serve"],
-        ["ui"],
         ["run"],
     ],
 )

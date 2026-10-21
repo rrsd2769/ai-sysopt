@@ -2,25 +2,20 @@
 
 This package is organized by subsystem:
 
-    config       -> Configuration
-    applog       -> Logging
-    storage      -> Data Storage
-    monitoring   -> Monitoring Engine
-    ingestion    -> Data Ingestion / Collector
-    features     -> Feature Engineering
-    forecasting  -> Forecasting Models
-    evaluation   -> Model Evaluation & Validation
-    contention   -> Contention Prediction
-    anomaly      -> Anomaly Detection
-    diagnosis    -> Diagnosis / Explainable AI
-    recommend    -> Recommendation Engine
-    retraining   -> Model Retraining
-    api          -> API Layer
-    frontend     -> Frontend
-    reporting    -> Reporting / Analytics
-
-Only ``config``, ``applog``, ``storage``, and ``common`` exist as of
-the initial scaffold.
+    config, applog, common -> configuration, logging, shared helpers
+    storage                -> SQLite schema, writer, reader, retention
+    monitoring             -> collectors, ingestion queue, batched writer
+    features               -> feature engineering and preprocessing
+    forecasting            -> LightGBM forecaster and statistical baselines
+    anomaly                -> Isolation Forest anomaly detector
+    contention             -> contention classifier
+    insight                -> diagnosis (SHAP) and recommendations
+    lifecycle              -> deployment gate, retraining, rollback
+    evaluation             -> ablation and the three-model comparison
+    reporting              -> summaries and predicted-vs-actual
+    replay                 -> record and replay a session for demos
+    api                    -> FastAPI server and live-inference loop
+    web                    -> browser dashboard served by the API
 """
 
 __version__ = "0.1.0"

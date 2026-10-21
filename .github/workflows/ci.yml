@@ -38,38 +38,15 @@ jobs:
       - name: Doctor (proves the install is usable, not just importable)
         run: aiperfopt doctor
 
-      - name: Backend tests
-        run: python -m pytest --ignore=tests/frontend -q
-
-  frontend:
-    name: frontend (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # macOS only -- see the backend job above.
-        os: [macos-latest]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
-          cache: pip
+          node-version: "22"
 
-      - name: Install
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+      - name: Python tests
+        run: python -m pytest -q
 
-      - name: Frontend tests (headless)
-        # Currently expected to fail: the Qt suite segfaults (exit 139).
-        # Phase 8 fixes it; until then this job reports without blocking,
-        # so the red is visible rather than hidden behind a skip.
-        continue-on-error: true
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: python -m pytest tests/frontend -q
+      - name: Dashboard JS tests
+        run: node --test src/aiperfopt/web/static/js/
 
   wheel:
     name: wheel contains its config

@@ -38,7 +38,7 @@ Desktop operating systems report resource usage only after a slowdown has
 already happened. We present PRISM, a monitor for a personal computer that runs
 entirely on the device. It forecasts CPU and memory utilisation 45\,s and
 210\,s ahead, estimates the probability of resource contention, explains the
-likely cause, and recommends an action. PRISM has 592 automated tests, a browser dashboard and a measured overhead
+likely cause, and recommends an action. PRISM has 524 automated tests, a browser dashboard and a measured overhead
 of 2.26\,\% CPU. To choose its
 forecasting model, we compared three machine-learning regressors, LightGBM,
 Random Forest and Ridge regression, on 113{,}876 samples (about 48\,h) of real
@@ -426,8 +426,7 @@ comparison in Section~\ref{sec:results} on demand: accuracy, error, error
 relative to persistence and directional accuracy per target, the
 stable-versus-moving split, the cross-validation folds and running cost.
 \emph{Model} shows the active version and is where an operator confirms or
-rolls back a retrained model. An earlier PySide6 desktop client is still
-included but is no longer the main interface. A record/replay tool plays back a real recorded
+rolls back a retrained model. A record/replay tool plays back a real recorded
 pressure event into a separate database at any speed, for reproducible
 demonstrations.
 
@@ -445,7 +444,7 @@ is to close unused browser tabs. After the tabs were closed, memory fell from
 \end{figure}
 
 \subsection{Engineering quality}
-The system has 592 automated tests: 568 Python tests (Table~\ref{tab:modules})
+The system has 524 automated tests: 500 Python tests (Table~\ref{tab:modules})
 and 24 JavaScript unit tests for the dashboard's numeric helpers. Each Python test is
 tagged either \emph{behavioural}, meaning it asserts that a computed value is
 correct, or \emph{plumbing}, meaning it only asserts that code ran. The tag is
@@ -468,18 +467,17 @@ Monitoring + ingestion & 35 & 17 & 18 \\
 Feature engineering & 45 & 29 & 16 \\
 Preprocessing & 9 & 8 & 1 \\
 Forecasting & 54 & 39 & 15 \\
-Contention + anomaly & 76 & 48 & 28 \\
+Contention + anomaly & 73 & 45 & 28 \\
 Diagnosis / XAI & 40 & 40 & 0 \\
 Recommendation & 14 & 7 & 7 \\
 Model lifecycle (gate, deploy) & 37 & 27 & 10 \\
 Model comparison + evaluation & 8 & 3 & 5 \\
-API layer & 63 & 16 & 47 \\
+API layer & 53 & 16 & 37 \\
 Reporting / analytics & 26 & 23 & 3 \\
 Web dashboard & 6 & 2 & 4 \\
-Desktop client (legacy) & 54 & 28 & 26 \\
-Cross-cutting (CLI, config, replay, \dots) & 70 & 40 & 30 \\
+Cross-cutting (CLI, config, replay, \dots) & 69 & 40 & 29 \\
 \midrule
-\textbf{Total} & \textbf{568} & \textbf{341} & \textbf{227} \\
+\textbf{Total} & \textbf{500} & \textbf{310} & \textbf{190} \\
 \bottomrule
 \end{tabular}
 \end{table}
