@@ -15,9 +15,16 @@ models/
 *.db-wal
 *.db-shm
 
-# Phase 5 evidence pack (aiperfopt evaluate --report) -- regenerated on
-# demand from accumulated real-usage data, not committed.
-results/
+# Generated results are not committed, except the small model-comparison
+# CSVs the paper quotes and the dashboard's Compare view reads.
+results/*
+!results/model_comparison.csv
+!results/model_comparison_cv.csv
+!results/model_comparison_raw.csv
+!results/model_comparison_raw_cv.csv
+!results/paper/
+results/paper/*
+!results/paper/*.csv
 
 # Tooling
 .pytest_cache/

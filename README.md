@@ -153,4 +153,6 @@ AIPERFOPT_HOME=paper_snapshot python scripts/paper_analysis.py
 python scripts/paper_figures.py
 ```
 
-`paper_snapshot/` and `results/` are not committed (see `.gitignore`).
+The model-comparison CSVs in `results/` are committed, so the Compare
+view works on a fresh clone; the database snapshot and other generated
+outputs are not (see `.gitignore`).
