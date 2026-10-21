@@ -35,3 +35,32 @@ export function barWidths(values) {
   const max = Math.max(0, ...values.map((v) => Math.abs(v ?? 0)));
   return values.map((v) => (max ? (Math.abs(v ?? 0) / max) * 100 : 0));
 }
+
+// Summarises /comparison/models holdout rows, one entry per model in
+// first-seen order. accuracy = 100 - MAE (the targets are 0-100 %);
+// skill = 1 - MAE / persistence MAE on the same target, so persistence
+// itself scores 0. `winner` follows the comparison's own rule: highest
+// mean skill among the candidates (persistence is the reference, not one).
+export function comparisonSummary(rows, reference = "Persistence (reference)") {
+  const baseline = new Map((rows ?? []).filter((r) => r.model === reference).map((r) => [r.target, r.mae]));
+  const byModel = new Map();
+  for (const r of rows ?? []) {
+    if (!byModel.has(r.model)) byModel.set(r.model, []);
+    byModel.get(r.model).push(r);
+  }
+  const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  const models = [...byModel].map(([model, rs]) => {
+    const skills = rs.filter((r) => baseline.get(r.target)).map((r) => 1 - r.mae / baseline.get(r.target));
+    return {
+      model,
+      isReference: model === reference,
+      accuracy: mean(rs.map((r) => 100 - r.mae)),
+      skill: mean(skills),
+      worstSkill: skills.length ? Math.min(...skills) : null,
+      directional: mean(rs.map((r) => r.directional_accuracy).filter((v) => v != null)),
+    };
+  });
+  const candidates = models.filter((m) => !m.isReference && m.skill != null);
+  const winner = candidates.length ? candidates.reduce((a, b) => (b.skill > a.skill ? b : a)).model : null;
+  return { models, winner };
+}

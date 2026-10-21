@@ -58,3 +58,10 @@ def test_static_mount_does_not_shadow_api_routes(tmp_path: Path):
     with build_test_client(tmp_path) as client:
         assert client.get("/health").json() == {"status": "ok"}
         assert client.get("/static/does-not-exist.js").status_code == 404
+
+
+@pytest.mark.plumbing
+def test_dashboard_files_are_revalidated_on_every_load(tmp_path: Path):
+    with build_test_client(tmp_path) as client:
+        assert client.get("/").headers["cache-control"] == "no-cache"
+        assert client.get("/static/js/app.js").headers["cache-control"] == "no-cache"

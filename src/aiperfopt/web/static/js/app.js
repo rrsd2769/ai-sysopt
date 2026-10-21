@@ -3,6 +3,7 @@
 import { LiveSocket, getJSON, postJSON } from "./api.js";
 import { readinessBannerText } from "./format.js";
 import * as accuracy from "./views/accuracy.js";
+import * as compare from "./views/compare.js";
 import * as live from "./views/live.js";
 import * as model from "./views/model.js";
 import * as reports from "./views/reports.js";
@@ -16,7 +17,7 @@ const CONN_LABELS = {
   down: "Server unreachable",
 };
 
-const VIEWS = { live, accuracy, reports, model };
+const VIEWS = { live, accuracy, reports, compare, model };
 
 // A tiny event bus the views subscribe to: "state" (each live snapshot)
 // and "open" (the socket reconnected after a drop).

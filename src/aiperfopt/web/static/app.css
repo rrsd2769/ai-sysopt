@@ -18,6 +18,10 @@
   --series-mem: #f0a35e;
   --series-swap: #8bd17c;
   --series-contention: #f472b6;
+  --model-lightgbm: #f0a35e;
+  --model-rf: #a78bfa;
+  --model-ridge: #2dd4bf;
+  --model-persistence: #7d8796;
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
   --s5: 20px; --s6: 24px; --s7: 32px; --s8: 48px;
@@ -43,6 +47,10 @@
     --series-mem: #c2620a;
     --series-swap: #3f8f2f;
     --series-contention: #be185d;
+    --model-lightgbm: #c2620a;
+    --model-rf: #6d28d9;
+    --model-ridge: #0f766e;
+    --model-persistence: #8a93a1;
   }
 }
 
@@ -337,6 +345,18 @@ code { font: 12px/1.3 ui-monospace, "SF Mono", Menlo, monospace; }
 .kv { display: flex; flex-direction: column; }
 .kv-value { font-size: 24px; font-weight: 600; line-height: 1.15; }
 .kv-label { font-size: 12px; color: var(--text-muted); }
+
+/* --- Compare ----------------------------------------------------------------- */
+
+.compare-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.compare-body { display: flex; flex-direction: column; gap: var(--s4); }
+.compare-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--s4); }
+.stat.winner { border-color: color-mix(in srgb, var(--ok) 55%, transparent); }
+.swatch.block { width: 10px; height: 10px; border: 0; border-radius: 2px; background: currentColor; margin-right: 6px; }
+.barchart { width: 100%; min-height: 120px; }
+.barchart svg { display: block; font: 12px var(--font); }
+.barchart .bar-num { font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart-card > p.small { margin: var(--s1) 0 var(--s1); }
 
 /* --- Model ------------------------------------------------------------------- */
 
